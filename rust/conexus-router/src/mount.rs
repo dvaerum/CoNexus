@@ -26,13 +26,6 @@
 //! peer-cred/trusted-proxy-list check and passes it in; this module
 //! stays a pure function of its inputs either way.
 //!
-//! `#![allow(dead_code)]`: this is a BINARY crate (unlike this
-//! workspace's library crates, `pub` alone doesn't exempt an item
-//! from `dead_code`) and this PR (2/24) has no real consumer yet --
-//! the session-gate/proxy-core PRs (8-13+) are. Same precedent as
-//! `conexus-backend`'s `rest_gate::ResolvedRestPrincipal`/
-//! `json_sanitize` module.
-#![allow(dead_code)]
 
 /// The app's internal route namespace. Every route + path-check is
 /// expressed relative to this; it is decoupled from the external mount.
@@ -132,7 +125,13 @@ pub fn external_path(
 }
 
 /// Absolute client-facing URL: origin + external prefix + suffix.
-#[allow(clippy::too_many_arguments)]
+/// No real call site yet -- every current consumer only needs the
+/// path (`external_path`) or origin (`external_origin`) separately,
+/// not the composed absolute URL. Kept as public API for whichever
+/// future surface needs to emit a full `scheme://host/path` (found
+/// unused, not masked, while removing this module's stale
+/// `#![allow(dead_code)]` during a docs audit -- see git blame).
+#[allow(dead_code, clippy::too_many_arguments)]
 pub fn external_url(
     path: &str,
     scheme: &str,

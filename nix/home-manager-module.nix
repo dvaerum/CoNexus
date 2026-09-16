@@ -2,7 +2,7 @@
 
 # Home-manager module exposing agent-mcp as user-scope systemd units.
 #
-# This module ships in the dvaerum/Agent-MCP fork (Phase 2 of the
+# This module ships in the dvaerum/CoNexus fork (Phase 2 of the
 # router-upstream plan, prancy-napping-pie). It mirrors the
 # multi-tenant deployment that previously lived in
 # nixos-developer-system/users/dennis/agent-mcp/default.nix verbatim,
@@ -18,7 +18,7 @@
 #     router — see `conexusRouterPackage` below) on 127.0.0.1:<port>
 #     (default 1337) does URL-path routing + activity tracking, calls
 #     systemctl --user start/stop for lazy spawn + idle shutdown, and
-#     serves the Next.js static dashboard at /agent-mcp/__dashboard/<name>/.
+#     serves the Next.js static dashboard at /agent-mcp/app/<name>/.
 #   - Per-project backends (conexus@<name>.service template — see
 #     `conexusLauncherPackage` below) are lazy-started by the router on
 #     first MCP request and idle-stopped after
@@ -32,13 +32,14 @@
 # and this file's own `router.impl` removal for the cutover.
 #
 # Project membership is *not* declared in nix. Every project is
-# registered at runtime via POST /agent-mcp/__create (dashboard form
-# or `curl`), recorded in ~/.config/agent-mcp/projects.local.json.
-# The module materialises the router + systemd template + the
-# daemon-agent wiring; project list lives outside source control.
+# registered at runtime via POST /agent-mcp/api/router/projects
+# (dashboard form or `curl`, JSON body), recorded in
+# ~/.config/agent-mcp/projects.local.json. The module materialises the
+# router + systemd template + the daemon-agent wiring; project list
+# lives outside source control.
 #
-# Phase 3 adds the `services.agent-mcp.multiTenant` toggle (default
-# true). When set to false, the operator additionally declares
+# `services.agent-mcp.multiTenant` (default true) picks the deployment
+# shape. When set to false, the operator additionally declares
 # `services.agent-mcp.singleProject = { name, workspace }`; the
 # module seeds a one-entry projects.local.json via ExecStartPre on
 # the router unit and passes --single-tenant / --single-workspace
@@ -387,9 +388,10 @@ in {
         type = lib.types.str;
         example = "/home/alice/.local/share/agent-mcp/projects";
         description = ''
-          Where /agent-mcp/__create puts a project's workspace when
-          the user leaves the "Workspace" form field blank. Each
-          project then lives at `''${defaultWorkspaceParent}/<name>/`.
+          Where POST /agent-mcp/api/router/projects puts a project's
+          workspace when the user leaves the "Workspace" form field
+          blank. Each project then lives at
+          `''${defaultWorkspaceParent}/<name>/`.
 
           The user can override per-project at create time by typing
           a path into the form's Workspace field; this default only
@@ -423,14 +425,15 @@ in {
       default = true;
       description = ''
         When true (default), the router runs in multi-tenant mode:
-        projects are registered at runtime via POST /agent-mcp/__create
-        and the dashboard's overview lists them all.
+        projects are registered at runtime via
+        POST /agent-mcp/api/router/projects and the dashboard's
+        overview lists them all.
 
         When false, the router runs in single-tenant mode (N=1):
         `services.agent-mcp.singleProject` declares the only project,
         the module seeds projects.local.json before the router starts,
-        and the router 410s __create / __unregister / __rename plus
-        302-redirects any wrong-project URL to the configured one
+        and the router 410s every project-lifecycle write endpoint
+        plus 302-redirects any wrong-project URL to the configured one
         (ADR-0008, plan decisions #1 + #9).
       '';
     };
@@ -623,7 +626,7 @@ in {
             example = "washing-brothers";
             description = ''
               Project slug. Must match an existing project registered
-              via POST /agent-mcp/__create.
+              via POST /agent-mcp/api/router/projects.
             '';
           };
           agentId = lib.mkOption {
@@ -665,8 +668,9 @@ in {
         message = ''
           services.agent-mcp.singleProject must be null when
           services.agent-mcp.multiTenant = true (multi-tenant mode
-          discovers projects at runtime via __create; the
-          singleProject option only applies to single-tenant mode).
+          discovers projects at runtime via
+          POST /agent-mcp/api/router/projects; the singleProject
+          option only applies to single-tenant mode).
         '';
       }
       {

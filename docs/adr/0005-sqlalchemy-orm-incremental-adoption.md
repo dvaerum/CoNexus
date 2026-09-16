@@ -2,14 +2,17 @@
 
 ## Status
 
-**Superseded** — the CoNexus Python→Rust migration (2026-08 onward,
+**Superseded** — the CoNexus Python→Rust migration (2026-09 onward,
 see `docs/proposals/security-authz-architecture-hardening.md` and the
-Rust workspace under `rust/`) replaced this entire layer with
-`rusqlite` + hand-rolled SQL (no ORM, no Alembic-equivalent — schema
-is Rust-source-of-truth in `conexus-db::schema`, with Alembic staying
-authoritative only until the Python side is fully decommissioned).
-Recorded here as history, not deleted: it explains the raw-`sqlite3`
-→ ORM→ Rust lineage the current schema-ownership model descends from.
+Rust workspace under `rust/`) replaced this entire layer with a real
+ORM again: `sea-orm` (+ `sea-orm-migration` as the schema-authority
+replacement for Alembic, per the migration plan's own "Migration-tool
+detail" decision), alongside some remaining hand-rolled `rusqlite`
+repositories not yet ported. Alembic itself, and the whole Python side,
+is fully deleted — schema authority is `sea-orm-migration` now, not a
+Rust-source-of-truth DDL file. Recorded here as history, not deleted:
+it explains the raw-`sqlite3` → SQLAlchemy ORM → sea-orm lineage the
+current schema-ownership model descends from.
 
 **Provenance**: originally filed in the `home-manager-config` deploy
 repo's `common/user/agent-mcp/docs/adr/` (as

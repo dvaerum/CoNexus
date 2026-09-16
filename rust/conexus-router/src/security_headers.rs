@@ -26,7 +26,6 @@
 //! `SERVER_BANNER`/the `overwrite: true` `Server` entry are kept
 //! anyway (a neutral, deliberate banner is still better than
 //! whatever a fronting proxy might otherwise pass through unmodified).
-#![allow(dead_code)]
 
 /// Pragmatic-but-protective default CSP. `script-src`/`style-src`
 /// allow `'unsafe-inline'` because the dashboard is a static Next.js

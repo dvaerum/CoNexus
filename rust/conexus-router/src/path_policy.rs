@@ -34,11 +34,6 @@
 //! have the prefix-vs-exact ambiguity the original aiohttp bug came
 //! from.
 //!
-//! `#![allow(dead_code)]`: this is a BINARY crate and this PR (2/24)
-//! has no real consumer yet -- same precedent as `mount.rs`'s own
-//! top-of-module note.
-#![allow(dead_code)]
-
 // ── Question 1: is this path public? ────────────────────────────────
 
 /// Prefixes that bypass operator-session gating entirely. Every entry

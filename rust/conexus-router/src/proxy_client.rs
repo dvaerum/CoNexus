@@ -33,11 +33,6 @@
 //! `text/event-stream` response is explicit that buffering it would
 //! simply never return).
 
-// No caller yet -- PR8 (`proxy-core`) is the first real consumer,
-// same helpers-ahead-of-their-first-consumer precedent as every other
-// not-yet-wired module in this crate.
-#![allow(dead_code)]
-
 use std::path::Path;
 
 use bytes::Bytes;

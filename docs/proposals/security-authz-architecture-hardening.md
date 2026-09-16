@@ -9,6 +9,25 @@
   confirmed-operator-tier (Phase 5), and whether `rotate_token()` gets a
   caller or gets deleted (N6). The SSO-vs-`rate_limit` trusted-proxy
   trust-model question stays flagged from Phase 1.
+* **Historical — describes the now-deleted Python implementation**,
+  superseded by the full Python→Rust rewrite this repo has since
+  completed. Every file:line citation below (`agent_mcp/router/sso.py`,
+  `app/rest_principal.py`, `tools/registry.py`, `core/access.py`,
+  `core/stream_gates.py`, `core/agent_secrets.py`,
+  `router/path_policy.py`, etc.) is a dead path. Findings A/C/D/H were
+  independently resolved by the rewrite (not a deliberate un-parking of
+  this doc, just the new architecture arriving at the same fix): A —
+  `Tool::REQUIRED` is now the single declaration site
+  (`rust/conexus-auth/src/requirement.rs`), no second registration
+  argument to drift against; C — `SsoSubject` is a real Rust value type
+  (`rust/conexus-router/src/sso_subject.rs`, [ADR-0024](../adr/0024-sso-subject-value-type.md));
+  D — `RestPrincipal` (`rust/conexus-backend/src/rest_principal.rs`) is
+  a real typed enum, no untyped dict/ContextVar; H — `CONTEXT.md` now
+  exists and documents the authorization model. N5 and N3 Tier 2's
+  mechanisms were carried forward (`rust/conexus-wakeloop/src/stream_gates.rs`,
+  `rust/conexus-router/src/path_policy.rs`). B, E, F, G, N1, N2, N4, N6
+  need a fresh audit against the real Rust source if revisited — this
+  doc's own citations can't be used to re-derive their current status.
 * Date: 2026-08-23
 * Source: two security-focused `/improve-codebase-architecture` passes.
   Pass 1 ran parallel with pentest-all round 21 (see

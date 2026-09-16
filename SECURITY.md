@@ -8,7 +8,7 @@ exists.
 
 Instead, use GitHub's private reporting flow:
 
-**[Report a vulnerability](https://github.com/dvaerum/Agent-MCP/security/advisories/new)**
+**[Report a vulnerability](https://github.com/dvaerum/CoNexus/security/advisories/new)**
 (Security tab → "Report a vulnerability")
 
 This opens a private advisory visible only to the maintainer, where
@@ -21,7 +21,7 @@ channel — don't include vulnerability details in that issue itself.
 
 ## What's in scope
 
-This repo (`dvaerum/Agent-MCP`) is a maintained fork of
+This repo (`dvaerum/CoNexus`) is a maintained fork of
 [`rinadelph/Agent-MCP`](https://github.com/rinadelph/Agent-MCP) — see
 [CONTRIBUTING.md](CONTRIBUTING.md) for the fork's background. Security
 reports against this fork's own code (router, backend, dashboard,

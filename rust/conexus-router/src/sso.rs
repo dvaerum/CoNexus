@@ -38,8 +38,6 @@
 //! test`'s parallel-thread env-var-race hazard; any real caching
 //! decision is PR23 app-wiring's to make, not this module's).
 
-#![allow(dead_code)]
-
 use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 

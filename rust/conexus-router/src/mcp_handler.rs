@@ -39,11 +39,6 @@
 //! one function every pre-auth-401 path in [`backend_mcp_handler`]
 //! funnels through.
 
-// No axum-route caller yet -- app-wiring (PR 23) is the first real
-// consumer, same helpers-ahead-of-their-first-consumer precedent as
-// every other not-yet-wired module in this crate.
-#![allow(dead_code)]
-
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
 
@@ -244,7 +239,8 @@ pub fn maybe_single_tenant_redirect(
 /// Port of the `API_VERSION_*`/`API_MEDIA_TYPE` constants.
 pub const API_VERSION_CURRENT: &str = "v1";
 pub const API_MEDIA_TYPE: &str = "application/vnd.agent-mcp.v1+json";
-const API_DOCS_URL: &str = "https://github.com/dvaerum/Agent-MCP/blob/main/docs/api-versioning.md";
+const API_DOCS_URL: &str =
+    "https://github.com/dvaerum/CoNexus/blob/main/docs/integrations/api-versioning.md";
 
 /// Port of `_accept_includes_strict_api_media` -- deliberately no
 /// wildcard honouring (`*/*`/`application/json` don't count); an
@@ -689,7 +685,14 @@ pub async fn backend_api_handler(
 /// on real-process sizing) since it's the one place a real router
 /// binary would construct its single, process-wide
 /// `StreamCapRegistry` from.
+///
+/// No real call site yet -- found unused, not masked, while removing
+/// this module's stale `#![allow(dead_code)]` during a docs audit;
+/// the real process binary hasn't wired a `StreamCapRegistry` from
+/// these yet. See git blame.
+#[allow(dead_code)]
 pub const DEFAULT_MAX_STREAMS_PER_AGENT: u32 = 4;
+#[allow(dead_code)]
 pub const DEFAULT_MAX_STREAMS_GLOBAL: u32 = 64;
 
 #[cfg(test)]

@@ -4,8 +4,9 @@ There is no project-wide admin / system token in any form — no DB
 row, no on-disk file, no CLI flag, no global, and no API endpoint
 that exposes it (retired in the original Python implementation's
 `system_token` retirement, and never reintroduced by the Rust
-rewrite — see `~/.claude/plans/prancy-napping-pie.md` for the full
-Python→Rust migration this project completed). External MCP clients
+rewrite — see this repo's own commit history, `git log --grep=Phase`,
+for the full Python→Rust migration this project completed). External
+MCP clients
 (Claude Code, IDE plugins, ad-hoc scripts) authenticate against
 `/agent-mcp/mcp/<project>` with **per-agent bearer tokens** — this
 document is the setup guide.

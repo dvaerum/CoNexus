@@ -43,7 +43,7 @@ Two reasons:
   "message": "agent-mcp REST endpoints require an Accept header specifying the API version. Resend with: Accept: application/vnd.agent-mcp.v1+json",
   "supported_versions": ["v1"],
   "current_default": "v1",
-  "docs": "https://github.com/dvaerum/Agent-MCP/blob/main/docs/api-versioning.md"
+  "docs": "https://github.com/dvaerum/CoNexus/blob/main/docs/integrations/api-versioning.md"
 }
 ```
 
@@ -75,10 +75,6 @@ about the *content*:
 - `/agent-mcp/app/...` and `/agent-mcp/assets/...` — dashboard HTML
   and Next.js static assets are loaded by browsers, which don't send
   our private media type.
-- `/agent-mcp/__projects`, `/agent-mcp/__overview`, `/agent-mcp/__create`,
-  `/agent-mcp/__rename`, etc. — direct router endpoints, not under
-  `/api/`. PR-C will fold the project-lifecycle ones into POST
-  /api/projects; the others stay router-only utilities.
 - CORS preflights (`OPTIONS`) — exempted so browsers can complete
   preflight before sending the real request. The Accept gate runs on
   the request itself.
@@ -86,24 +82,34 @@ about the *content*:
 ## Service descriptor
 
 `GET /agent-mcp/` returns a JSON discovery document so a plain HTTP
-client can find the endpoint layout without scraping HTML:
+client can find the endpoint layout without scraping HTML (port of
+`_service_descriptor`, `rust/conexus-router/src/dashboard_static.rs`;
+the internal package version is deliberately NOT echoed — SEC,
+owner-authorised — pure attacker-useful build fingerprinting no
+operator consumes):
 
 ```json
 {
   "service": "agent-mcp",
-  "version": "4.0.0",
   "mode": "multi-tenant",
   "endpoints": {
     "api": "/agent-mcp/api",
     "app": "/agent-mcp/app",
     "assets": "/agent-mcp/assets",
-    "mcp": "/agent-mcp"
+    "mcp": "/agent-mcp/mcp"
   },
-  "projects_url": "/agent-mcp/__projects",
-  "overview_url": "/agent-mcp/__overview",
+  "projects_url": "/agent-mcp/api/router/projects",
+  "overview_url": "/agent-mcp/api/router/overview",
+  "health_url": "/agent-mcp/api/router/health",
   "single_tenant_project": null
 }
 ```
+
+(The old `/agent-mcp/__projects`, `/agent-mcp/__overview`,
+`/agent-mcp/__create`, `/agent-mcp/__rename` dunder endpoints named in
+an earlier draft of this doc were retired by ADR-0014 — the real
+project-lifecycle/admin surface now lives entirely under
+`/agent-mcp/api/router/*`.)
 
 PR-B (v4.0.0) renamed the top-level prefixes from
 `/__api` / `/__dashboard` / `/__dashboard/_next` to `/api` / `/app` /

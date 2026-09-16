@@ -123,8 +123,8 @@ export function CreateTaskModal({ open, onOpenChange, onCreated }: CreateTaskMod
             Assign To
           </Label>
           {/*
-            The shared <AgentSelect> sources live agents from the
-            data-store (filters terminated rows via shouldDisplayAgent)
+            The shared <AgentSelect> sources live agents from
+            useActiveAgents() (filters out status === "terminated")
             and pins Admin at the top. noneLabel="— Unassigned —" because
             the underlying field is a nullable assignment, not a filter.
           */}

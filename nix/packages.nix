@@ -46,7 +46,7 @@ let
 
   # ── Dashboard static export ──────────────────────────────────────
   # Next.js 15 project with `output: 'export'`. The router serves the
-  # `out/` directory at /agent-mcp/__dashboard/.
+  # `out/` directory at /agent-mcp/app/.
   #
   # Phase 4 (prancy-napping-pie): we deliberately do NOT set
   # `ASSET_PREFIX` here. The dashboard's `next.config.ts` now defaults

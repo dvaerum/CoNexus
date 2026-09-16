@@ -19,12 +19,6 @@
 //! reads this state) is later PRs in the same breakdown, not this
 //! one.
 //!
-//! Most fields have no reader yet (route registration is a later
-//! step) -- same "helpers ahead of their first consumer" precedent as
-//! `mount.rs`/`path_policy.rs`/`identity.rs` when they first landed.
-
-#![allow(dead_code)]
-
 use std::path::PathBuf;
 
 use tokio::sync::Mutex as AsyncMutex;
@@ -97,9 +91,17 @@ pub struct RouterState {
     pub session_gate_config: SessionGateConfig,
     pub sock_dir: PathBuf,
     pub dashboard_dir: Option<PathBuf>,
+    /// No real reader yet -- found unused, not masked, while removing
+    /// this module's stale `#![allow(dead_code)]` during a docs
+    /// audit; see git blame.
+    #[allow(dead_code)]
     pub external_url: Option<String>,
     pub idle_sec: u64,
+    /// No real reader yet -- see `external_url`'s doc above.
+    #[allow(dead_code)]
     pub asset_prefix: Option<String>,
+    /// No real reader yet -- see `external_url`'s doc above.
+    #[allow(dead_code)]
     pub single_tenant_workspace: Option<PathBuf>,
     pub default_workspace_parent: PathBuf,
     pub token_dir: Option<PathBuf>,

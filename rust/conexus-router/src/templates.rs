@@ -42,7 +42,6 @@
 //! the entity back to `/` when parsing an attribute value), verified
 //! live against the real renderer (see this module's own tests)
 //! before being noted here, not inferred from minijinja's docs alone.
-#![allow(dead_code)]
 
 use std::sync::LazyLock;
 

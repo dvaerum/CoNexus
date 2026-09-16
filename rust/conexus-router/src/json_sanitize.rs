@@ -44,7 +44,6 @@
 //! handlers (`admin_users_users.rs`/`admin_groups.rs`/etc.) are this
 //! module's first real consumers, via `perm_gates.rs`'s
 //! `read_body_and_revalidate` fusion wrapper.
-#![allow(dead_code)]
 
 use serde_json::{Map, Value};
 

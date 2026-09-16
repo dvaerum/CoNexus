@@ -50,7 +50,7 @@ Monitor every agent's status, assigned tasks, and recent activity. The system au
 
 ## Quick Start
 
-This is a maintained fork ([dvaerum/Agent-MCP](https://github.com/dvaerum/Agent-MCP))
+This is a maintained fork ([dvaerum/CoNexus](https://github.com/dvaerum/CoNexus))
 with a Rust backend/router (`rust/` — the original Python
 implementation was retired once the rewrite reached functional
 completeness); the dashboard (`agent_mcp/dashboard/`) is Next.js/
@@ -61,8 +61,8 @@ registration, router startup, operator login) and
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev/build/test loop.
 
 ```bash
-git clone https://github.com/dvaerum/Agent-MCP.git
-cd Agent-MCP
+git clone https://github.com/dvaerum/CoNexus.git
+cd CoNexus
 
 nix build .#conexus-backend .#conexus-router .#agent-mcp-dashboard
 ```
@@ -368,7 +368,7 @@ The dashboard provides real-time visibility into your AI development team:
 **Memory Health** - Ensure context remains fresh and accessible  
 **Activity Timeline** - See exactly what each agent is doing
 
-Access at `http://localhost:3847` after launching the dashboard.
+Access at `http://localhost:5454/agent-mcp/` after launching the router.
 
 ## Advanced Features
 
@@ -661,7 +661,7 @@ Verify all workers are initialized with the `--worker` flag for proper coordinat
 
 **"Dashboard connection failed"**  
 1. Ensure MCP server is running first
-2. Check Node.js version (18+ required)
+2. Check Node.js version (22+ required)
 3. Reinstall dashboard dependencies
 
 **"Memory queries returning stale data"**  
@@ -684,8 +684,8 @@ straight to the most common entry points:
 
 **Get Help**
 - [Discord Community](https://discord.gg/7Jm7nrhjGn) - Active developer discussions
-- [GitHub Issues](https://github.com/rinadelph/Agent-MCP/issues) - Bug reports and features
-- [Discussions](https://github.com/rinadelph/Agent-MCP/discussions) - Share your experiences
+- [GitHub Issues](https://github.com/dvaerum/CoNexus/issues) - Bug reports and features (this fork; see [CONTRIBUTING.md](CONTRIBUTING.md) for the upstream/fork split)
+- [Discussions](https://github.com/dvaerum/CoNexus/discussions) - Share your experiences
 
 **Contributing**
 We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for:

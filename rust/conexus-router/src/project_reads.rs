@@ -16,7 +16,6 @@
 //! that envelope (three `COUNT` queries against the project's own
 //! SQLite) and is complete here; assembling it alongside a real
 //! `is_active` result into the full overview JSON is PR 23's job.
-#![allow(dead_code)]
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

@@ -1,20 +1,16 @@
-//! CoNexus always-on URL-keyed router. Port target: `agent_mcp/
-//! cli.py::router_cmd` + `agent_mcp/router/app.py`.
+//! CoNexus always-on URL-keyed router. Ported from the deleted Python
+//! `agent_mcp/cli.py::router_cmd` + `agent_mcp/router/app.py`.
 //!
-//! **App-wiring status (Phase E2, `conexus-router-app-wiring`
-//! breakdown)**: steps 1-3 of 10 are done -- real `RouterState`
-//! construction + the fail-closed `boot::assert_startup_safe` guard +
-//! the router DB boot sequence + background reaper/reconciliation
-//! task spawns (step 1); the real security-headers/rate-limit/
-//! empty-users-redirect/session-gate middleware stack (step 2); and
-//! the real MCP/API reverse-proxy routes, mounted OUTSIDE the
-//! session-gate middleware (step 3, `proxy_routes.rs`). Still
-//! deferred to LATER steps of the same breakdown (4-10: login-setup,
-//! revalidation-fusion, lifecycle-rest, users-groups-rest, dashboard-
-//! static, mount-aliases, sso-admin-config), matching this migration's
-//! own "smallest, most foundational first" discipline for large
-//! phases. Every decision function these later steps will wire is
-//! already built and tested across `conexus-router/src/*.rs`.
+//! Full app-wiring is done: `RouterState` construction, the
+//! fail-closed `boot::assert_startup_safe` guard, the router DB boot
+//! sequence, background reaper/reconciliation task spawns, the
+//! security-headers/rate-limit/empty-users-redirect/session-gate
+//! middleware stack, the MCP/API reverse-proxy routes (mounted
+//! OUTSIDE the session-gate middleware, `proxy_routes.rs`),
+//! login/setup, `perm_gates.rs`'s revalidation fusion, the
+//! lifecycle-rest/users-groups-rest REST surfaces, dashboard-static
+//! serving, ADR-0020 mount-aliases, and sso-admin-config are all real
+//! routes wired into the `Router` below.
 //!
 //! Guiding Principle 2 / ADR-0020: this binary crate depends on
 //! `conexus-auth`/`conexus-core` only -- never `conexus-tools` or

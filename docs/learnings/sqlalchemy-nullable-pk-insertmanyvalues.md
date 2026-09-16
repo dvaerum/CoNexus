@@ -1,5 +1,13 @@
 # A nullable autoincrement PK breaks multi-row inserts under SQLAlchemy 2.0
 
+**Historical.** SQLAlchemy/Alembic are fully deleted; schema authority
+is `sea-orm-migration` now (`rust/conexus-db/src/migration/`), with a
+real `task_comment` entity/repository at
+`rust/conexus-db/src/entity/task_comment.rs`. sea-orm's multi-row
+insert path has different sentinel-column semantics entirely, so this
+specific `insertmanyvalues` lesson doesn't mechanically generalize —
+kept as a record of the original bug, not current guidance.
+
 Found while renaming `task_notes` → `task_comments`
 (`agent_mcp/db/models/task_comment.py`, migration
 `0026_rename_task_notes_to_task_comments.py`). `TaskComment.note_id` is

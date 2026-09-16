@@ -88,9 +88,11 @@ point so it coalesces with operator writes.
 
 ## Cross-language test guards (don't get surprised by this)
 
-A refactor that only touches `agent_mcp/dashboard/` can still turn Python CI red:
-several `tests/test_dashboard_*.py` guards grep the dashboard source (via
-`tests/dashboard_sources.py`) to pin conventions. If you move/rename/delete a
-symbol they pin, **run `pytest tests/test_dashboard_*.py -q` before pushing** and
-repoint the guard to the new location — never weaken it. This bit every increment
-of the migration at least once.
+A refactor that only touches `agent_mcp/dashboard/` can still turn CI red:
+several `agent_mcp/dashboard/tests/*.test.ts` guards grep the dashboard
+source (via `agent_mcp/dashboard/tests/support/*-source.ts`) to pin
+conventions. If you move/rename/delete a symbol they pin, **run `npm
+test` before pushing** and repoint the guard to the new location —
+never weaken it. This bit every increment of the migration at least
+once. (The original guards were `tests/test_dashboard_*.py`, ported to
+vitest when the Python side was deleted.)

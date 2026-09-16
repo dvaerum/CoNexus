@@ -3,16 +3,6 @@
 //! `_deny_cross_tenant_project_read`/`_revalidate_capability_and_
 //! membership_or_403` (decision halves) + `create_project_handler`'s
 //! full logic. Phase E2 PR 17, `conexus-router-project-gate`.
-//!
-//! Framework-agnostic and fully synchronous, matching
-//! `session_gate.rs::evaluate_session_gate`'s own proof that a fresh
-//! DB-backed capability/membership re-check needs no `async`, lock, or
-//! systemctl-await at all -- only the FUSION of this decision logic
-//! with a real yield point (`perm_gates.py`'s `revalidated_lock`/
-//! `revalidate_after`/`read_body_and_revalidate`) needs axum's real
-//! extractor/handler shape, deferred to PR 23 per this migration's own
-//! DEFERRED decision for `perm_gates.py`.
-#![allow(dead_code)]
 
 use std::collections::HashSet;
 use std::path::Path;

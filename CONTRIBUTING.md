@@ -1,4 +1,4 @@
-# Contributing to dvaerum/Agent-MCP
+# Contributing to dvaerum/CoNexus
 
 This is a maintained fork of [`rinadelph/Agent-MCP`](https://github.com/rinadelph/Agent-MCP).
 Upstream has been effectively dormant since October 2025, so this fork
@@ -22,10 +22,10 @@ The backend/router implementation (`rust/` — `conexus-backend`,
 `conexus-daemon-agent`, `conexus-vec`) is Rust. The dashboard
 (`agent_mcp/dashboard/`) is a Next.js/TypeScript frontend, unrelated
 to that migration — it was never Python and didn't need to move. Both
-implementations were originally Python; see
-`~/.claude/plans/prancy-napping-pie.md` (or its final state in this
-repo's history) for the full migration record if you're curious why
-the tree is shaped this way.
+implementations were originally Python; the full migration record
+lives in this repo's own commit history — `git log --grep=Phase` (or
+`git log --oneline | grep -i migration`) — if you're curious why the
+tree is shaped this way.
 
 Prerequisites:
 
@@ -40,8 +40,8 @@ Prerequisites:
   indexer/query path
 
 ```sh
-git clone https://github.com/dvaerum/Agent-MCP.git
-cd Agent-MCP
+git clone https://github.com/dvaerum/CoNexus.git
+cd CoNexus
 
 # Backend/router (rust/)
 cd rust

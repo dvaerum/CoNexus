@@ -1,7 +1,7 @@
 # agent-mcp home-manager module
 
 [Agent-MCP](https://github.com/rinadelph/Agent-MCP), packaged via
-the [`dvaerum/Agent-MCP`](https://github.com/dvaerum/Agent-MCP)
+the [`dvaerum/CoNexus`](https://github.com/dvaerum/CoNexus)
 fork, exposed as a home-manager module. Provides multi-agent
 coordination tools (spawn sub-agents, assign tasks, shared messages,
 per-project RAG over markdown) to claude-code sessions on the same
@@ -14,9 +14,10 @@ Three groups of user-scope systemd units:
 - **`conexus-router.service`** (the CoNexus Rust router; the retired
   Python one was `agent-mcp-router.service`) — always-on URL-keyed
   HTTP router on loopback (default `127.0.0.1:1337`). Serves the
-  Next.js dashboard at `/agent-mcp/__dashboard/`, proxies MCP traffic
+  Next.js dashboard at `/agent-mcp/app/`, proxies MCP traffic
   to per-project backends, lazy-starts/stops them by activity, and
-  exposes the add/remove/rename REST endpoints.
+  exposes the project-lifecycle REST API under `/agent-mcp/api/router/`
+  (ADR-0014).
 - **`conexus@<name>.service`** (systemd template; the retired Python
   one was `agent-mcp@<name>.service`) — one instance per registered
   project, started lazily by the router on first MCP request, stopped
@@ -30,8 +31,9 @@ Three groups of user-scope systemd units:
   task assignments without anyone keeping a Claude session open.
 
 Project membership is **not** declared in nix. Every project is
-registered at runtime via `POST /agent-mcp/__create` (dashboard form
-or `curl`), recorded in `~/.config/agent-mcp/projects.local.json`.
+registered at runtime via `POST /agent-mcp/api/router/projects`
+(dashboard form or `curl`, JSON body), recorded in
+`~/.config/agent-mcp/projects.local.json`.
 The module materialises the router + systemd templates + the
 daemon-agent wiring; the project list lives outside source control.
 
@@ -41,7 +43,7 @@ In your home-manager flake:
 
 ```nix
 {
-  inputs.agent-mcp.url = "github:dvaerum/Agent-MCP";
+  inputs.agent-mcp.url = "github:dvaerum/CoNexus";
 
   outputs = { self, nixpkgs, home-manager, agent-mcp, ... }: {
     homeConfigurations."alice" = home-manager.lib.homeManagerConfiguration {
@@ -65,8 +67,9 @@ In your home-manager flake:
               # host's loopback.
               externalUrl = "https://my-host.tailfdae0.ts.net";
 
-              # Where /agent-mcp/__create puts a project's workspace
-              # when the form's Workspace field is empty.
+              # Where POST /agent-mcp/api/router/projects puts a
+              # project's workspace when the form's Workspace field
+              # is empty.
               defaultWorkspaceParent =
                 "/home/alice/.local/share/agent-mcp/projects";
             };
@@ -90,10 +93,12 @@ In your home-manager flake:
 ```
 
 After `home-manager switch`, the router boots on
-`http://127.0.0.1:1337/agent-mcp/`. The first project you create
-through the dashboard (or via
-`curl -F name=foo http://127.0.0.1:1337/agent-mcp/__create`) appears
-in `~/.config/agent-mcp/projects.local.json` and shows up in the
+`http://127.0.0.1:1337/agent-mcp/`. Log in as the operator (see
+[`docs/operator/getting-started.md`](../docs/operator/getting-started.md#first-boot-setup-operator-login)
+for first-boot setup), then the first project you create through the
+dashboard (or via `POST /agent-mcp/api/router/projects` with a JSON
+body `{"name": "foo"}` and the session cookie) appears in
+`~/.config/agent-mcp/projects.local.json` and shows up in the
 dashboard's overview.
 
 ## Options reference
@@ -110,12 +115,26 @@ dashboard's overview.
 | `services.agent-mcp.dashboard.enable` | bool | `true` | Build and serve the Next.js dashboard. |
 | `services.agent-mcp.dashboard.package` | package | computed | Override the dashboard derivation. |
 | `services.agent-mcp.daemonAgents` | list of submodules | `[]` | Each entry expands to one `agent-mcp-daemon-agent@<project>--<agent_id>.service` unit. |
+| `services.agent-mcp.multiTenant` | bool | `true` | `true`: the router runs multi-tenant (projects registered at runtime). `false`: single-tenant (N=1) — requires `singleProject` to be set; an assertion enforces the pairing. |
+| `services.agent-mcp.singleProject` | nullable submodule (`name`, `workspace`) | `null` | Required when `multiTenant = false`, must stay `null` when `true`. Declares the single project a single-tenant deploy serves. |
+| `services.agent-mcp.sso.oidc` | nullable submodule | `null` | OIDC authorization-code+PKCE config (`issuer`, `clientId`, `clientSecretFile`, `providerName`, `groupMapping`, `scopes`, `redirectUrl`). Mutually exclusive with `sso.proxyHeader` — the router refuses to start if both are set. |
+| `services.agent-mcp.sso.proxyHeader` | nullable submodule | `null` | Trust-an-upstream-proxy SSO config (`trustHeader`, `trustedIps`, `defaultIsSysadmin`). Mutually exclusive with `sso.oidc`. |
+| `services.agent-mcp.conexusLauncherPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The `conexus@<name>.service` backend launcher. `null` with no override (i.e. bypassing the flake wrapper) ships no per-project backend at all. |
+| `services.agent-mcp.conexusRouterPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The `conexus-router` singleton service package. `null` with no override ships no router at all. |
+| `services.agent-mcp.conexusDaemonAgentPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The daemon-agent binary for every `daemonAgents` unit. `null` with no override omits every daemon-agent unit entirely. |
+
+The three `conexus*Package` options are auto-wired to a `crane`-built
+binary when the module is consumed via this flake's own
+`homeModules.default` (the normal path, shown under
+[Quick start](#quick-start) above) — they only matter directly if
+you're importing `home-manager-module.nix` standalone without the
+flake wrapper.
 
 Each `daemonAgents` entry has:
 
 | Sub-option | Type | Description |
 |------------|------|-------------|
-| `project` | str | Project slug (must exist via `/__create`). |
+| `project` | str | Project slug (must exist — create it via `POST /agent-mcp/api/router/projects` first). |
 | `agentId` | str | Agent slug (must exist on the project). |
 | `tokenPath` | str | Absolute path to the file holding the agent's bearer token. |
 
@@ -176,21 +195,32 @@ the path resolves to a readable file containing the token.
 
 ## URL surface
 
-The router exposes:
+The router exposes (see `rust/conexus-router/src/main.rs`'s real
+route table for the authoritative list — this is a summary, not
+exhaustive):
 
 | URL | Purpose |
 |-----|---------|
-| `GET /agent-mcp/` | HTML index (Phase 3.5 redirects this to the dashboard overview). |
-| `GET /agent-mcp/__dashboard/` | Next.js dashboard. |
-| `GET /agent-mcp/__projects` | JSON list of registered projects. |
-| `POST /agent-mcp/__create` | Register a new project (form field `name`, optional `workspace`). |
-| `POST /agent-mcp/__create-agent` | Create a worker agent on a project. |
-| `POST /agent-mcp/__rename` | Rename a project (creates a grace-period alias; ADR-0010). |
-| `POST /agent-mcp/__unregister` | Drop a project. |
-| `POST /agent-mcp/__stop` | Stop a project's backend (refuses if busy). |
-| `ANY /agent-mcp/<name>/mcp` | Streamable HTTP MCP endpoint for `<name>`. |
-| `GET /agent-mcp/__client-installer/<n>.sh?agent=<id>` | Curl-installable `.mcp.json` merger. |
-| `GET /agent-mcp/__client-config/<n>.mcp.json?agent=<id>` | Raw `.mcp.json` snippet. |
+| `GET /agent-mcp/` | JSON service descriptor, or a redirect to the dashboard for a browser (`Accept: text/html`). |
+| `GET /agent-mcp/app/` | Next.js dashboard. |
+| `GET/POST /agent-mcp/api/router/projects` | List / register a project (JSON body: `{"name": ..., "workspace": ...}`). |
+| `PATCH/DELETE /agent-mcp/api/router/projects/{name}` | Rename (creates a grace-period alias; ADR-0010) / unregister a project. |
+| `POST /agent-mcp/api/router/projects/{name}/stop` | Stop a project's backend (refuses if busy). |
+| `GET /agent-mcp/api/router/projects/{name}/aliases` | Retired-alias usage for a project. |
+| `DELETE /agent-mcp/api/router/projects/{name}/aliases/{alias}` | Drop a grace-period alias early. |
+| `GET /agent-mcp/api/router/overview` | Cross-project status summary. |
+| `GET/POST /agent-mcp/api/router/users`, `.../groups` (+ `PATCH`/`DELETE .../{id}` on each), `GET/POST .../groups/{id}/members` (+ `DELETE .../members/{member_id}`), `GET/PUT .../groups/{id}/capabilities` | Operator/group/capability admin surface. |
+| `GET/POST /agent-mcp/api/router/projects/{name}/memberships`, `PATCH`/`DELETE .../memberships/{id}` | Per-project membership admin. |
+| `GET /agent-mcp/api/router/sso/config` | SSO configuration readback. |
+| `ANY /agent-mcp/mcp/{name}` | Streamable HTTP MCP endpoint for `{name}`. |
+
+Every `/agent-mcp/api/router/*` route above is also mounted with an
+`/agent-mcp/api/router/.../` trailing-slash twin and a root-mounted
+alias without the `/agent-mcp` prefix (ADR-0020, mount-agnostic). No
+`client-config`/`installer` curl-installable-snippet route exists
+today — the router's own CLI carries an `--installer-template` flag
+wired up alongside those routes, but they're deferred indefinitely
+(confirmed inert token plumbing in production).
 
 Tailnet exposure (`externalUrl`) is configured outside this module
 — e.g. via `services.tailscale.serve` at NixOS scope. See the
@@ -204,36 +234,53 @@ in `assetPrefix`. The router substitutes the configured runtime
 prefix into served HTML / JS / CSS bodies on the fly so a single
 build artifact serves any deployment URL.
 
-* **Default** prefix: `/agent-mcp/__dashboard`. Operators who deploy
-  the router straight onto loopback (the documented path) need no
-  configuration — the default matches the router's own route table.
-* **Custom mount**: deploying the dashboard behind a reverse proxy
-  mounted at a different prefix (e.g. `/tools/`) is a one-line
-  change. Set `AGENT_MCP_ASSET_PREFIX=/tools` in the router unit's
-  `environment`, or pass `--asset-prefix /tools` on the
-  `conexus-router` command line. No rebuild required.
+* **Default**: assets serve at `/agent-mcp/assets` (the router's own
+  route table). Operators who deploy the router straight onto loopback
+  (the documented path) need no configuration.
+* **Custom mount**: the prefix is resolved per-request
+  (`mount::external_prefix`), not from a static flag — a request that
+  arrived under `/agent-mcp` gets that prefix; a request a TRUSTED
+  reverse proxy forwarded with an `X-Forwarded-Prefix` header gets
+  that header's value instead (only honoured when the peer is on the
+  trusted-proxy list). Deploying behind a reverse proxy mounted at a
+  different prefix (e.g. `/tools/`) means configuring that proxy to
+  send `X-Forwarded-Prefix: /tools` and trusting its source address —
+  no router rebuild or restart-time flag needed. (The `--asset-prefix`
+  CLI flag is accepted and stored on `RouterState` but never read
+  anywhere after that — don't rely on it. There is no
+  `AGENT_MCP_ASSET_PREFIX` env var wired to it at all; the only place
+  that string appears in the source is the unrelated build-time
+  sentinel `__AGENT_MCP_ASSET_PREFIX__` Next.js bakes in, a different
+  mechanism entirely.)
 
-Substitution is Content-Type-gated: only `text/html`,
-`text/css`, and `application/javascript` responses are eligible.
-JSON API responses, fonts, images, and other binary assets pass
-through verbatim, so substitution can never corrupt their bytes
-even if a chance sequence happens to match the sentinel.
+Substitution is Content-Type-gated (`rust/conexus-router/src/asset_prefix.rs`'s
+`SUBSTITUTABLE_CTYPE_PREFIXES`): `text/html`, `text/css`,
+`application/javascript`, `text/javascript`, `text/plain`, and
+`text/x-component` (the last two cover Next.js's RSC flight payloads,
+which also carry the sentinel as a plain string). JSON API responses,
+fonts, images, and other binary assets pass through verbatim, so
+substitution can never corrupt their bytes even if a chance sequence
+happens to match the sentinel.
 
 **Important — single-tenant requires a router-fronted serve.** Per
-decision #1 of the [prancy-napping-pie
-plan](https://github.com/dvaerum/Agent-MCP/blob/main/.claude/plans/prancy-napping-pie.md)
-and [ADR-0008](../docs/adr/0008-single-tenant-url-parity.md), the
-router runs in both single-tenant and multi-tenant modes. Substitution
+[ADR-0008](../docs/adr/0008-single-tenant-url-parity.md), the router
+runs in both single-tenant and multi-tenant modes. Substitution
 happens at the router, so deploying the dashboard without the router
 (e.g. serving the static export directly from nginx) would leak the
 sentinel into served bytes and render the dashboard blank. Don't.
 
-## Multi-tenant only (for now)
+## Multi-tenant vs. single-tenant
 
-Phase 2 ships the multi-tenant deployment only — the router always
-runs with project routing enabled. The `services.agent-mcp.multiTenant`
-toggle (decision #1, [ADR-0008](../docs/adr/0008-single-tenant-url-parity.md))
-lands in Phase 3, alongside `pkgs.nixosTest` VM tests for both modes.
+`services.agent-mcp.multiTenant` (default `true`, [ADR-0008](../docs/adr/0008-single-tenant-url-parity.md))
+picks the deployment shape. `true` (default): the router runs
+multi-tenant, projects are registered at runtime, `singleProject` must
+stay `null`. `false`: single-tenant (N=1) — `services.agent-mcp.singleProject`
+(`name`/`workspace`) declares the sole project, the module seeds
+`projects.local.json` before the router starts, and the router 410s
+every project-lifecycle write endpoint plus 302-redirects any
+wrong-project URL to the configured one. An assertion enforces the
+`multiTenant`/`singleProject` pairing at evaluation time, not at
+runtime.
 
 ## Wiring claude
 
@@ -241,16 +288,20 @@ Once the router is up, point claude at any registered project's MCP
 endpoint. The dashboard's "Wiring help" panel shows three ready-to-paste
 recipes per project:
 
-1. **One-line installer** (`curl … | bash`) — merges `agent-mcp`
-   into the current directory's `.mcp.json`, creating one if missing.
-   Idempotent.
+1. **One-line installer** (`curl … | bash`) — the UI still offers
+   this, but the router-side route it curls
+   (`.../projects/{name}/installer`) is currently NOT registered
+   (deferred indefinitely — confirmed inert token plumbing in
+   production; see `rust/conexus-router/src/main.rs`'s
+   `installer_template` doc comment). Running this recipe today 404s.
+   Use recipe 2 or 3 instead until that route lands.
 2. **Raw `.mcp.json` snippet** — paste into an existing
    `.mcp.json`'s `mcpServers` block.
 3. **`claude mcp add`** invocation — writes to `~/.claude.json`
    (user scope, not project scope).
 
 All three use the Streamable HTTP transport (`type: http`). The
-legacy SSE pair (`type: sse`) was retired in `dvaerum/Agent-MCP`
+legacy SSE pair (`type: sse`) was retired in `dvaerum/CoNexus`
 3.0.0.
 
 ## Architectural background

@@ -36,12 +36,6 @@
 //! shape via [`coerce_to_record`], matching Python's
 //! `_normalise_for_write`.
 
-// No caller yet -- main.rs's `--projects-file` flag stays accepted-
-// but-unused until PR6 (orchestrator) wires a live consumer, same
-// helpers-ahead-of-their-first-consumer precedent as mount.rs/
-// path_policy.rs/identity.rs.
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
@@ -57,6 +51,12 @@ use conexus_db::scheduled_directive_repository::parse_flexible;
 
 /// Default grace period for [`ProjectRegistry::add_alias`] when the
 /// caller passes neither `expires_at` nor `grace_days`.
+///
+/// No real external reader yet ([`ProjectRegistry::add_alias`] itself
+/// is unwired too) -- found unused, not masked, while removing this
+/// module's stale `#![allow(dead_code)]` during a docs audit; see git
+/// blame.
+#[allow(dead_code)]
 pub const DEFAULT_ALIAS_GRACE_DAYS: i64 = 30;
 
 /// Interprets a truly legacy on-disk record with no `backend_impl`
@@ -193,6 +193,12 @@ fn validate_slug(name: &str, field_label: &str) -> Result<(), RegistryError> {
 /// Phase D2 RAG-clients convention -- sidesteps `cargo test`'s
 /// parallel-thread env-var-race hazard, the same bug class already
 /// hit twice in this workspace.
+///
+/// No real call site yet -- main.rs's `--projects-file` flag is still
+/// wired directly, not through this default. Found unused, not
+/// masked, while removing this module's stale
+/// `#![allow(dead_code)]` during a docs audit; see git blame.
+#[allow(dead_code)]
 pub fn default_registry_path(get_env: impl Fn(&str) -> Option<String>) -> PathBuf {
     if let Some(p) = get_env("AGENT_MCP_PROJECTS_FILE") {
         return PathBuf::from(p);
@@ -359,6 +365,10 @@ impl ProjectRegistry {
         Self { path }
     }
 
+    /// No real call site yet -- found unused, not masked, while
+    /// removing this module's stale `#![allow(dead_code)]` during a
+    /// docs audit; see git blame.
+    #[allow(dead_code)]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -617,6 +627,11 @@ impl ProjectRegistry {
     /// mutation gets its own method" split as `add_alias`/`rename`).
     /// Does NOT touch systemd/sockets -- only rewrites the registry
     /// file; that's the caller's job.
+    ///
+    /// No real call site yet -- found unused, not masked, while
+    /// removing this module's stale `#![allow(dead_code)]` during a
+    /// docs audit; see git blame.
+    #[allow(dead_code)]
     pub fn set_backend_impl(
         &self,
         name: &str,
@@ -644,6 +659,11 @@ impl ProjectRegistry {
     /// can express "dead on arrival" via `grace_days: Some(0)`);
     /// otherwise `expires_at` is used if given, else the default
     /// [`DEFAULT_ALIAS_GRACE_DAYS`]-day grace period.
+    ///
+    /// No real call site yet -- found unused, not masked, while
+    /// removing this module's stale `#![allow(dead_code)]` during a
+    /// docs audit; see git blame.
+    #[allow(dead_code)]
     pub fn add_alias(
         &self,
         name: &str,

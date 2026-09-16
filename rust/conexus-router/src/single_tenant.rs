@@ -20,7 +20,6 @@
 //! shared, top-level module Python's own design calls for -- `perm_gates.py`
 //! (folded into this phase's later PRs) and the lifecycle handlers both
 //! need it too.
-#![allow(dead_code)]
 
 use crate::mcp_handler::{HandlerBody, HandlerResponse};
 

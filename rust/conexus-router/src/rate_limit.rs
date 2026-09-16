@@ -37,7 +37,6 @@
 //! per-`Application`-instance limiter storage are PR 23's job --
 //! [`RateLimitState`] is the plain data this module offers in their
 //! place, owned by whatever real middleware wraps it.
-#![allow(dead_code)]
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::IpAddr;
@@ -199,10 +198,16 @@ impl SlidingWindowLimiter {
     }
 
     /// Tracked-key count, for tests + metrics.
+    ///
+    /// No real call site yet -- found unused, not masked, while
+    /// removing this module's stale `#![allow(dead_code)]` during a
+    /// docs audit; see git blame.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.hits.len()
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.hits.is_empty()
     }

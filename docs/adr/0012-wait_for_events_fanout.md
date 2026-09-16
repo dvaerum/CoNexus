@@ -5,6 +5,18 @@
 Accepted (2026-06-07). Supersedes the "Per-agent serialization lock"
 row of ADR-0011 (PR #128 hardening).
 
+**Superseded by the Rust rewrite.** `conexus-wakeloop::waiter_registry`
+(`rust/conexus-wakeloop/src/waiter_registry.rs`) reverted to
+single-waiter, newest-wins semantics — `register()` evicts any prior
+waiter with a `connection_superseded` signal rather than fanning the
+wake out to N concurrent queues. This isn't a re-guess: the Phase D3
+research that preceded the port found Python's own N-way list was
+never actually live in practice (`supersede_prior_waiters` evicted
+every other entry the instant a new one registered), so the port
+implements the *actual* contract directly — one sender per agent, not
+a list. The 409 envelope stays retired either way; the reversal is
+scoped to fan-out vs. newest-wins, not a return to ADR-0011's lock.
+
 ## Context
 
 ADR-0011 shipped `wait_for_events` with a per-agent `asyncio.Lock`

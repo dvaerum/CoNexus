@@ -8,12 +8,6 @@
 //! inheritance, project-role inheritance) with
 //! `conexus-db::group_membership_repository`'s already-ported
 //! writer/graph primitives.
-//!
-//! Framework-agnostic, matching every other decision-function module
-//! this phase -- real axum route registration and the async
-//! body-read yield point stay deferred to PR 23.
-
-#![allow(dead_code)]
 
 use conexus_core::principal::Principal;
 use conexus_db::group_membership_repository::{self, GroupMemberRow, GroupMembershipError};
