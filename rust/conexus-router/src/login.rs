@@ -41,11 +41,6 @@
 //! - **Templating** (`login.html`/`setup.html`): no HTML-rendering
 //!   crate exists in this workspace; out of scope for this module
 //!   entirely (a pure-logic layer has nothing to render).
-//!
-//! `#![allow(dead_code)]`: no HTTP handler wires this module in yet
-//! (PR 23) -- same helpers-ahead-of-their-first-consumer precedent as
-//! `mount.rs`/`path_policy.rs`/`identity.rs`/`project_registry.rs`.
-#![allow(dead_code)]
 
 use std::sync::LazyLock;
 
@@ -298,6 +293,11 @@ pub fn resolve_current_user(
 /// eventual session-gate middleware, PR 13) that has already resolved
 /// the user by some other means this request and only needs to keep
 /// the session alive.
+///
+/// No real call site yet -- found unused, not masked, while removing
+/// this module's stale `#![allow(dead_code)]` during a docs audit;
+/// see git blame.
+#[allow(dead_code)]
 pub fn touch_session(conn: &Connection, session_id: &str, now: &str) -> Result<(), IdentityError> {
     conn.execute(
         "UPDATE sessions SET last_used_at = ?1 WHERE session_id = ?2",
@@ -371,6 +371,10 @@ pub enum SetupError {
     /// and this call's INSERT. The caller's job is to treat this as
     /// "wizard already completed" (a 303 to `/login`), not a 409.
     UsernameAlreadyExists,
+    /// No real call site reads the wrapped error yet -- found unused,
+    /// not masked, while removing this module's stale
+    /// `#![allow(dead_code)]` during a docs audit; see git blame.
+    #[allow(dead_code)]
     Db(IdentityError),
 }
 

@@ -47,8 +47,9 @@ result.
 
 ## What the pilot alone did — and did NOT — prove
 
-`multi-tenant.nix` never actually triggers `agent_mcp/router/app.py`'s
-`_ensure()` (the `systemctl start agent-mcp@<name>` lazy-spawn path) —
+`multi-tenant.nix` never actually triggers `conexus-router`'s
+`orchestrator::ensure::ensure()` (the `systemctl start conexus@<name>`
+lazy-spawn path) —
 the dashboard deep-link assertion is served straight from the static
 `index.html` without touching the per-project backend. That was
 already true under the QEMU version (see the module's own docstring),
@@ -56,13 +57,13 @@ and stays true under nspawn. The pilot alone proved nspawn can boot
 full systemd + D-Bus + polkit and serve the router's HTTP surface
 under nested Nix-sandbox virtualization — it did NOT independently
 exercise the polkit-authorized `systemctl start` against the
-`agent-mcp@` template unit, because nothing in that one test suite
+`conexus@` template unit, because nothing in that one test suite
 does.
 
 **The other two migrations closed that gap.** `event-driven-coord.nix`
-calls `systemctl start agent-mcp@coord-test.service` directly (and
+calls `systemctl start conexus@coord-test.service` directly (and
 later `restart`), and `no-auto-cleanup.nix` drives the router's real
-`_ensure()` lazy-spawn path over HTTP (its own comment: "thus fires
+`ensure()` lazy-spawn path over HTTP (its own comment: "thus fires
 the lazy-spawn — for an AUTHORIZED caller"). Both went green on real
 GitHub Actions CI across 2+ independent runs — the polkit-authorized,
 `DynamicUser`-adjacent `systemctl start` against a template unit

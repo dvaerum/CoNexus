@@ -34,11 +34,6 @@
 //! `proxy_client::UdsRequestBody = Full<Bytes>` choice for exactly
 //! the same reason.
 
-// No axum-route caller yet -- app-wiring (PR 23) is the first real
-// consumer, same helpers-ahead-of-their-first-consumer precedent as
-// every other not-yet-wired module in this crate.
-#![allow(dead_code)]
-
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -226,6 +221,11 @@ pub enum ProxyError {
     /// function receives an already-buffered body, so it can't
     /// observe a mid-upload disconnect directly; kept as a variant so
     /// the app-wiring PR's error mapping has a home for it).
+    ///
+    /// Confirmed still unconstructed, not masked, while removing this
+    /// module's stale `#![allow(dead_code)]` during a docs audit; see
+    /// git blame.
+    #[allow(dead_code)]
     ClientGone,
     /// Port of the socket-poll-timeout/systemctl-failure surface via
     /// `ensure()`.

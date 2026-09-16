@@ -5,7 +5,7 @@
 //! out-of-band. It is NOT recurring — no `next_due_at`/interval —
 //! just one row, delivered once (stamped `delivered_at`) or sitting
 //! undelivered until the next check-in. Its sibling
-//! `scheduled_directive_repository` (not yet ported) is the same
+//! [`crate::scheduled_directive_repository`] is the same
 //! delivery concept at a different lifecycle stage: a recurring,
 //! self-scheduling directive. Both converge on the identical
 //! `directive` event JSON shape ([`DirectiveEvent`]), distinguished

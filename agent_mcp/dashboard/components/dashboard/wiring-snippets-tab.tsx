@@ -11,28 +11,32 @@
 //     entry that points an MCP client at the project's /mcp URL.
 //     Admin token masked by default with a "Reveal" toggle + a
 //     "Copy" button.
-//   * Installer one-liner — `curl ... | bash` form fetching the
-//     installer script from the router (which substitutes the
-//     project's URL + token at request time).
 //   * Agent-token generation help — short note explaining where
 //     agent tokens come from (admin-only `create_agent` tool).
 //
 // The content is intentionally read-only / informational. Add /
 // rename / remove live on the Projects tab (the cards). This tab
 // is the "how do I wire a client up to this project" panel.
+//
+// A third recipe -- an "Installer one-liner" (`curl ... | bash`
+// fetching a router-rendered installer script) -- used to live here
+// too. Removed (found during a docs audit): the router-side route it
+// depended on (`.../projects/{name}/installer`) was never actually
+// registered -- it's deferred indefinitely per
+// `rust/conexus-router/src/main.rs`'s own `installer_template` doc
+// comment ("confirmed inert token plumbing in production") -- so the
+// recipe always 404'd. `lib/urls.ts::projectInstallerUrl` is left in
+// place (the URL shape a future real route would use), just no
+// longer rendered here. Re-add this block if/when that route ships.
 
 import React, { useEffect, useState } from "react"
 import {
-  Copy, Eye, EyeOff, Loader2, AlertCircle, ExternalLink, FileCode,
+  Copy, Eye, EyeOff, Loader2, AlertCircle, FileCode,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useProjectsStore } from "@/lib/stores/projects-store"
-import {
-  mcpUrl,
-  projectClientConfigUrl,
-  projectInstallerUrl,
-} from "@/lib/urls"
+import { mcpUrl, projectClientConfigUrl } from "@/lib/urls"
 import { routerApi } from "@/lib/router-api"
 
 interface ClientConfig {
@@ -65,11 +69,6 @@ function buildMcpJsonFor(projectName: string, token: string | null): ClientConfi
     entry.headers = { Authorization: `Bearer ${token}` }
   }
   return { mcpServers: { "agent-mcp": entry } }
-}
-
-function buildInstallerOneliner(projectName: string): string {
-  const path = projectInstallerUrl(projectName)
-  return `curl -fsSL "${originBase()}${path}" | bash`
 }
 
 function MaskedToken({
@@ -150,7 +149,6 @@ function ProjectWiringPanel({
 
   const mcpJson = buildMcpJsonFor(projectName, revealed ? token.token : null)
   const mcpJsonText = JSON.stringify(mcpJson, null, 2)
-  const installerOneliner = buildInstallerOneliner(projectName)
 
   return (
     <div className="space-y-4">
@@ -222,48 +220,6 @@ function ProjectWiringPanel({
             Fetching admin token from router…
           </p>
         )}
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Installer one-liner
-          </span>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              asChild
-            >
-              <a
-                href={projectInstallerUrl(projectName)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-3 w-3 mr-1" />
-                View
-              </a>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => copy(installerOneliner, "installer")}
-            >
-              <Copy className="h-3 w-3 mr-1" />
-              {copyState === "installer" ? "Copied" : "Copy"}
-            </Button>
-          </div>
-        </div>
-        <pre className="bg-muted px-3 py-2 rounded text-[11px] overflow-x-auto">
-          <code>{installerOneliner}</code>
-        </pre>
-        <p className="text-[11px] text-muted-foreground mt-1">
-          Runs the router-rendered installer script. The script
-          writes the .mcp.json into the current directory or wherever
-          the template directs.
-        </p>
       </div>
 
       <div className="text-[11px] text-muted-foreground border-t pt-2">

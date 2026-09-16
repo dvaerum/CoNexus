@@ -9,11 +9,6 @@
 //! call sites, cycle detection) done before any code, matching this
 //! migration's own discipline for large files.
 //!
-//! Framework-agnostic, matching every prior handler-layer module: real
-//! axum route registration and the async body-read yield point
-//! (`perm_gates.py`'s `read_body_and_revalidate`) stay deferred to
-//! PR 23.
-//!
 //! **A genuine design fork, resolved by re-deriving rather than
 //! following the research's own first suggestion**: the research
 //! proposed unifying `_is_last_sysadmin`/`_no_sysadmin_would_remain`
@@ -30,7 +25,6 @@
 //! (matching Python's own two-function design), each documenting the
 //! other's existence and its own scope/timing contract explicitly so
 //! neither silently drifts.
-#![allow(dead_code)]
 
 use std::sync::LazyLock;
 
@@ -56,6 +50,11 @@ pub enum AdminUsersError {
     Validation,
     NotFound,
     Conflict,
+    /// No real call site yet -- found unused, not masked, while
+    /// removing this module's stale `#![allow(dead_code)]` during a
+    /// docs audit; kept as a closed-discriminator-set member for
+    /// whichever future handler needs a generic 500 path.
+    #[allow(dead_code)]
     Internal,
     Forbidden,
     UnknownCapability,
@@ -268,6 +267,11 @@ pub fn split_membership_id(membership_id: &str) -> Option<(MembershipKind, &str)
 /// threaded explicitly rather than read off a hidden request object,
 /// matching this crate's "explicit input over hidden dependency"
 /// convention.
+///
+/// No real call site yet -- found unused, not masked, while removing
+/// this module's stale `#![allow(dead_code)]` during a docs audit;
+/// see git blame.
+#[allow(dead_code)]
 pub fn caller_is_sysadmin(
     single_tenant_name: Option<&str>,
     principal_sysadmin: Option<bool>,

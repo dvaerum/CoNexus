@@ -7,21 +7,6 @@
 //! Phase E2 PR 16, `conexus-router-lifecycle-foundations` -- the
 //! smallest, most-contained slice of the lifecycle-REST research's own
 //! proposed breakdown.
-//!
-//! Framework-agnostic, matching every prior handler-layer module: real
-//! axum route registration is PR 23's job. The genuine `async`/lock/
-//! systemctl-yield-point revalidation wrappers (`perm_gates.py`'s
-//! `revalidated_lock`/`revalidate_after`/`read_body_and_revalidate`)
-//! are deliberately NOT built here either -- see this migration's own
-//! DEFERRED entry for `perm_gates.py` in the plan file: designing a
-//! generic async fusion wrapper ahead of axum's real extractor/yield
-//! shape would be guessing at yield points that don't exist yet. The
-//! *synchronous* half of that pattern (a fresh DB-backed capability +
-//! membership re-check, which needs no lock/systemctl/await at all --
-//! `session_gate.rs::evaluate_session_gate` already proves this) is
-//! PR 17's job, once this PR's envelope/validation vocabulary exists
-//! for it to return through.
-#![allow(dead_code)]
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -267,6 +252,11 @@ pub fn error_envelope(
 /// for the rare call site (R9-F2's rank denial, R1-F1's escape hatch)
 /// that reuses a discriminator's message shape at a status other than
 /// its documented default.
+///
+/// No real call site yet -- found unused, not masked, while removing
+/// this module's stale `#![allow(dead_code)]` during a docs audit;
+/// see git blame.
+#[allow(dead_code)]
 pub fn error_envelope_with_status(
     error: LifecycleError,
     message: &str,

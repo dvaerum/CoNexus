@@ -35,11 +35,8 @@
 //! fix); the DB lock is acquired FRESH, after the real yield point,
 //! never held across it.
 //!
-//! Not yet wired to a real axum handler -- that's the
-//! lifecycle-rest/users-groups-rest PRs (steps 6-7), matching every
-//! prior PR1-shaped module in this migration (`state.rs`, `boot.rs`,
-//! `json_sanitize.rs` itself).
-#![allow(dead_code)]
+//! Wired into every real mutating handler across `lifecycle_rest.rs`
+//! and `users_groups_rest.rs`.
 
 use std::future::Future;
 

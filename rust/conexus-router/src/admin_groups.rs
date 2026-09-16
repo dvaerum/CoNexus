@@ -5,12 +5,6 @@
 //! composes `admin_users_gate.rs`'s validators/security-invariant
 //! checks with `conexus-db::group_membership_repository`'s new
 //! groups-CRUD primitives.
-//!
-//! Framework-agnostic, matching every other decision-function module
-//! this phase -- real axum route registration and the async
-//! body-read yield point stay deferred to PR 23.
-
-#![allow(dead_code)]
 
 use conexus_db::group_membership_repository::{self, GroupCrudError, GroupFieldUpdate, GroupRow};
 use rusqlite::{Connection, TransactionBehavior};

@@ -37,10 +37,10 @@ import { cn } from "@/lib/utils"
  * Live agents only
  * ----------------
  *
- * The agent list is read from the existing `useDataStore` Zustand
- * store via `getActiveAgents()` — which already filters terminated
- * rows via the `shouldDisplayAgent` predicate (PR #134). Don't
- * re-implement the filter here; compose the helper. Assigning a task
+ * The agent list is read via `useActiveAgents()`
+ * (lib/queries/all-data.ts) — which already filters out
+ * `status === "terminated"` rows. Don't re-implement the filter here;
+ * compose the hook. Assigning a task
  * to a terminated agent is meaningless, so the live-only rule is the
  * locked design decision for *every* call site of this component.
  *

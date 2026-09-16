@@ -25,7 +25,7 @@ QEMU itself is brought in by the flake.
 
 ```sh
 # Multi-tenant (default): router only — no projects auto-created.
-nix run github:dvaerum/Agent-MCP
+nix run github:dvaerum/CoNexus
 
 # Once the boot output stops scrolling, open the dashboard:
 xdg-open http://localhost:5454/agent-mcp/
@@ -54,7 +54,7 @@ see [LLM endpoints](#llm-endpoints-in-guest-internal-vs-on-host-external).
 ## Flags
 
 ```
-nix run github:dvaerum/Agent-MCP -- [flags]
+nix run github:dvaerum/CoNexus -- [flags]
 ```
 
 | Flag                  | Meaning                                                                                                       |
@@ -187,9 +187,8 @@ AGENT_MCP_EMBEDDING_MODEL=qwen3-embedding:0.6b
 AGENT_MCP_EMBEDDING_DIMENSION=1024
 ```
 
-No Python change is involved — see the module docstrings in
-`agent_mcp/external/completion_service.py` and
-`embedding_service.py` for the resolution rules those vars feed.
+No Python change is involved — see `rust/conexus-tools/src/completion_client.rs`
+and `embedding_client.rs` for the resolution rules those vars feed.
 
 ### Fail-loud endpoint probe
 
@@ -207,27 +206,29 @@ instead of degrading it. `conexus-router.service` is deliberately
 plus an explicit "backend failed to start" is more diagnostic than a
 refused connection.
 
-## Running the e2e tests against the VM
+## Exercising the VM manually
 
-The flake doesn't ship any test runner — point your existing
-test suite at the VM:
-
-```sh
-AGENT_MCP_BASE=http://localhost:5454 uv run pytest tests/e2e/
-```
-
-Tests should target `http://localhost:5454/agent-mcp/` endpoints.
+There is no standalone automated e2e harness that points at a live
+VM URL today — the repo's real test coverage (Rust `#[test]`s,
+dashboard `vitest` suites, `nix/tests/checks/`) runs against
+in-process fixtures or `nix eval`/`nix build`, not a booted VM. To
+exercise this VM by hand, drive it the same way a real client would:
+log in at `http://localhost:5454/agent-mcp/`, provision a per-agent
+token from the dashboard, and curl
+`http://localhost:5454/agent-mcp/mcp/<project>` with that bearer (see
+[`docs/integrations/external-mcp-client.md`](../integrations/external-mcp-client.md)
+for the full request shape).
 
 ## Build artefacts
 
 The flake exposes:
 
 ```
-nix build github:dvaerum/Agent-MCP#conexus-backend      # Rust backend
-nix build github:dvaerum/Agent-MCP#conexus-router       # Rust router
-nix build github:dvaerum/Agent-MCP#agent-mcp-dashboard  # static export
-nix build github:dvaerum/Agent-MCP#vm-multi             # multi-tenant VM
-nix build github:dvaerum/Agent-MCP#default              # wrapper script
+nix build github:dvaerum/CoNexus#conexus-backend      # Rust backend
+nix build github:dvaerum/CoNexus#conexus-router       # Rust router
+nix build github:dvaerum/CoNexus#agent-mcp-dashboard  # static export
+nix build github:dvaerum/CoNexus#vm-multi             # multi-tenant VM
+nix build github:dvaerum/CoNexus#default              # wrapper script
 ```
 
 `nix flake check` builds the dashboard + CoNexus Rust binaries
@@ -239,7 +240,7 @@ opt-in.
 
 ```nix
 {
-  inputs.agent-mcp.url = "github:dvaerum/Agent-MCP";
+  inputs.agent-mcp.url = "github:dvaerum/CoNexus";
   outputs = { self, nixpkgs, agent-mcp, ... }: {
     nixosConfigurations.example = nixpkgs.lib.nixosSystem {
       modules = [

@@ -17,7 +17,6 @@
 //! `forget`, workspace move, token-file renames, the atomic registry
 //! rename with its full error-mapping ladder, membership rekey,
 //! runtime-dir purge).
-#![allow(dead_code)]
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -75,6 +74,10 @@ fn parse_grace_days(raw: Option<&serde_json::Value>) -> Result<i64, HandlerRespo
 
 #[derive(Debug)]
 pub struct RenamePrecheckOk {
+    /// No real reader yet -- found unused, not masked, while removing
+    /// this module's stale `#![allow(dead_code)]` during a docs
+    /// audit; see git blame.
+    #[allow(dead_code)]
     pub old_name: String,
     pub new_name: String,
     pub grace_days: i64,

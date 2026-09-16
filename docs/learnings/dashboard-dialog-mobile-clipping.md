@@ -51,11 +51,14 @@ touched since it was first written.
 
 ## The permanent guard
 
-`tests/test_dashboard_polish_mobile_pass.py::test_every_dialog_content_caps_height_for_mobile`
-globs every `<DialogContent>` in the tree and asserts a `dvh`-based
+`agent_mcp/dashboard/tests/polish-mobile-pass.test.ts` — describe
+block `"CC-14 companion: DialogContent mobile height cap"`, test
+`"every <DialogContent> caps height with a dvh unit"` — globs every
+`<DialogContent>` in the tree and asserts a `dvh`-based
 `max-h` is present in its className — the same glob-not-hardcoded-list
-idiom the file's older `test_every_dialog_content_has_mobile_width_fallback`
-already uses for the `w-[calc(100vw-2rem)]` fallback, so a dialog added
+idiom the same file's older describe block `"CC-14: DialogContent
+mobile-width fallback"`, test `"every <DialogContent> has
+w-[calc(100vw-2rem)]"`, already uses for that fallback, so a dialog added
 tomorrow is covered automatically, and this specific bug class can't
 reappear silently the way it did here.
 

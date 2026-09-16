@@ -3,13 +3,6 @@
 //! `_serve_dashboard_file`/`dashboard_handler`'s resolve-or-SPA-
 //! fallback chain/`_accept_prefers_html`/`_service_descriptor`. Phase
 //! E2, `conexus-router-dashboard-static` (PR23 step 8, PR 1/3).
-//!
-//! Framework-agnostic, matching every other decision-function module
-//! this phase -- real axum route registration is PR 2/3; the
-//! `_warm_backend`/`_schedule_backend_warm` side effect (plus the
-//! `middleware.rs` `warm_authorized`-threading fix it needs) is PR 3/3.
-
-#![allow(dead_code)]
 
 use std::path::{Component, Path, PathBuf};
 

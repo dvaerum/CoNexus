@@ -5,12 +5,6 @@
 //! validators/security-invariant checks + `identity.rs`'s public-row
 //! primitives.
 //!
-//! Framework-agnostic and performs its own real DB writes directly,
-//! matching `login.rs::attempt_setup`/`project_gate.rs`'s established
-//! "decision function does the real write" precedent. The async
-//! body-read yield point (`perm_gates.py`'s `read_body_and_revalidate`)
-//! and real axum wiring stay deferred to PR 23.
-//!
 //! **A small, deliberate simplification from the literal Python
 //! source**: `edit_user_handler` builds ONE dynamic `UPDATE ... SET
 //! a = ?, b = ?` statement from a `sets`/`params` list assembled at
@@ -18,7 +12,6 @@
 //! single-column `UPDATE`s inside the SAME transaction -- functionally
 //! identical (both fields still land atomically before `COMMIT`), and
 //! avoids building SQL strings dynamically for a two-field surface.
-#![allow(dead_code)]
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use sea_orm::DatabaseConnection;

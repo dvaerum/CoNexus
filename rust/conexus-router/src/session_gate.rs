@@ -31,7 +31,6 @@
 //!   produces for a truly nonexistent project (SEC round 3, PF-1: a
 //!   status/body differential between the two would be a cross-tenant
 //!   project-existence oracle).
-#![allow(dead_code)]
 
 use std::collections::HashSet;
 
@@ -129,7 +128,13 @@ pub struct GateIdentity {
     /// for a router-admin (non-project-scoped) path, OR a URL segment
     /// that doesn't resolve to any real/aliased project at all (see
     /// this module's own doc for why that case is NOT rejected here).
+    ///
+    /// No real reader yet -- found unused, not masked, while removing
+    /// this module's stale `#![allow(dead_code)]` during a docs
+    /// audit; see git blame.
+    #[allow(dead_code)]
     pub project: Option<String>,
+    #[allow(dead_code)]
     pub project_role: Option<ProjectRole>,
     pub principal: Principal,
 }

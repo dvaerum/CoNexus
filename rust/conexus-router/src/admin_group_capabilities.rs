@@ -6,10 +6,6 @@
 //! (`caps_caller_lacks`/`forbid_cap_amplification`) with the already-
 //! ported `conexus-db::group_capability_repository`.
 //!
-//! Framework-agnostic, matching every other decision-function module
-//! this phase -- real axum route registration and the async
-//! body-read yield point stay deferred to PR 23.
-//!
 //! **Phase G (sea-orm migration, router step 4 PR G)**: converted
 //! wholesale to `sea_orm::DatabaseConnection` -- this module's own
 //! call-site classification found no function here opens a rusqlite
@@ -18,8 +14,6 @@
 //! preserve a twin for; `group_membership_repository::get_group`/
 //! `group_capability_repository::fetch`/`replace`'s own async primaries
 //! (added in this same PR) serve every function here directly.
-
-#![allow(dead_code)]
 
 use std::collections::HashSet;
 

@@ -182,65 +182,48 @@ ollama pull mxbai-embed-large       # 1024D, 670MB
 
 ## Configuring Agent-MCP
 
-### Step 1: Locate Your .env File
+The Rust `conexus-backend`/`conexus-router` binaries read real process
+environment variables only — there is no `.env`-file-loading mechanism
+(the old Python single-process server's `.env` support did not carry
+over). Set these however your deployment already sets other env vars:
+plain `export` in a dev shell, a systemd `Environment=`/
+`EnvironmentFile=` line, or (for the Nix/home-manager deployment path)
+the `services.agent-mcp.*` module options.
 
-Navigate to your Agent-MCP directory:
-```bash
-cd /path/to/Agent-MCP
-```
+The provider switch is presence/absence of a non-empty `OPENAI_API_KEY`
+— leave it **unset entirely** and Ollama is used; set it to a real
+OpenAI key and OpenAI is used instead. `OPENAI_API_KEY` is NOT a
+sentinel you set to `"ollama"` — any non-empty value (including the
+literal string `"ollama"`) routes through the OpenAI branch, which
+reads a completely different set of variables (`OPENAI_BASE_URL`, not
+`AGENT_MCP_LLM_BASE_URL`) and would silently try to reach OpenAI's
+real cloud endpoint with a garbage key. There is no separate
+`EMBEDDING_PROVIDER`/`EMBEDDING_PROVIDERS` fallback-chain variable —
+this is a single either/or switch, not a chain (see
+[`docs/operator/getting-started.md`](getting-started.md#environment-variables)
+for the authoritative table).
 
-### Step 2: Create or Edit .env File
-
-Create one if you want a persistent file (Agent-MCP loads `.env` from
-the project directory at startup):
-```bash
-touch .env
-```
-
-Or just `export` the variables in your shell — both work. Pre-v5.0.53
-the repo shipped a `.env.example` template; that file is gone (the
-server now defaults to Ollama out of the box without one).
-
-### Step 3: Add Ollama Configuration
-
-Open `.env` in your favorite editor and add:
-
-```bash
-# Embedding Provider Configuration
-EMBEDDING_PROVIDER=ollama
-OLLAMA_MODEL=qwen3-embedding:0.6b
-OLLAMA_URL=http://localhost:11434
-
-# Optional: Fallback chain (tries Ollama first, then OpenAI if it fails)
-EMBEDDING_PROVIDERS=ollama,openai
-
-# OpenAI Key (optional if using only local)
-# OPENAI_API_KEY=your_key_here_only_if_you_want_fallback
-```
-
-### Step 4: Verify Configuration
-
-Your `.env` file should look like this:
+### Step 1: Set the local-Ollama variables
 
 ```bash
-# Agent-MCP Configuration
-
-# Claude Code / Primary LLM (still needed for agent operations)
-ANTHROPIC_API_KEY=your_anthropic_key_here
-
-# Embedding Provider (for RAG/search)
-EMBEDDING_PROVIDER=ollama
-OLLAMA_MODEL=qwen3-embedding:0.6b
-OLLAMA_URL=http://localhost:11434
-
-# Project Settings — normally set by `--project-dir` on the CLI.
-# Only export manually for advanced cases.
-# MCP_PROJECT_DIR=.
+unset OPENAI_API_KEY                                    # must be UNSET, not "ollama" — see above
+export AGENT_MCP_LLM_BASE_URL=http://localhost:11434/v1  # Ollama's OpenAI-compatible endpoint
+export AGENT_MCP_EMBEDDING_MODEL=qwen3-embedding:0.6b
+export AGENT_MCP_EMBEDDING_DIMENSION=1024               # must match the embedding model
 ```
+
+### Step 2: Verify Configuration
+
+Start `conexus-router` (or `conexus-backend` directly, for local
+debugging) with those variables exported and confirm a RAG query
+against a real project succeeds — there is no separate `.env` file to
+inspect.
 
 **Important**:
-- You still need an `ANTHROPIC_API_KEY` for Claude Code (agent operations)
-- Only embeddings run locally; the main AI agent uses Claude
+- Agent-MCP itself doesn't need an Anthropic key — that's your MCP
+  client's (e.g. Claude Code's) own concern, not this server's.
+- Only embeddings/RAG run through this switch; it has no effect on
+  which chat model your MCP client uses for its own reasoning.
 
 ---
 
@@ -261,10 +244,9 @@ curl http://localhost:11434/api/embeddings -d '{
 
 ### Full Test: Agent-MCP Integration
 
-Once configured, start Agent-MCP normally and confirm that the
-embeddings provider initializes from your `.env` (look for
-`EMBEDDING_PROVIDER=ollama` being honored in startup logs and that
-RAG queries succeed).
+Once configured, start `conexus-router` normally (with the variables
+from Step 1 exported) and confirm RAG queries succeed against a real
+project.
 
 **If queries succeed**: You're all set!
 
@@ -406,18 +388,16 @@ ollama serve
 
 ### Q: Do I still need an OpenAI API key?
 
-**A**: No, not for embeddings! However:
-- You DO need an `ANTHROPIC_API_KEY` for Claude Code (the main agent)
-- Embeddings run locally with Ollama
-- Optionally keep OpenAI as a fallback with `EMBEDDING_PROVIDERS=ollama,openai`
+**A**: No, not for embeddings — Agent-MCP itself doesn't touch your
+MCP client's own LLM key (e.g. Claude Code's `ANTHROPIC_API_KEY`,
+which is that client's concern, not this server's).
 
-### Q: Can I use both local and OpenAI embeddings?
+### Q: Can I use both local and OpenAI embeddings, with a fallback?
 
-**A**: Yes! Use the fallback chain:
-```bash
-EMBEDDING_PROVIDERS=ollama,openai
-```
-This tries Ollama first, falls back to OpenAI if Ollama is unavailable.
+**A**: No — the provider switch (`OPENAI_API_KEY` set vs. unset) is a
+single either/or choice, not a fallback chain. There is no
+`EMBEDDING_PROVIDERS`-style variable; if Ollama is down, requests
+fail rather than silently falling back to OpenAI.
 
 ### Q: Which model is best for me?
 
@@ -492,18 +472,17 @@ ollama pull qwen3-embedding:0.6b
 
 Once your local embeddings are working:
 
-1. **Start Agent-MCP** with local embeddings:
+1. **Start the router** with the local-embedding variables exported
+   (see [Getting Started](getting-started.md) for the full quick-start):
    ```bash
-   npm start
+   conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/agent-mcp-sockets --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
    ```
 
-2. **Test RAG functionality**: Try searching your codebase through the Agent-MCP interface
+2. **Test RAG functionality**: Try searching your codebase through the Agent-MCP dashboard
 
-3. **Monitor performance**: Watch the console for embedding generation times
+3. **Monitor performance**: Watch `journalctl`/stderr for embedding generation times
 
 4. **Experiment with models**: Try different models to find your sweet spot
-
-5. **Set up fallback**: Add OpenAI as a fallback for reliability
 
 ---
 
@@ -511,21 +490,19 @@ Once your local embeddings are working:
 
 - **Ollama Documentation**: https://ollama.ai/docs
 - **Agent-MCP README**: [README.md](../../README.md)
-- **Discord Community**: [Join for help](https://discord.gg/agent-mcp) *(check README for link)*
+- **Discord Community**: [Join for help](https://discord.gg/7Jm7nrhjGn)
 
 ---
 
 ## Feedback & Support
 
 Found an issue with this guide? Have suggestions?
-- Open an issue: https://github.com/rinadelph/Agent-MCP/issues
-- Tag: @LR or @Clarity for embedding-related questions
+- Open an issue: https://github.com/dvaerum/CoNexus/issues
 
 ---
 
 **Written by**: Claude (with testing by the Agent-MCP team)
-**Last Updated**: October 2025
-**Tested on**: Qwen3-embedding:0.6b, Agent-MCP v4.0+
+**Tested on**: Qwen3-embedding:0.6b, Agent-MCP (conexus-backend/conexus-router, Rust)
 
 ---
 
@@ -541,16 +518,14 @@ ollama pull qwen3-embedding:0.6b
 # Start service
 ollama serve
 
-# Configure .env
-EMBEDDING_PROVIDER=ollama
-OLLAMA_MODEL=qwen3-embedding:0.6b
-OLLAMA_URL=http://localhost:11434
+# Configure the environment (no .env file — see "Configuring Agent-MCP" above)
+unset OPENAI_API_KEY
+export AGENT_MCP_LLM_BASE_URL=http://localhost:11434/v1
+export AGENT_MCP_EMBEDDING_MODEL=qwen3-embedding:0.6b
+export AGENT_MCP_EMBEDDING_DIMENSION=1024
 
-# Test
-node test-ollama-embeddings.js
-
-# Start Agent-MCP
-npm start
+# Start the router (see Getting Started for the full command)
+conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/agent-mcp-sockets --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
 ```
 
 **That's it!** You're now running Agent-MCP with free, fast, private local embeddings! 🚀

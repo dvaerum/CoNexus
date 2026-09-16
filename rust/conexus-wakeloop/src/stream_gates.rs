@@ -13,8 +13,8 @@
 //! before handing anything back. A revoked stream is a hard error
 //! ([`StreamRevoked`]), not a value a caller could forget to inspect.
 //!
-//! `wait_for_events` (Phase D3's own tool, not yet ported) is this
-//! crate's first real consumer; the port is written generically (over
+//! `conexus-tools::agent_communication_tools::WaitForEventsTool` is
+//! this crate's first real consumer; the port is written generically (over
 //! the item type and the liveness/cadence closures) so a future
 //! SSE-style stream can reuse it too, matching Python's own four-streams
 //! design even though only one of those streams has a Rust home so far.

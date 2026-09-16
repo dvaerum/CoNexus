@@ -65,8 +65,8 @@ export function ComposeMessageModal({
   // Participants drive the Compose recipient dropdown only (needs the
   // BROADCAST "*" option, which is NOT an agent and is outside
   // <AgentSelect>'s contract; the hardcoded "admin" entry mirrors
-  // data-store::shouldDisplayAgent so the compose UX matches the rest
-  // of the dashboard).
+  // useActiveAgents() (lib/queries/all-data.ts) so the compose UX
+  // matches the rest of the dashboard).
   const [liveParticipants, setLiveParticipants] = useState<
     { agent_id: string; status?: string }[]
   >([])

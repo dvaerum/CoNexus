@@ -100,4 +100,4 @@ immediately surfaced a real pre-existing bug the hardcoded list had been hiding.
   terminal route) was the day's fourth instance of the same shape: two places
   deciding "is this session ACP?" and only one of them updated.
 - `components/dashboard/shared/*.tsx` — the scaffold contracts (canonical).
-- `tests/test_dashboard_polish_mobile_pass.py` — the delegation-aware audit.
+- `agent_mcp/dashboard/tests/polish-mobile-pass.test.ts` — the delegation-aware audit.

@@ -25,7 +25,6 @@
 //! `finish_stop_project` is never called in that case) -- the two
 //! handlers are NOT symmetric here, confirmed by re-reading the real
 //! Python source, not assumed from the file's own earlier framing.
-#![allow(dead_code)]
 
 use std::path::Path;
 

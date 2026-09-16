@@ -1,5 +1,16 @@
 # Wake/event-timing tests must disable RAG placement analysis
 
+**Historical.** Describes the deleted Python test suite
+(`pytest`/`agent_mcp.tools.task_tools`, all gone). The underlying
+premise no longer even applies to the Rust port: `assign_task_tools.rs`'s
+own header states the Rust `assign_task`/`create_self_task` ship
+mechanical-only — the whole `ENABLE_TASK_PLACEMENT_RAG` placement-
+validation block is not wired in at all, so no real RAG call runs
+during assignment and this exact flakiness class can't recur as
+described. Kept for the general lesson (a real embedding/LLM call
+inside a tight wake-timing budget is a latency-dependent flake) in
+case the RAG-placement block gets wired into the Rust port later.
+
 Symptom: `assign_task` wake-event tests (`test_wake_on_task_assigned`,
 `test_assign_task_to_offline_agent_returns_promptly`,
 `test_task_assigned_event_is_skinny`) fail intermittently — usually

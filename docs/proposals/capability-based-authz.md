@@ -1,6 +1,21 @@
 # Proposal: Capability-based authorization
 
-* Status: **Proposed / parked** (foundation partially shipped, remainder deferred)
+* Status: **Resolved by the Rust rewrite.** The user-visible feature
+  this proposal describes as "unbuilt pending a concrete need" now
+  ships in full: a real closed `Capability` enum
+  (`rust/conexus-core/src/capability.rs`), a `group_capability` table +
+  repository (`rust/conexus-db/src/group_capability_repository.rs`),
+  the `GET`/`PUT /agent-mcp/api/router/groups/{group_id}/capabilities`
+  REST routes (registered in `rust/conexus-router/src/main.rs`,
+  dispatching to `users_groups_rest.rs`'s handlers, which call the
+  decision logic in `admin_group_capabilities.rs`),
+  and a dashboard UI to manage per-group capabilities
+  (`agent_mcp/dashboard/components/dashboard/groups/group-capabilities-section.tsx`).
+  This wasn't a deliberate un-parking of this specific proposal — the
+  full Python→Rust migration independently arrived at the same design
+  as part of rebuilding authorization from scratch. Kept as a record
+  of the original design reasoning; every Python file citation below
+  is now a dead path.
 * Date: 2026-07-19
 * Builds on: [ADR-0013](../adr/0013-operator-login.md) (operator login),
   [ADR-0015](../adr/0015-sso-oidc-and-proxy-header.md) (SSO/OIDC + groups)

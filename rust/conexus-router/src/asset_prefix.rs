@@ -17,7 +17,6 @@
 //! [`AssetPrefixCache`] follows that precedent; PR 23's app-wiring
 //! owns the one instance for the process's lifetime, same as Python's
 //! module-scope dict living for the process's lifetime.
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::path::Path;

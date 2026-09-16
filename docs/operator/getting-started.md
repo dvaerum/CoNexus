@@ -40,18 +40,24 @@ real deployment does:
 
 ### 1. Clone and build
 ```bash
-git clone https://github.com/dvaerum/Agent-MCP.git
-cd Agent-MCP
+git clone https://github.com/dvaerum/CoNexus.git
+cd CoNexus
 
-nix build .#conexus-backend    # the per-project backend binary
-nix build .#conexus-router     # the always-on router binary
-nix build .#agent-mcp-dashboard  # the dashboard static export
+nix build .#conexus-backend -o result-backend      # the per-project backend binary
+nix build .#conexus-router -o result-router        # the always-on router binary
+nix build .#agent-mcp-dashboard -o result-dashboard  # the dashboard static export
 ```
 
-For local backend/router development without Nix, `cargo build
---release` in `rust/` produces the same three binaries under
-`target/release/`; see [CONTRIBUTING.md](../../CONTRIBUTING.md) for
-the full build/test loop.
+`conexus-cli` (used below for `migrate`) has no Nix flake output —
+build it with Cargo instead: `cargo build --release -p conexus-cli`
+from `rust/` produces `rust/target/release/conexus-cli`. The Rust
+binaries alone (`conexus-backend`/`conexus-router`/`conexus-cli`, and
+any of the other `rust/` workspace crates) can likewise be built with
+`cargo build --release` for local development without Nix — but
+`cargo` cannot build the dashboard; that's always the separate `npm
+run build` step in `agent_mcp/dashboard/` (or the `nix build
+.#agent-mcp-dashboard` above). See
+[CONTRIBUTING.md](../../CONTRIBUTING.md) for the full build/test loop.
 
 ### 2. Register a project and start the router
 ```bash
@@ -60,13 +66,13 @@ echo '{"my-project": "/path/to/your/project"}' > projects.json
 
 # Apply the schema-authority baseline to the project's own DB.
 mkdir -p /path/to/your/project/.agent
-./result/bin/conexus-cli migrate /path/to/your/project
+rust/target/release/conexus-cli migrate /path/to/your/project
 
-./result/bin/conexus-router \
+./result-router/bin/conexus-router \
   --port 5454 \
   --projects-file projects.json \
   --sock-dir /tmp/agent-mcp-sockets \
-  --dashboard-dir ./result/share/agent-mcp-dashboard
+  --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
 ```
 
 The router lazily starts `conexus-backend` for a project on its first
@@ -162,25 +168,35 @@ echo "$NEW_PW" | conexus-cli router create-operator \
 After first boot, log in at `http://localhost:5454/agent-mcp/login`.
 The session cookie is `agent_mcp_session=<opaque>; HttpOnly; Secure;
 SameSite=Lax; Path=/agent-mcp/`. Sessions live 30 days idle, sliding
-on every dashboard request; revoke immediately via `agent-mcp router
-delete-operator <username>` (Phase 2) or directly with a SQL `DELETE
-FROM sessions WHERE user_id = ...` against `/var/lib/agent-mcp/router.db`.
+on every dashboard request; revoke immediately with a SQL `DELETE
+FROM sessions WHERE user_id = ...` against `router.db` (no
+`conexus-cli` subcommand for this exists yet — `router create-operator`
+and `router migrate` are the only two `router`-scoped subcommands
+today; don't confuse the latter with the plain top-level `migrate`
+used above, which operates on a project's own database, not `router.db`).
 
 ---
 
 ## Environment variables
 
 Agent-MCP defaults are designed to work out of the box — none of the
-following are required.
+following are required. The provider switch is presence/absence of a
+non-empty `OPENAI_API_KEY` (see
+[`rust/conexus-tools/src/embedding_client.rs`](../../rust/conexus-tools/src/embedding_client.rs)/
+[`completion_client.rs`](../../rust/conexus-tools/src/completion_client.rs)
+for the exact resolution rules) — it is NOT auto-seeded to any value;
+unset (or empty) means the local-Ollama branch.
 
-| Variable                          | Default                          | Notes |
-| --------------------------------- | -------------------------------- | ----- |
-| `OPENAI_API_KEY`                  | `ollama` (auto-seeded)           | Set to a real OpenAI key to use the cloud. |
-| `OPENAI_BASE_URL`                 | `http://127.0.0.1:11434/v1`      | Override only if Ollama is not on localhost. |
-| `OPENAI_MODEL`                    | `qwen3:1.7b`                     | Chat-completions model. |
-| `AGENT_MCP_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`           | RAG embedding model. |
-| `AGENT_MCP_EMBEDDING_DIMENSION`   | `1024`                           | Must match the embedding model. |
-| `MCP_PROJECT_DIR`                 | (set by `--project-dir`)         | **Advanced.** The CLI sets this from `--project-dir`. Only export manually for cases like running Alembic migrations outside the CLI (see `agent_mcp/db/README.md`). |
+| Variable                          | Default (unset `OPENAI_API_KEY`, i.e. Ollama) | Default (`OPENAI_API_KEY` set, i.e. OpenAI) | Notes |
+| --------------------------------- | ---------------------------------------------- | -------------------------------------------- | ----- |
+| `OPENAI_API_KEY`                  | unset                                          | (required — this is the switch)              | Set to a real OpenAI key to use the cloud; leave unset for local Ollama. |
+| `AGENT_MCP_LLM_BASE_URL`          | `http://localhost:11434/v1`                    | not consulted                                | Chat + embedding endpoint override, Ollama path only. |
+| `OLLAMA_MODEL`                    | `qwen3:1.7b`                                   | not consulted                                | Chat-completions model, Ollama path only. |
+| `OPENAI_BASE_URL`                 | not consulted                                  | `https://api.openai.com/v1`                  | Chat + embedding endpoint override, OpenAI path only. |
+| `OPENAI_MODEL`                    | not consulted                                  | **required, no default** — a missing value is a hard config error | Chat-completions model, OpenAI path only. |
+| `AGENT_MCP_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`                         | `text-embedding-3-large`                     | RAG embedding model; an explicit value overrides either branch's default. |
+| `AGENT_MCP_EMBEDDING_DIMENSION`   | `1024`                                         | `1536`                                       | Must match the embedding model; an explicit value overrides either branch's default. |
+| `MCP_PROJECT_DIR`                 | (set by `--project-dir`)                       | (set by `--project-dir`)                     | **Advanced.** The CLI sets this from `--project-dir`. Schema authority is `sea-orm-migration`, not Alembic — see `rust/conexus-db/src/migration/mod.rs`'s module doc for the migration model. |
 
 Pre-v5.0.53 wirings used a `.env.example` checked into the repo
 referencing `MCP_SERVER_URL` and `MCP_ADMIN_TOKEN`. Both are
@@ -487,7 +503,7 @@ instead — see
 ### ❌ "Dashboard won't load"
 **Solution**: 
 ```bash
-# Check Node.js version (needs 18+)
+# Check Node.js version (needs 22+)
 node --version  
 
 # Reinstall dependencies in dashboard directory
@@ -498,7 +514,7 @@ npm run dev
 ```
 
 ### ❌ "MCP server connection failed"
-**Solution**: Verify the server is running on the correct port and that your AI assistant can reach `http://localhost:8080/sse`.
+**Solution**: Verify the router is running on the correct port and that your AI assistant can reach `http://localhost:5454/agent-mcp/mcp/<project-name>` (the per-project MCP endpoint, proxied through the router — `conexus-backend` has no direct client-facing port of its own).
 
 ---
 
@@ -545,7 +561,7 @@ npm run dev
 
 ### Stay Connected
 - **[Discord Community](https://discord.gg/7Jm7nrhjGn)** - Daily discussions and support
-- **[GitHub](https://github.com/rinadelph/Agent-MCP)** - Source code and issue tracking
+- **[GitHub](https://github.com/dvaerum/CoNexus)** - Source code and issue tracking (this fork)
 - **[Documentation](../README.md)** - Comprehensive guides and references
 
 ---

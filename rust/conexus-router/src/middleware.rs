@@ -6,12 +6,13 @@
 //! layer rejects) -> rate-limit -> empty-users-redirect ->
 //! session-gate (innermost, closest to the real handler).
 //!
-//! **Deliberately layered onto an otherwise-empty router first**
+//! **Originally verified against an otherwise-empty router first**
 //! (matching `conexus-backend`'s own PR1-shaped "verify the gate in
-//! isolation" precedent) -- no real admin/proxy route exists yet
-//! (later steps in the same breakdown); this PR's own live
-//! verification (boot the real compiled binary, curl it) exercises
-//! the gates directly against `GET /health`. `axum::middleware::Next`
+//! isolation" precedent, before the real admin/proxy routes existed)
+//! -- that PR's own live verification (boot the real compiled binary,
+//! curl it) exercised the gates directly against `GET /health`; the
+//! router now has a fully populated `admin_router`/`proxy_router`,
+//! and this middleware stack layers onto that. `axum::middleware::Next`
 //! has no public constructor anywhere in this workspace's pinned
 //! axum version (confirmed by reading the vendored source, not
 //! assumed) -- unlike every framework-agnostic decision function

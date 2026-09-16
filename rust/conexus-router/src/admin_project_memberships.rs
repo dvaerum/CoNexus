@@ -9,16 +9,6 @@
 //! project-existence-oracle closer, already proven in PR17) with
 //! `admin_users_gate.rs`'s `membership_grant_denied` and the
 //! already-ported `identity.rs` project-membership primitives.
-//!
-//! Framework-agnostic, matching every other decision-function module
-//! this phase -- real axum route registration and the async
-//! body-read yield point (`perm_gates.py`'s
-//! `read_body_and_revalidate`, which for these three handlers ALSO
-//! carries `project_name` so its fused re-check covers the
-//! membership half, not just capability -- R9-F3) stay deferred to
-//! PR 23.
-
-#![allow(dead_code)]
 
 use conexus_db::group_membership_repository;
 use rusqlite::Connection;
