@@ -45,6 +45,7 @@ use conexus_core::tool_result::ToolResult;
 use conexus_db::agent_action_repository;
 use conexus_db::agent_repository::{
     parse_agent_sort_by, parse_sort_order, AgentQueryFilters, AgentRepository,
+    TERMINAL_AGENT_STATUSES,
 };
 use rusqlite::Connection;
 use serde_json::Value;
@@ -862,12 +863,6 @@ impl Tool for RegisterAgentTool {
         })
     }
 }
-
-/// `agents` statuses a bearer rotation/restore refuses to act past.
-/// Port of `agent_repository.TERMINAL_AGENT_STATUSES` -- kept inline
-/// (not re-exported from `conexus-db`) since only this module's three
-/// lifecycle tools need it.
-const TERMINAL_AGENT_STATUSES: &[&str] = &["terminated", "tombstone"];
 
 pub struct RotateAgentTokenTool;
 

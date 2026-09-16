@@ -183,6 +183,18 @@ pub struct ProfileChangeRow {
     pub profile_updated_by: Option<String>,
 }
 
+/// The terminal agent statuses. Ported from Python's
+/// `TERMINAL_AGENT_STATUSES`. `pub` so `conexus-tools` can reuse this
+/// exact set (`admin_tools.rs`/`scheduled_directive_tools.rs`) instead
+/// of each hand-declaring their own copy — found and fixed as a real
+/// F-class regression (the same duplication-drift class this
+/// migration's Python source already closed once) during a docs
+/// audit. Kept in sync with [`NOT_TERMINAL_SQL`] by
+/// `not_terminal_sql_matches_terminal_agent_statuses` below, since the
+/// SQL fragment can't be generated from this array at const-eval time
+/// without pulling in a format-at-compile-time crate for two elements.
+pub const TERMINAL_AGENT_STATUSES: &[&str] = &["terminated", "tombstone"];
+
 /// The `NOT IN (...)` fragment excluding every terminal status from
 /// an "active"/"live" agent view. Ported from Python's
 /// `TERMINAL_AGENT_STATUSES`/`LIVE_AGENT_SQL` — kept as one constant
@@ -1261,6 +1273,26 @@ pub struct ReviewProfileResult {
 mod tests {
     use super::*;
     use crate::schema::init_schema;
+
+    /// Pins [`TERMINAL_AGENT_STATUSES`] and [`NOT_TERMINAL_SQL`] against
+    /// each other -- the SQL fragment is a separate literal (not
+    /// generated from the array), so nothing else stops them drifting
+    /// apart if one is edited without the other.
+    #[test]
+    fn not_terminal_sql_matches_terminal_agent_statuses() {
+        for status in TERMINAL_AGENT_STATUSES {
+            assert!(
+                NOT_TERMINAL_SQL.contains(&format!("'{status}'")),
+                "NOT_TERMINAL_SQL is missing status {status:?} present in TERMINAL_AGENT_STATUSES"
+            );
+        }
+        // And no extra status embedded in the SQL that the array doesn't know about.
+        let quoted_in_sql: Vec<&str> = NOT_TERMINAL_SQL
+            .split(['(', ')', ',', ' ', '\''])
+            .filter(|s| !s.is_empty() && *s != "status" && *s != "NOT" && *s != "IN")
+            .collect();
+        assert_eq!(quoted_in_sql.len(), TERMINAL_AGENT_STATUSES.len());
+    }
 
     fn test_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();

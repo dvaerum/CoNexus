@@ -137,7 +137,11 @@ async fn task_status(db: &DatabaseConnection, task_id: &str) -> Result<Option<St
     }
 }
 
-const TERMINAL_STATUSES: &[&str] = &["completed", "cancelled", "failed"];
+/// `pub` so `conexus-tools::task_comments_tools` can reuse this exact
+/// set instead of hand-declaring its own copy -- found and fixed as a
+/// real F-class regression (the same duplication-drift class this
+/// migration's Python source already closed once) during a docs audit.
+pub const TERMINAL_STATUSES: &[&str] = &["completed", "cancelled", "failed"];
 
 /// Failure modes of [`edit_comment`]/[`delete_comment`]. See this
 /// module's doc for why `NotFoundOrForbidden` carries no owner
