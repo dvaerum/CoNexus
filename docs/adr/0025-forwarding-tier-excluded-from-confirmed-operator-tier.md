@@ -6,6 +6,12 @@ existing invariant a name, a rationale that outlives the function
 docstring holding it, and a regression test broad enough to catch the
 near-miss that prompted it.
 **Date**: 2026-08-24
+**Update**: ported to Rust — `conexus-core::principal::is_confirmed_operator_tier`
+(`rust/conexus-core/src/principal.rs:203`, MCP side) and
+`conexus-backend::rest_principal::is_confirmed_operator_tier`
+(`rust/conexus-backend/src/rest_principal.rs:198`, REST side) both
+preserve this exclusion bit-for-bit; the Links section below cites the
+now-deleted Python files this was ported from.
 **Builds on**: ADR-0015 (SSO — the `AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN`
 precedent this ADR's escape hatch copies), ADR-0017 (no content-based
 secret redaction — the reason token disclosure is gated by an

@@ -2580,8 +2580,11 @@ mod tests {
     /// Passes the Cap(agents.register) gate AND is confirmed operator
     /// tier (project_role Operator) -- the "real admin" case.
     fn confirmed_operator() -> Principal {
+        // ForwardingHeader is deliberately NEVER confirmed-operator-tier
+        // (ADR-0025) -- a genuine confirmed operator, for secrets
+        // disclosure purposes, must be an OperatorSession.
         Principal {
-            kind: PrincipalKind::ForwardingHeader,
+            kind: PrincipalKind::OperatorSession,
             user_id: Some("op-1".to_string()),
             agent_id: None,
             project_name: None,
