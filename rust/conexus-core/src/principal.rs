@@ -193,22 +193,31 @@ pub fn catalog_role(principal: Option<&Principal>) -> CatalogRole {
 ///    Python's `Worker` OR `Manager` OR `Admin` narrows to just
 ///    `Manager` here, since `Worker` was never operator-tier and
 ///    `Admin` isn't a representable `AgentRole` value).
-/// 2. `OperatorSession` and `ForwardingHeader` are BOTH confirmed
-///    only via "the backend can SEE a resolved operator identity" —
-///    the sysadmin wildcard, or `project_role == Operator`. Per the
-///    Python module's own docstring, a signed-forwarding caller is
-///    deliberately NOT given clause-1 treatment even though it
-///    carries a signed role — ADR-0025's forwarding-tier-exclusion
-///    principle, preserved bit-for-bit here.
+/// 2. `OperatorSession` is confirmed only via "the backend can SEE a
+///    resolved operator identity" — the sysadmin wildcard, or
+///    `project_role == Operator`.
+/// 3. `ForwardingHeader` is NEVER confirmed, unconditionally —
+///    ADR-0025's forwarding-tier-exclusion principle: the forwarding
+///    door never counts as confirmed-operator-tier for secrets
+///    disclosure regardless of the role it signs, including a
+///    forwarding principal carrying both `project_role == Operator`
+///    and `Capabilities::Sysadmin`. A previous version of this
+///    function grouped `ForwardingHeader` into the same match arm as
+///    `OperatorSession` for clause 2 — a real, found bug (this
+///    function's own doc comment claimed the exclusion was
+///    "preserved bit-for-bit" while the code did the opposite);
+///    fixed by giving `ForwardingHeader` its own arm that always
+///    returns `false`.
 pub fn is_confirmed_operator_tier(principal: &Principal) -> bool {
     match principal.kind {
         PrincipalKind::AgentBearer => {
             principal.agent_role == Some(crate::capability::AgentRole::Manager)
         }
-        PrincipalKind::OperatorSession | PrincipalKind::ForwardingHeader => {
+        PrincipalKind::OperatorSession => {
             matches!(principal.capabilities, Capabilities::Sysadmin)
                 || principal.project_role == Some(ProjectRole::Operator)
         }
+        PrincipalKind::ForwardingHeader => false,
     }
 }
 
@@ -398,13 +407,23 @@ mod tests {
     }
 
     #[test]
-    fn forwarding_header_with_operator_role_is_confirmed() {
-        // Clause 2 applies identically to ForwardingHeader as it does
-        // to OperatorSession -- "the backend can SEE a resolved
-        // operator identity" doesn't care which seam proved it.
+    fn forwarding_header_is_never_confirmed_even_with_a_signed_operator_role() {
+        // ADR-0025: the forwarding door never counts as
+        // confirmed-operator-tier for secrets disclosure, regardless
+        // of the role it signs -- clause 2 must NOT apply to
+        // ForwardingHeader at all, only to OperatorSession.
         let mut p = base_principal(PrincipalKind::ForwardingHeader, Capabilities::from_iter([]));
         p.project_role = Some(ProjectRole::Operator);
-        assert!(is_confirmed_operator_tier(&p));
+        assert!(!is_confirmed_operator_tier(&p));
+    }
+
+    #[test]
+    fn forwarding_header_is_never_confirmed_even_with_a_signed_sysadmin_role() {
+        // ADR-0025's own wording: "including one carrying both
+        // project_role='operator' and sysadmin=True" -- the exclusion
+        // is unconditional, not just the weaker project-role case.
+        let p = base_principal(PrincipalKind::ForwardingHeader, Capabilities::Sysadmin);
+        assert!(!is_confirmed_operator_tier(&p));
     }
 
     #[test]
