@@ -49,6 +49,7 @@ use conexus_auth::{Requirement, Tool};
 use conexus_core::capability::Capability;
 use conexus_core::principal::{is_operator_tier, Principal, PrincipalKind};
 use conexus_core::tool_result::ToolResult;
+use conexus_db::agent_repository::TERMINAL_AGENT_STATUSES;
 use conexus_db::agent_repository::{AgentRepository, AgentRow};
 use conexus_db::scheduled_directive_repository::{
     self as repo, NullableUpdate, ScheduledDirectiveFields, ScheduledDirectiveRow,
@@ -62,12 +63,6 @@ use crate::task_tools::{bool_arg, str_arg};
 
 const MAX_INTERVAL_SECONDS: i64 = 315_360_000; // 10 years
 const MAX_COUNT: i64 = 1_000_000;
-
-/// Mirrors `agent_repository`'s own private `NOT_TERMINAL_SQL` set --
-/// no shared public constant exists to reuse (that set is
-/// SQL-embedded, not exported), so this is redeclared here rather
-/// than reached into.
-const TERMINAL_AGENT_STATUSES: &[&str] = &["terminated", "tombstone"];
 
 fn rand_u64() -> u64 {
     use std::collections::hash_map::RandomState;

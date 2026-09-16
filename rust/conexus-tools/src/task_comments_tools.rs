@@ -41,7 +41,9 @@ use conexus_core::capability::Capability;
 use conexus_core::principal::Principal;
 use conexus_core::task_ownership::can_access_task;
 use conexus_core::tool_result::ToolResult;
-use conexus_db::task_comments_repository::{self, AddCommentError, EditCommentError};
+use conexus_db::task_comments_repository::{
+    self, AddCommentError, EditCommentError, TERMINAL_STATUSES,
+};
 use conexus_db::{project_settings_repository, task_repository};
 use rusqlite::Connection;
 use serde_json::Value;
@@ -49,8 +51,6 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use crate::task_mutation_engine::{is_unassigned_owner, worker_ownership_deny};
 use crate::task_tools::str_arg;
-
-const TERMINAL_STATUSES: &[&str] = &["completed", "cancelled", "failed"];
 
 fn is_agent_or_operator_caller(principal: Option<&Principal>) -> bool {
     principal.is_some_and(|p| {

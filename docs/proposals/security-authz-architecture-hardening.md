@@ -25,9 +25,39 @@
   a real typed enum, no untyped dict/ContextVar; H — `CONTEXT.md` now
   exists and documents the authorization model. N5 and N3 Tier 2's
   mechanisms were carried forward (`rust/conexus-wakeloop/src/stream_gates.rs`,
-  `rust/conexus-router/src/path_policy.rs`). B, E, F, G, N1, N2, N4, N6
-  need a fresh audit against the real Rust source if revisited — this
-  doc's own citations can't be used to re-derive their current status.
+  `rust/conexus-router/src/path_policy.rs`).
+  **Update (re-audited against the real Rust source, 2026-09-16):**
+  B/E/N6 carried forward faithfully; N1/N2's designs carried forward
+  (in two places structurally *stronger* than the Python original) but
+  each is missing the dynamic-discovery enforcement TEST Python had —
+  an acknowledged, not a silent, gap; N4 is carried forward for
+  Resources/Prompts, with one confirmed non-security LIST/CALL
+  divergence on the Tools catalog (`bulk_task_operations`, working as
+  designed — see below); G's specific Python mechanism (AST module
+  discovery) has no Rust analogue, but the workspace independently
+  achieves the same anti-drift goal elsewhere by walking real runtime
+  collections instead; **F had genuinely regressed** — two real,
+  independently-declared duplicate-constant pairs were found and fixed
+  in the same pass (see below). Full per-finding detail:
+
+  | Finding | Disposition | Evidence |
+  |---|---|---|
+  | B | **Carried forward.** One canonical `Principal`/`RestPrincipal` construction site per admission boundary (`conexus-backend/src/principal_resolve.rs`, `rest_principal.rs`; `conexus-router/src/project_gate.rs`, `session_gate.rs`). `project_name` is `None` only where genuinely absent (the per-project backend is mount-agnostic) and `Some(..)` where the router has resolved one — no hardcoded-`None`-when-available duplicate found anywhere outside test fixtures. |
+  | E | **Carried forward.** `conexus-tools/src/resources.rs`'s purpose-built `resolve_read_scope()` derives LIST and READ from the identical own-agent-id-or-admin fact (replacing Python's generic `decide()`, since both real resources need only that one axis). Regression test `read_denies_a_foreign_workers_status_resource` proves a resource absent from one agent's `list_for` output is also denied on direct URI-guess read. |
+  | F | **Regressed, now fixed.** `TERMINAL_AGENT_STATUSES` was independently re-declared (identical name+value) in both `conexus-tools/src/admin_tools.rs` and `scheduled_directive_tools.rs`, instead of importing `conexus-db::agent_repository`'s canonical set; `task_comments_repository.rs`/`task_comments_tools.rs` had the same pattern for `TERMINAL_STATUSES`. Both pairs collapsed to one `pub` definition each, imported by the other side, with a new test (`not_terminal_sql_matches_terminal_agent_statuses`) pinning the surviving `NOT_TERMINAL_SQL` SQL-fragment sibling against the same array so they can't silently drift apart either. |
+  | G | **Python mechanism not applicable; goal independently achieved.** No AST-parsing exists in Rust (nothing needs it: `perm_gates.rs`'s router-admin revalidation coverage has no discovery test, an acknowledged, documented gap from this session's own earlier work, not new). But `conexus-tools/src/registry.rs`'s `public_tools_match_the_reviewed_allowlist` (walks the live `all_tools()` registry) and `admin_tools.rs`'s `every_agents_table_column_is_accounted_for` (walks a real `PRAGMA table_info` schema) both achieve G's actual goal — discover invariant-needing sites from a live collection, not a hand-maintained list — using Rust's own real runtime/schema collections instead of a source-level AST walk. |
+  | N1 | **Design carried forward; enforcement test is a gap.** `decode_untrusted_body` exists identically in both `conexus-backend`/`conexus-router` (byte-identical bodies, duplicated only because the two binaries can't share code without a new library crate — a documented trade-off, not drift). Full call-site audit of every JSON-body-reading handler in both crates found zero live bypasses; the Python-deferred SSO flow-cookie sanitization is *already* routed through the seam in Rust (better than Python's state when N1 shipped). No Rust equivalent of `test_arch_enforced_sanitization.py`'s dynamic discovery exists — nothing programmatically stops a future handler from skipping the seam. |
+  | N2 | **Design carried forward, in two places structurally stronger; enforcement tests are a gap.** Router-admin fusion (`perm_gates::read_body_and_revalidate`) is a plain sync function with zero `.await` between decode and revalidate — enforced by the type signature, not a convention. Backend-REST proxy buffering (`proxy_core.rs`'s `ProxyRequest::body: Bytes`) is a *compile-time* guarantee, stronger than Python's runtime behavior. MCP tool dispatch (`conexus_auth::dispatch`) has one centralized chokepoint (not 49 ad-hoc Python call sites) with a synchronous capability check immediately followed by the tool call. The "direct backend access has no protection" scope caveat remains honest and is reinforced by the backend's UDS-only, `chmod 0600` binding. No dedicated test pins the buffering or dispatch-fusion properties as security invariants (existing tests check correctness, not the ordering guarantee itself) — the same enforcement-test gap as N1. |
+  | N4 | **Carried forward for Resources/Prompts; one confirmed, non-security divergence on Tools.** Tools' `tools/list` visibility and `dispatch()`'s capability gate both derive from the same `Requirement` for the general case. One deliberate `TIER_OVERRIDES` entry, `bulk_task_operations`, is force-hidden from workers in `tools/list` (matching Python's own documented "deliberate tighten") while its own capability (`Cap(TasksUpdate)`) and call-time logic still let a worker successfully run `update_status`/`add_note` on their own task — confirmed live by the passing test `update_status_op_succeeds_for_the_owner`. Not a privilege escalation (the same worker already has equivalent access via the separately-visible `update_task_status` tool) and not a regression of N4's own finding, since `tools/list` visibility was never a security boundary to begin with — that asymmetry is N4's whole point. No test proves "hidden from list ⇒ denied on call" end-to-end for any tool; `bulk_task_operations` shows that generalization wouldn't even hold. |
+  | N6 | **Carried forward, with a documented adaptation.** `AGENT_SECRET_FIELDS` (`admin_tools.rs`) is hand-declared, since Rust has no ORM-metadata analogue to derive it from — but paired with a dynamic schema-completeness test achieving the same anti-drift goal. All four Python mechanics stay genuinely distinct: mask (`get_agent_tokens`), drop (`/all-data`), unconditional narrower allowlist (`list_agents_dashboard`, though missing Python's extra defense-in-depth pass through the secret-field filter — a minor structural weakening, not a mechanic collapse), and outright-gate (`/api/tokens`, real 403, never redacted). No fifth secret-classification list found. |
+
+  (ADR-0025 covers a related, separately-discovered issue: the *policy*
+  question this doc's Phase 5 explicitly left open for the operator —
+  whether a forwarding caller's signed role should count toward
+  confirmed-operator-tier — was accidentally decided "yes" by a bug in
+  the Rust port, contradicting the operator's actual decision. Fixed;
+  see that ADR for detail. Distinct from the D/RestPrincipal type-safety
+  claim above, which remains accurate on its own terms.)
 * Date: 2026-08-23
 * Source: two security-focused `/improve-codebase-architecture` passes.
   Pass 1 ran parallel with pentest-all round 21 (see
