@@ -3,7 +3,7 @@
  * W6-followup F4 — groups list on TanStack Query: cache + invalidation.
  *
  * The router-admin groups list is its own query (`['groups']`, fetched
- * from `GET /agent-mcp/api/router/groups`). Unlike tasks/messages it is
+ * from `GET /conexus/api/router/groups`). Unlike tasks/messages it is
  * ROUTER-level, not per-project, so its key carries NO project segment,
  * and — because the cross-project overview has NO operator-events SSE
  * stream (`subscribeMcpNotifications` early-returns for `isOverview`) —

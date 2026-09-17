@@ -112,8 +112,8 @@ export function SsoDashboard() {
             config.
           </p>
           <p>
-            <code>AGENT_MCP_SSO_OIDC_*</code> turns on OIDC;{" "}
-            <code>AGENT_MCP_SSO_PROXY_HEADER</code> turns on proxy-header
+            <code>CONEXUS_SSO_OIDC_*</code> turns on OIDC;{" "}
+            <code>CONEXUS_SSO_PROXY_HEADER</code> turns on proxy-header
             trust. The two modes are mutually exclusive — the router
             refuses to start when both are set.
           </p>

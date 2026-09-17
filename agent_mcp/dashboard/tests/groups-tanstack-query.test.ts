@@ -9,7 +9,7 @@
  * router-admin sibling of the retired `usePagedQuery`.
  *
  * W6-followup F4 moved the GROUPS LIST read (`GET
- * /agent-mcp/api/router/groups`) off `useRouterQuery` and onto the
+ * /conexus/api/router/groups`) off `useRouterQuery` and onto the
  * shared TanStack Query `queryClient` via `useGroupsQuery`
  * (`lib/queries/groups.ts`), mirroring the F2 (tasks) / F3 (messages)
  * migrations. Two things make groups deliberately different from the

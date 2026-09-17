@@ -44,7 +44,7 @@ export const AGENT_ID_RE = /^[a-z](?:[a-z0-9@_-]*[a-z0-9])?$/
 // agent_id + bearer token + ready-to-paste .mcp.json snippet, with a
 // "Copy snippet" button.
 //
-// agent-mcp does NOT start a claude process; the operator hands the
+// conexus does NOT start a claude process; the operator hands the
 // snippet to the user, who pastes it into their own `.mcp.json` and
 // runs claude themselves. The legacy `CreateAgentModal` (spawn path)
 // was deleted in Wave 7 PR 3.
@@ -91,7 +91,7 @@ export const RegisterAgentModal = () => {
         project_name: projectName,
         host: host || undefined,
         // ADR-0020: send the current mount prefix so the snippet URL
-        // matches this front door ("" at root, "/agent-mcp" on tailnet).
+        // matches this front door ("" at root, "/conexus" on tailnet).
         mount_prefix: deriveMount(),
       })
       if (!res.agent_id || !res.agent_token || !res.mcp_snippet) {
@@ -153,8 +153,8 @@ export const RegisterAgentModal = () => {
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {result
-              ? "Paste the snippet below into the user's claude .mcp.json. agent-mcp doesn't start the claude process for you — the user does."
-              : 'Mint an agent identity (DB row + bearer token) and get back a ready-to-paste .mcp.json snippet. Wave 7 coordinator model: agent-mcp never spawns claude.'}
+              ? "Paste the snippet below into the user's claude .mcp.json. conexus doesn't start the claude process for you — the user does."
+              : 'Mint an agent identity (DB row + bearer token) and get back a ready-to-paste .mcp.json snippet. Wave 7 coordinator model: conexus never spawns claude.'}
           </DialogDescription>
         </DialogHeader>
 

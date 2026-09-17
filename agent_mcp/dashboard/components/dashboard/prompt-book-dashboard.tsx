@@ -512,7 +512,7 @@ export function PromptBookDashboard() {
             Prompt Book
           </h1>
           <p className="text-muted-foreground text-fluid-base mt-1">
-            Standardized prompts and workflows for Agent-MCP
+            Standardized prompts and workflows for CoNexus
           </p>
         </div>
         {/* CC-23 audit 2026-06-02: added flex-wrap so the 4 badges +
@@ -589,12 +589,12 @@ export function PromptBookDashboard() {
             Quick Start
           </CardTitle>
           <CardDescription>
-            Essential prompts to get started with Agent-MCP
+            Essential prompts to get started with CoNexus
           </CardDescription>
         </CardHeader>
         <CardContent>
           {/* Wave 7 PR 2 — coordinator transition. Step copy
-              rewritten to match the register-only flow: agent-mcp
+              rewritten to match the register-only flow: conexus
               mints the token + ready-to-paste .mcp.json snippet,
               the user owns the claude process. */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -761,4 +761,4 @@ export function PromptBookDashboard() {
       />
     </div>
   )
-}
+}

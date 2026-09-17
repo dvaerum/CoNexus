@@ -68,7 +68,7 @@ function buildMcpJsonFor(projectName: string, token: string | null): ClientConfi
   if (token) {
     entry.headers = { Authorization: `Bearer ${token}` }
   }
-  return { mcpServers: { "agent-mcp": entry } }
+  return { mcpServers: { "conexus": entry } }
 }
 
 function MaskedToken({
@@ -113,7 +113,7 @@ function ProjectWiringPanel({
         projectClientConfigUrl(projectName),
         { cache: "no-store" },
       )
-      const auth = body?.mcpServers?.["agent-mcp"]?.headers?.Authorization ?? ""
+      const auth = body?.mcpServers?.["conexus"]?.headers?.Authorization ?? ""
       const m = auth.match(/^Bearer\s+(.+)$/)
       if (m && m[1] && m[1] !== "REPLACE_WITH_YOUR_AGENT_TOKEN") {
         setToken({ token: m[1], source: "router" })

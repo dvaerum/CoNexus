@@ -9,7 +9,7 @@
 //                             DEFAULT_WORKSPACE_PARENT/<name>
 //
 // POSTs a JSON body to the router-admin REST resource at
-// ``POST /agent-mcp/api/router/projects`` (ADR 0014). The session
+// ``POST /conexus/api/router/projects`` (ADR 0014). The session
 // cookie carries auth — the dashboard sends no token field. On
 // success we refresh the overview store; on 4xx we surface the
 // router's envelope ``message``.
@@ -71,7 +71,7 @@ export function AddProjectModal({
         if (!o) reset()
       }}
       title="Add a new project"
-      description="Register a new agent-mcp project on this router. Leave the workspace blank to let the router create one under the default location."
+      description="Register a new conexus project on this router. Leave the workspace blank to let the router create one under the default location."
       icon={Plus}
       onSubmit={handleSubmit}
       submitLabel="Create"
@@ -104,7 +104,7 @@ export function AddProjectModal({
           id="add-project-workspace"
           value={workspace}
           onChange={(e) => setWorkspace(e.target.value)}
-          placeholder="/home/dennis/.local/share/agent-mcp/projects/<name>"
+          placeholder="/home/dennis/.local/share/conexus/projects/<name>"
         />
         <p className="text-xs text-muted-foreground">
           Editable for the &quot;restore from existing folder&quot; use case.

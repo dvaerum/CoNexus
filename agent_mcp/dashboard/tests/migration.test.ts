@@ -6,7 +6,7 @@
  *   * ``agent_mcp/dashboard/lib/api/*.ts`` no longer splices
  *     ``token: tokens.admin_token`` into mutation payloads — the session
  *     cookie is what authenticates.
- *   * ``ApiClient`` redirects to ``/agent-mcp/login`` on a 401, preserving
+ *   * ``ApiClient`` redirects to ``/conexus/login`` on a 401, preserving
  *     the current path in ``?next=``.
  *
  * Phase F (prancy-napping-pie): this file used to also grep-check the
@@ -68,17 +68,17 @@ describe("dashboard api client: no admin token in mutation payloads", () => {
 // ── ApiClient 401 redirect handler exists ─────────────────────────
 
 describe("dashboard api client: 401 redirect handler", () => {
-  it("redirects to /agent-mcp/login on a 401, preserving the path in ?next=", () => {
-    // ApiClient must redirect to /agent-mcp/login on a 401, preserving
+  it("redirects to /conexus/login on a 401, preserving the path in ?next=", () => {
+    // ApiClient must redirect to /conexus/login on a 401, preserving
     // the current path in ``?next=`` so post-login the operator lands
     // back where they started.
     const text = readApiClient()
-    // Loose match: must reference both ``401`` and ``/agent-mcp/login``
+    // Loose match: must reference both ``401`` and ``/conexus/login``
     // somewhere in the file plus ``next=`` for the preserved path.
     expect(text.includes("401"), "ApiClient must inspect the 401 status code").toBe(true)
     expect(
-      text.includes("/agent-mcp/login"),
-      "ApiClient must redirect to /agent-mcp/login on 401",
+      text.includes("/conexus/login"),
+      "ApiClient must redirect to /conexus/login on 401",
     ).toBe(true)
     expect(
       text.includes("next=") || text.includes("next ="),

@@ -119,7 +119,7 @@ export class ApiClient {
    * already knows the absolute or relative URL of the API root
    * (for example, path-prefixed deployments mounted behind a
    * reverse-proxy router where the dashboard fetches resolve via
-   * `/agent-mcp/api/<name>` (PR-B renamed from /__api/) rather than
+   * `/conexus/api/<name>` (PR-B renamed from /__api/) rather than
    * a `http://host:port/api`
    * origin).
    *
@@ -162,14 +162,14 @@ export class ApiClient {
     // Enhanced CORS configuration.
     //
     // PR-A: the strict, version-pinned API media type is required by
-    // the router's Accept-header gate (/agent-mcp/api/<name>/*). A
+    // the router's Accept-header gate (/conexus/api/<name>/*). A
     // plain `application/json` Accept value is rejected with 406. The
     // dashboard is a first-class consumer of the v1 surface, so the
     // gate header is part of every request.
     //
     // PR D (prancy-napping-pie): credentials='include' so the
-    // ``agent_mcp_session`` cookie is sent with every fetch. The
-    // cookie is set by /agent-mcp/login (PR C) and is what
+    // ``conexus_session`` cookie is sent with every fetch. The
+    // cookie is set by /conexus/login (PR C) and is what
     // authenticates dashboard mutations now that the body-token
     // path is retired. Same-origin requests still attach the cookie
     // with omit (Path matches), but credentials='include' covers
@@ -178,7 +178,7 @@ export class ApiClient {
     const fetchOptions: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/vnd.agent-mcp.v1+json',
+        'Accept': 'application/vnd.conexus.v1+json',
         // Don't set Origin header - let browser handle it automatically
         ...options.headers,
       },
@@ -225,7 +225,7 @@ export class ApiClient {
       // non-401 (see below) are not retried.
       //
       // 401 rides the SAME bounded retry (Firefox-MCP finding,
-      // 2026-09-06): the router's `/agent-mcp/api/<project>/*` proxy
+      // 2026-09-06): the router's `/conexus/api/<project>/*` proxy
       // route is NOT behind the operator session-gate — it forwards
       // straight to the per-project backend's own REST gate
       // (`conexus-backend`'s `rest_gate::require_rest_identity`),
@@ -288,7 +288,7 @@ export class ApiClient {
         // the retry loop's comment — a read hitting this line has
         // already ridden out up to 600ms of transient backend-auth
         // hiccups), treat it as the operator's session cookie having
-        // expired (or never been set). Bounce to /agent-mcp/login and
+        // expired (or never been set). Bounce to /conexus/login and
         // preserve the current path in ?next= so we land back here
         // post-login.
         //
@@ -302,7 +302,7 @@ export class ApiClient {
           typeof window !== 'undefined' &&
           // ADR-0020: compare against the mount-derived login path
           // (loginUrl() = `${ROOT}/login`) so the loop-guard holds at
-          // both the tailnet (/agent-mcp/login) and root (/login) mounts.
+          // both the tailnet (/conexus/login) and root (/login) mounts.
           !window.location.pathname.endsWith(loginUrl())
         ) {
           const next = window.location.pathname + window.location.search

@@ -430,8 +430,8 @@ export const AgentDetailDialog = ({
             </Label>
             <p className="text-xs text-muted-foreground">
               Streamable HTTP transport (MCP spec rev 2025-03-26). Server name is
-              the fixed <code>agent-mcp</code> (slash-command prefix
-              <code>agent-mcp:</code>); .mcp.json entries are scoped per project.
+              the fixed <code>conexus</code> (slash-command prefix
+              <code>conexus:</code>); .mcp.json entries are scoped per project.
             </p>
             {/*
               Tabs are expanded statically (one TabsTrigger / TabsContent
@@ -442,9 +442,9 @@ export const AgentDetailDialog = ({
               wires it up.
 
               Snippet format details:
-              - Server name: the fixed string `agent-mcp` (matches the
+              - Server name: the fixed string `conexus` (matches the
                 user's .claude.json convention → slash-command prefix
-                `agent-mcp:`). A single fixed key is fine because
+                `conexus:`). A single fixed key is fine because
                 .mcp.json entries are scoped per cwd/project.
               - URL: derived from window.location.origin +
                 projectContext.apiPrefix + '/mcp' (path-prefix adapter,

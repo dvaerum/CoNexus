@@ -342,13 +342,13 @@ describe("MCP-onboarding tabbed section", () => {
 
   it("persists the active tab in localStorage", () => {
     // The active tab must persist across reloads — we key it under
-    // `agent-mcp-popup-active-client` so a user's "I always use
+    // `conexus-popup-active-client` so a user's "I always use
     // OpenCode" preference is sticky.
     const src = readAgents()
     expect(
-      src.includes("agent-mcp-popup-active-client"),
+      src.includes("conexus-popup-active-client"),
       "active-tab persistence must use the localStorage key " +
-        "'agent-mcp-popup-active-client'",
+        "'conexus-popup-active-client'",
     ).toBe(true)
     expect(
       src.includes("localStorage"),
@@ -356,26 +356,26 @@ describe("MCP-onboarding tabbed section", () => {
     ).toBe(true)
   })
 
-  it("uses the fixed 'agent-mcp' server name", () => {
-    // The snippet server name must be the fixed string `agent-mcp`
-    // (NOT namespaced `agent-mcp-${agent.agent_id}`). This matches the
+  it("uses the fixed 'conexus' server name", () => {
+    // The snippet server name must be the fixed string `conexus`
+    // (NOT namespaced `conexus-${agent.agent_id}`). This matches the
     // user's .claude.json convention so the slash-command prefix is
-    // `agent-mcp:`; a single fixed key is fine because .mcp.json entries
+    // `conexus:`; a single fixed key is fine because .mcp.json entries
     // are scoped per cwd/project. The regex guards against a revert to
-    // the `agent-mcp-${...}` interpolated form.
+    // the `conexus-${...}` interpolated form.
     const src = readAgents()
     // buildSnippet owns the server-name literal; assert it binds `name`
-    // to the fixed 'agent-mcp' string.
+    // to the fixed 'conexus' string.
     expect(
-      /const\s+name\s*=\s*'agent-mcp'/.test(src),
-      "buildSnippet must set `const name = 'agent-mcp'` (the fixed " +
+      /const\s+name\s*=\s*'conexus'/.test(src),
+      "buildSnippet must set `const name = 'conexus'` (the fixed " +
         "server key), matching the user's .claude.json convention",
     ).toBe(true)
     // And guard against a revert to the interpolated per-agent_id form.
     expect(
-      /agent-mcp-\$\{[^}]*agent[^}]*\.agent_id/.test(src),
-      "snippet server name must be the fixed `agent-mcp`, not the " +
-        "namespaced `agent-mcp-${agent.agent_id}` form",
+      /conexus-\$\{[^}]*agent[^}]*\.agent_id/.test(src),
+      "snippet server name must be the fixed `conexus`, not the " +
+        "namespaced `conexus-${agent.agent_id}` form",
     ).toBe(false)
   })
 

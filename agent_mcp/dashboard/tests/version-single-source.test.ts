@@ -51,17 +51,17 @@ describe("version single source of truth", () => {
       hardcoded,
       `hardcoded version literal ${JSON.stringify(
         hardcoded?.[0],
-      )} found in app-sidebar.tsx; derive it from NEXT_PUBLIC_AGENT_MCP_VERSION instead`,
+      )} found in app-sidebar.tsx; derive it from NEXT_PUBLIC_CONEXUS_VERSION instead`,
     ).toBeNull()
     // ...and it must actually read the derived env var.
-    expect(src).toContain("NEXT_PUBLIC_AGENT_MCP_VERSION")
+    expect(src).toContain("NEXT_PUBLIC_CONEXUS_VERSION")
   })
 
   it("next.config.ts wires the version env from package.json", () => {
     // What makes the version reach the client bundle (env-var first,
     // package.json fallback for plain `npm run dev`).
     const src = readFileSync(NEXT_CONFIG, "utf8")
-    expect(src).toContain("NEXT_PUBLIC_AGENT_MCP_VERSION")
+    expect(src).toContain("NEXT_PUBLIC_CONEXUS_VERSION")
     expect(
       src,
       "next.config.ts should resolve its package.json fallback " +

@@ -19,10 +19,10 @@ const inter = { variable: "--font-sans" } as const;
 const jetbrainsMono = { variable: "--font-mono" } as const;
 
 export const metadata: Metadata = {
-  title: "Agent MCP Dashboard",
+  title: "CoNexus Dashboard",
   description: "Premium multi-agent system dashboard with real-time monitoring and control capabilities",
   keywords: ["agent", "mcp", "dashboard", "multi-agent", "ai", "automation"],
-  authors: [{ name: "Agent MCP Team" }],
+  authors: [{ name: "CoNexus Team" }],
 };
 
 export const viewport = {

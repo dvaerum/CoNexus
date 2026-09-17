@@ -190,7 +190,7 @@ export function ComposeMessageModal({
   ])
 
   // v5.0.22: ask the backend (which delegates to Ollama if
-  // AGENT_MCP_SUBJECT_MODEL is configured) to propose a subject.
+  // CONEXUS_SUBJECT_MODEL is configured) to propose a subject.
   const suggestSubject = async () => {
     if (!composeContent.trim()) return
     setSuggestLoading(true)
@@ -204,7 +204,7 @@ export function ComposeMessageModal({
       } else {
         setSuggestHint(
           "No suggestion available — type a subject manually " +
-            "(or set AGENT_MCP_SUBJECT_MODEL server-side to enable Ollama).",
+            "(or set CONEXUS_SUBJECT_MODEL server-side to enable Ollama).",
         )
       }
     } catch (e) {

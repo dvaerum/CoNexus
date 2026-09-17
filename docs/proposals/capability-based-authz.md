@@ -5,7 +5,7 @@
   ships in full: a real closed `Capability` enum
   (`rust/conexus-core/src/capability.rs`), a `group_capability` table +
   repository (`rust/conexus-db/src/group_capability_repository.rs`),
-  the `GET`/`PUT /agent-mcp/api/router/groups/{group_id}/capabilities`
+  the `GET`/`PUT /conexus/api/router/groups/{group_id}/capabilities`
   REST routes (registered in `rust/conexus-router/src/main.rs`,
   dispatching to `users_groups_rest.rs`'s handlers, which call the
   decision logic in `admin_group_capabilities.rs`),

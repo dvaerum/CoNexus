@@ -17,8 +17,8 @@
  *     dashboard is a single client page that switches a `currentView`
  *     enum) — query-param keeps the diff small.
  *   * Coexists cleanly with the path-prefix adapter from PR #56 that
- *     mounts the dashboard at `/agent-mcp/__dashboard/<project>/`. The
- *     shape becomes `/agent-mcp/__dashboard/<project>/?page=tasks`.
+ *     mounts the dashboard at `/conexus/__dashboard/<project>/`. The
+ *     shape becomes `/conexus/__dashboard/<project>/?page=tasks`.
  *   * `useSearchParams` is the canonical Next.js hook for this; no
  *     `dynamicParams` / `generateStaticParams` plumbing needed.
  *   * Bookmarks + share-links work out of the box.

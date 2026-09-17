@@ -1,15 +1,15 @@
-# agent-mcp Delivery Bridge (AoE plugin worker)
+# conexus Delivery Bridge (AoE plugin worker)
 
 A native Rust [Agent of Empires](https://github.com/agent-of-empires) plugin
-worker that implements the **runtime side** of agent-mcp's per-worker
+worker that implements the **runtime side** of conexus's per-worker
 *delivery* fallback channel ([ADR-0021](../docs/adr/0021-delivery-transport.md)).
 
-agent-mcp owns the **policy** — when to nudge a session that has stopped calling
-`wait_for_events`. This bridge owns **delivery**: it reaches *out* to agent-mcp,
+conexus owns the **policy** — when to nudge a session that has stopped calling
+`wait_for_events`. This bridge owns **delivery**: it reaches *out* to conexus,
 subscribes to each covered session's delivery SSE stream, reports that session's
 `transport-status` back up, and injects the skinny frames it receives into the
-AoE-run Claude session through AoE's localhost REST. agent-mcp needs no
-knowledge of AoE; the dependency points from the runtime into agent-mcp.
+AoE-run Claude session through AoE's localhost REST. conexus needs no
+knowledge of AoE; the dependency points from the runtime into conexus.
 
 ## What it does, per covered session
 
@@ -45,9 +45,9 @@ knowledge of AoE; the dependency points from the runtime into agent-mcp.
 
 ## The session → route mapping
 
-**One base, everything derived.** There is exactly one agent-mcp URL to
+**One base, everything derived.** There is exactly one conexus URL to
 configure — `agent_mcp_base`, the **bare** router address you reach it at (on the
-same host `http://127.0.0.1:1337`, no `/agent-mcp` — that prefix is a
+same host `http://127.0.0.1:1337`, no `/conexus` — that prefix is a
 reverse-proxy concern, per ADR-0020, not part of this base). Every per-session
 URL is derived from it plus the row's `project`:
 
@@ -57,7 +57,7 @@ mcp      = <agent_mcp_base>/mcp/<project>   (injected per-session MCP server)
 ```
 
 So a covered-session row carries **only identity** — never a URL. The **one
-token drives both surfaces**: an agent-mcp agent token (minted via
+token drives both surfaces**: a conexus agent token (minted via
 `register_agent`) authenticates the delivery stream AND the MCP transport. The
 bridge wires delivery (always) and MCP (when `expose_mcp`, over
 `session.mcp.set`) — no separate provisioning step.
@@ -71,9 +71,9 @@ session:
 | Field | Meaning |
 |---|---|
 | `session_id` | **(required)** AoE session id (matches `sessions.list[].id`; stable across respawn). |
-| `token` | **(required)** The session's agent-mcp bearer. Authenticates both the delivery stream and the injected MCP server. |
-| `project` | **(required)** The agent-mcp project this session acts as. Appended to `agent_mcp_base` for both its `/api/<project>` (delivery) and `/mcp/<project>` (MCP) URLs. |
-| `expose_mcp` | Also inject agent-mcp's tools into this session (default `true`). Delivery fires regardless; this gates only the MCP-tools half. First enable respawns the session once (transcript-preserving) to load the set. |
+| `token` | **(required)** The session's conexus bearer. Authenticates both the delivery stream and the injected MCP server. |
+| `project` | **(required)** The conexus project this session acts as. Appended to `agent_mcp_base` for both its `/api/<project>` (delivery) and `/mcp/<project>` (MCP) URLs. |
+| `expose_mcp` | Also inject conexus's tools into this session (default `true`). Delivery fires regardless; this gates only the MCP-tools half. First enable respawns the session once (transcript-preserving) to load the set. |
 | `mode` | `auto` \| `terminal` \| `structured`. |
 
 Global settings: `agent_mcp_base` (the one above), `aoe_base` (the **AoE-side**
@@ -94,7 +94,7 @@ provisioned.
   bridge appends `/api/<project>` (+ `/delivery/stream|status`) and
   `/mcp/<project>`.
 - **`token`** authenticates both the SSE subscribe and the status POST; it is
-  the session's agent-mcp worker bearer.
+  the session's conexus worker bearer.
 - **Mode `auto` is resolved per inject, not per reconcile.** Injecting on the
   wrong transport is refused outright (`400 acp_mode_unsupported`), and a
   session's view can change at any point in an interval — this bridge's own
@@ -123,7 +123,7 @@ provisioned.
   keyword match (`map_transport_status`); it only *gates nudge timing*, never
   authorizes anything, so an occasional misclassification is low-blast-radius.
 - **The operator populates `sessions`.** Each row's `token` is minted via
-  agent-mcp's `register_agent`; the bridge then wires both delivery and (if
+  conexus's `register_agent`; the bridge then wires both delivery and (if
   `expose_mcp`) the per-session MCP itself — no separate provisioning step. On a
   nix deploy where config.toml is writable (e.g. via `nix-it-in`), rows are added
   at runtime so tokens stay out of git.
@@ -190,7 +190,7 @@ Two surfaces, because the host gives a runtime worker exactly two channels.
 ### The status page (live state)
 
 The manifest declares the global `settings-page` UI slot, so the AoE dashboard
-mounts **Settings → agent-mcp Delivery Bridge**. The worker re-pushes it after
+mounts **Settings → conexus Delivery Bridge**. The worker re-pushes it after
 every reconcile, on every stream/inject state change, and at least every 30s.
 It answers, per covered session:
 
@@ -201,13 +201,13 @@ It answers, per covered session:
 | did a frame arrive? | `frames received`: count, age, and the frame's `reason` |
 | did the inject work? | `injects`: ok/failed counts, and `last inject` with the HTTP status |
 | **why did it fail?** | `last inject` carries AoE's error code, e.g. `HTTP 400: acp_mode_unsupported` — compacted from the JSON body so it still reads on a phone; the untruncated body is in the log |
-| is agent-mcp's MCP wired in? | `agent-mcp tools`: injected / pending |
+| is conexus's MCP wired in? | `conexus tools`: injected / pending |
 
 Failing sessions sort first and render expanded. The overall verdict
 distinguishes *disabled*, *not configured*, *no live sessions*, *healthy* and
 *degraded* — an empty page always says which.
 
-The `agent-mcp Delivery: status` command forces an immediate repaint and toasts
+The `conexus Delivery: status` command forces an immediate repaint and toasts
 a one-line summary. It cannot return anything (see *Protocol model*), so the
 toast is the answer.
 
@@ -253,4 +253,4 @@ title could occupy — only ids, counts, timestamps, HTTP codes and the frame's
 - A transient SSE drop is treated as *temporarily gone*, not a session end: the
   stream reconnects with capped backoff and the policy re-fires on reconnect
   (self-healing, ADR-0021). No delivered-state, no ack — the condition on the
-  agent-mcp side is the source of truth.
+  conexus side is the source of truth.

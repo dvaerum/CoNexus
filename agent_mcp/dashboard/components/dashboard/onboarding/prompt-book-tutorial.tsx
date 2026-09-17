@@ -26,7 +26,7 @@ interface TutorialStep {
 const tutorialSteps: TutorialStep[] = [
   {
     title: "Welcome to Prompt Book",
-    description: "Your central hub for Agent-MCP workflows and prompts",
+    description: "Your central hub for CoNexus workflows and prompts",
     icon: BookOpen,
     content: (
       <div className="space-y-4">
@@ -36,7 +36,7 @@ const tutorialSteps: TutorialStep[] = [
           </div>
           <h3 className="text-lg font-semibold">Welcome to your Prompt Book!</h3>
           <p className="text-muted-foreground">
-            This is your centralized collection of standardized prompts and workflows for Agent-MCP. 
+            This is your centralized collection of standardized prompts and workflows for CoNexus. 
             Think of it as your personal AI prompt library.
           </p>
         </div>
@@ -48,7 +48,7 @@ const tutorialSteps: TutorialStep[] = [
               <span className="font-medium text-sm">Standardized</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Pre-built prompts for common Agent-MCP tasks
+              Pre-built prompts for common CoNexus tasks
             </p>
           </div>
           <div className="p-3 border rounded-lg bg-muted/30">
@@ -134,7 +134,7 @@ const tutorialSteps: TutorialStep[] = [
             <span className="font-medium text-blue-900 dark:text-blue-100 text-sm">Pro Tip</span>
           </div>
           <p className="text-xs text-blue-800 dark:text-blue-200">
-            Start with the &quot;Quick Start&quot; section to see the essential prompts for getting Agent-MCP running.
+            Start with the &quot;Quick Start&quot; section to see the essential prompts for getting CoNexus running.
           </p>
         </div>
       </div>
@@ -210,10 +210,10 @@ const tutorialSteps: TutorialStep[] = [
         
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Agent-MCP works best when you follow a structured workflow. Here&apos;s the typical sequence:
+            CoNexus works best when you follow a structured workflow. Here&apos;s the typical sequence:
           </p>
           
-          {/* Wave 7 PR 2 — coordinator transition. agent-mcp mints
+          {/* Wave 7 PR 2 — coordinator transition. conexus mints
               tokens + ready-to-paste .mcp.json snippets; the user
               owns the claude process. The step copy was rewritten
               from "Spawn workers / Initialize workers" to "Register
@@ -222,7 +222,7 @@ const tutorialSteps: TutorialStep[] = [
           <div className="space-y-2">
             {[
               { step: 1, title: "Add Project Context", desc: "Load your MCD and project documentation" },
-              { step: 2, title: "Register Worker Agents", desc: "Click New Agent — agent-mcp mints a token + .mcp.json snippet" },
+              { step: 2, title: "Register Worker Agents", desc: "Click New Agent — conexus mints a token + .mcp.json snippet" },
               { step: 3, title: "Start Workers Locally", desc: "Paste the snippet into the user’s claude .mcp.json and start claude" },
               { step: 4, title: "Assign Tasks", desc: "Delegate work to the appropriate agents from the dashboard" },
               { step: 5, title: "Monitor & Debug", desc: "Track progress and troubleshoot issues" }
@@ -277,7 +277,7 @@ const tutorialSteps: TutorialStep[] = [
               <span className="font-medium text-sm">Try a Quick Start</span>
             </div>
             {/* Wave 7 PR 2 — coordinator transition. The prompt copy
-                used to say "spawn your first worker"; agent-mcp
+                used to say "spawn your first worker"; conexus
                 doesn't spawn claude anymore. The flow is: register
                 an agent → paste snippet → start claude yourself. */}
             <p className="text-xs text-muted-foreground">
@@ -440,4 +440,4 @@ export function usePromptBookTutorial() {
   }, [])
 
   return { showTutorial, setShowTutorial }
-}
+}

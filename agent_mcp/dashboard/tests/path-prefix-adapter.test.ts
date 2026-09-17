@@ -116,13 +116,13 @@ describe("lib/project-context.ts", () => {
     ).toBe(true)
     const urlsSrc = read(resolve(DASHBOARD_ROOT, "lib", "urls.ts"))
     expect(
-      urlsSrc.includes("/agent-mcp/app"),
-      "expected the path-prefix literal `/agent-mcp/app` in " +
+      urlsSrc.includes("/conexus/app"),
+      "expected the path-prefix literal `/conexus/app` in " +
         "lib/urls.ts (PR-B renamed from /__dashboard/)",
     ).toBe(true)
     expect(
-      urlsSrc.includes("/agent-mcp/api"),
-      "expected the derived API root literal `/agent-mcp/api` in " +
+      urlsSrc.includes("/conexus/api"),
+      "expected the derived API root literal `/conexus/api` in " +
         "lib/urls.ts (PR-B renamed from /__api/)",
     ).toBe(true)
   })

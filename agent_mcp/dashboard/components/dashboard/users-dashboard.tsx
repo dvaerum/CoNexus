@@ -1,13 +1,13 @@
 "use client"
 
 // Router-level user list view — Phase 3 Wave 1b (prancy-napping-pie).
-// Lives at the cross-project overview (``/agent-mcp/app/``) as a
+// Lives at the cross-project overview (``/conexus/app/``) as a
 // tabbed section alongside the existing Projects tab; rendered by
 // ProjectsOverviewDashboard via the same Tabs component used for
 // the project listing. Per-project pages don't show this — user
 // management is a router-level concern.
 //
-// Backend: /agent-mcp/api/router/users[/<user_id>] (Wave 1b REST).
+// Backend: /conexus/api/router/users[/<user_id>] (Wave 1b REST).
 // Cookie session carries auth; no body-token field.
 //
 // Presentation is delegated to the shared <DataTablePage> scaffold

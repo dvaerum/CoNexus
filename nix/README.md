@@ -14,16 +14,16 @@ Three groups of user-scope systemd units:
 - **`conexus-router.service`** (the CoNexus Rust router; the retired
   Python one was `agent-mcp-router.service`) — always-on URL-keyed
   HTTP router on loopback (default `127.0.0.1:1337`). Serves the
-  Next.js dashboard at `/agent-mcp/app/`, proxies MCP traffic
+  Next.js dashboard at `/conexus/app/`, proxies MCP traffic
   to per-project backends, lazy-starts/stops them by activity, and
-  exposes the project-lifecycle REST API under `/agent-mcp/api/router/`
+  exposes the project-lifecycle REST API under `/conexus/api/router/`
   (ADR-0014).
 - **`conexus@<name>.service`** (systemd template; the retired Python
   one was `agent-mcp@<name>.service`) — one instance per registered
   project, started lazily by the router on first MCP request, stopped
   after `services.agent-mcp.router.idleSec` seconds of inactivity.
   Listens on a Unix domain socket under
-  `$XDG_RUNTIME_DIR/agent-mcp/<name>/backend.sock`.
+  `$XDG_RUNTIME_DIR/conexus/<name>/backend.sock`.
 - **`agent-mcp-daemon-agent@<project>--<agent_id>.service`** (systemd
   template) — one instance per entry in
   `services.agent-mcp.daemonAgents`. Runs an event-driven
@@ -31,9 +31,9 @@ Three groups of user-scope systemd units:
   task assignments without anyone keeping a Claude session open.
 
 Project membership is **not** declared in nix. Every project is
-registered at runtime via `POST /agent-mcp/api/router/projects`
+registered at runtime via `POST /conexus/api/router/projects`
 (dashboard form or `curl`, JSON body), recorded in
-`~/.config/agent-mcp/projects.local.json`.
+`~/.config/conexus/projects.local.json`.
 The module materialises the router + systemd templates + the
 daemon-agent wiring; the project list lives outside source control.
 
@@ -67,11 +67,11 @@ In your home-manager flake:
               # host's loopback.
               externalUrl = "https://my-host.tailfdae0.ts.net";
 
-              # Where POST /agent-mcp/api/router/projects puts a
+              # Where POST /conexus/api/router/projects puts a
               # project's workspace when the form's Workspace field
               # is empty.
               defaultWorkspaceParent =
-                "/home/alice/.local/share/agent-mcp/projects";
+                "/home/alice/.local/share/conexus/projects";
             };
             dashboard.enable = true;
             daemonAgents = [
@@ -81,7 +81,7 @@ In your home-manager flake:
                 project = "washing-brothers";
                 agentId = "backend-dev";
                 tokenPath =
-                  "/home/alice/.config/agent-mcp/tokens/washing-brothers--backend-dev.token";
+                  "/home/alice/.config/conexus/tokens/washing-brothers--backend-dev.token";
               }
             ];
           };
@@ -93,12 +93,12 @@ In your home-manager flake:
 ```
 
 After `home-manager switch`, the router boots on
-`http://127.0.0.1:1337/agent-mcp/`. Log in as the operator (see
+`http://127.0.0.1:1337/conexus/`. Log in as the operator (see
 [`docs/operator/getting-started.md`](../docs/operator/getting-started.md#first-boot-setup-operator-login)
 for first-boot setup), then the first project you create through the
-dashboard (or via `POST /agent-mcp/api/router/projects` with a JSON
+dashboard (or via `POST /conexus/api/router/projects` with a JSON
 body `{"name": "foo"}` and the session cookie) appears in
-`~/.config/agent-mcp/projects.local.json` and shows up in the
+`~/.config/conexus/projects.local.json` and shows up in the
 dashboard's overview.
 
 ## Options reference
@@ -134,7 +134,7 @@ Each `daemonAgents` entry has:
 
 | Sub-option | Type | Description |
 |------------|------|-------------|
-| `project` | str | Project slug (must exist — create it via `POST /agent-mcp/api/router/projects` first). |
+| `project` | str | Project slug (must exist — create it via `POST /conexus/api/router/projects` first). |
 | `agentId` | str | Agent slug (must exist on the project). |
 | `tokenPath` | str | Absolute path to the file holding the agent's bearer token. |
 
@@ -183,7 +183,7 @@ plaintext file is fine:
 
 ```sh
 install -m 600 /dev/stdin \
-  ~/.config/agent-mcp/tokens/washing-brothers--backend-dev.token \
+  ~/.config/conexus/tokens/washing-brothers--backend-dev.token \
   <<<'<bearer-token-from-dashboard>'
 ```
 
@@ -201,21 +201,21 @@ exhaustive):
 
 | URL | Purpose |
 |-----|---------|
-| `GET /agent-mcp/` | JSON service descriptor, or a redirect to the dashboard for a browser (`Accept: text/html`). |
-| `GET /agent-mcp/app/` | Next.js dashboard. |
-| `GET/POST /agent-mcp/api/router/projects` | List / register a project (JSON body: `{"name": ..., "workspace": ...}`). |
-| `PATCH/DELETE /agent-mcp/api/router/projects/{name}` | Rename (creates a grace-period alias; ADR-0010) / unregister a project. |
-| `POST /agent-mcp/api/router/projects/{name}/stop` | Stop a project's backend (refuses if busy). |
-| `GET /agent-mcp/api/router/projects/{name}/aliases` | Retired-alias usage for a project. |
-| `DELETE /agent-mcp/api/router/projects/{name}/aliases/{alias}` | Drop a grace-period alias early. |
-| `GET /agent-mcp/api/router/overview` | Cross-project status summary. |
-| `GET/POST /agent-mcp/api/router/users`, `.../groups` (+ `PATCH`/`DELETE .../{id}` on each), `GET/POST .../groups/{id}/members` (+ `DELETE .../members/{member_id}`), `GET/PUT .../groups/{id}/capabilities` | Operator/group/capability admin surface. |
-| `GET/POST /agent-mcp/api/router/projects/{name}/memberships`, `PATCH`/`DELETE .../memberships/{id}` | Per-project membership admin. |
-| `GET /agent-mcp/api/router/sso/config` | SSO configuration readback. |
-| `ANY /agent-mcp/mcp/{name}` | Streamable HTTP MCP endpoint for `{name}`. |
+| `GET /conexus/` | JSON service descriptor, or a redirect to the dashboard for a browser (`Accept: text/html`). |
+| `GET /conexus/app/` | Next.js dashboard. |
+| `GET/POST /conexus/api/router/projects` | List / register a project (JSON body: `{"name": ..., "workspace": ...}`). |
+| `PATCH/DELETE /conexus/api/router/projects/{name}` | Rename (creates a grace-period alias; ADR-0010) / unregister a project. |
+| `POST /conexus/api/router/projects/{name}/stop` | Stop a project's backend (refuses if busy). |
+| `GET /conexus/api/router/projects/{name}/aliases` | Retired-alias usage for a project. |
+| `DELETE /conexus/api/router/projects/{name}/aliases/{alias}` | Drop a grace-period alias early. |
+| `GET /conexus/api/router/overview` | Cross-project status summary. |
+| `GET/POST /conexus/api/router/users`, `.../groups` (+ `PATCH`/`DELETE .../{id}` on each), `GET/POST .../groups/{id}/members` (+ `DELETE .../members/{member_id}`), `GET/PUT .../groups/{id}/capabilities` | Operator/group/capability admin surface. |
+| `GET/POST /conexus/api/router/projects/{name}/memberships`, `PATCH`/`DELETE .../memberships/{id}` | Per-project membership admin. |
+| `GET /conexus/api/router/sso/config` | SSO configuration readback. |
+| `ANY /conexus/mcp/{name}` | Streamable HTTP MCP endpoint for `{name}`. |
 
-Every `/agent-mcp/api/router/*` route above is also mounted with an
-`/agent-mcp/api/router/.../` trailing-slash twin and a root-mounted
+Every `/conexus/api/router/*` route above is also mounted with an
+`/conexus/api/router/.../` trailing-slash twin and a root-mounted
 alias without the `/agent-mcp` prefix (ADR-0020, mount-agnostic). No
 `client-config`/`installer` curl-installable-snippet route exists
 today — the router's own CLI carries an `--installer-template` flag
@@ -229,12 +229,12 @@ Tailnet exposure (`externalUrl`) is configured outside this module
 ## Asset prefix
 
 The dashboard's static export embeds a literal sentinel string
-(`__AGENT_MCP_ASSET_PREFIX__`) wherever Next.js would normally bake
+(`__CONEXUS_ASSET_PREFIX__`) wherever Next.js would normally bake
 in `assetPrefix`. The router substitutes the configured runtime
 prefix into served HTML / JS / CSS bodies on the fly so a single
 build artifact serves any deployment URL.
 
-* **Default**: assets serve at `/agent-mcp/assets` (the router's own
+* **Default**: assets serve at `/conexus/assets` (the router's own
   route table). Operators who deploy the router straight onto loopback
   (the documented path) need no configuration.
 * **Custom mount**: the prefix is resolved per-request
@@ -248,9 +248,9 @@ build artifact serves any deployment URL.
   no router rebuild or restart-time flag needed. (The `--asset-prefix`
   CLI flag is accepted and stored on `RouterState` but never read
   anywhere after that — don't rely on it. There is no
-  `AGENT_MCP_ASSET_PREFIX` env var wired to it at all; the only place
+  `CONEXUS_ASSET_PREFIX` env var wired to it at all; the only place
   that string appears in the source is the unrelated build-time
-  sentinel `__AGENT_MCP_ASSET_PREFIX__` Next.js bakes in, a different
+  sentinel `__CONEXUS_ASSET_PREFIX__` Next.js bakes in, a different
   mechanism entirely.)
 
 Substitution is Content-Type-gated (`rust/conexus-router/src/asset_prefix.rs`'s

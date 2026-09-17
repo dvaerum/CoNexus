@@ -1,10 +1,10 @@
 "use client"
 
 // Cross-project overview dashboard (Phase 3.5a — prancy-napping-pie).
-// Lives at `/agent-mcp/app/` (no project segment, PR-B renamed from
+// Lives at `/conexus/app/` (no project segment, PR-B renamed from
 // /__dashboard/). Renders one card per registered project (R2 + S2 +
 // multi-line per the locked design table) backed by the
-// `/agent-mcp/api/router/overview` router endpoint (ADR 0014) via
+// `/conexus/api/router/overview` router endpoint (ADR 0014) via
 // `useProjectsStore`.
 //
 // Per-card layout (multi-line, ~2-3 visible lines + "Show details"
@@ -16,7 +16,7 @@
 //   │  [alias: oldname (expires 2026-07-15)] [Show details ▼]    │
 //   │                                                            │
 //   │  --- expanded ---                                          │
-//   │  Workspace: /home/dennis/.local/share/agent-mcp/projects/x │
+//   │  Workspace: /home/dennis/.local/share/conexus/projects/x │
 //   └────────────────────────────────────────────────────────────┘
 //
 // Add/Remove/Rename modal buttons wired in PR-B (Phase 3.5b). Alias
@@ -299,7 +299,7 @@ export function ProjectsOverviewDashboard(): React.ReactElement {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
-              Agent MCP — Projects
+              CoNexus — Projects
             </h1>
             <p className="text-sm text-muted-foreground">
               {envelope?.multi_tenant === false

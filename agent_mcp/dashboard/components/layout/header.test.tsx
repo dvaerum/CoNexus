@@ -3,7 +3,7 @@
 // R12-F1: the dashboard SPA had no logout/session-termination UI
 // anywhere. `<Header>` is the single shared header rendered on every
 // authenticated page (via `<MainLayout>`), so the logout control lives
-// here. The server-side `POST /agent-mcp/logout` route was already
+// here. The server-side `POST /conexus/logout` route was already
 // correct (POST-only, CSRF-safe via SameSite cookie, httpOnly session,
 // 30-day expiry) — this only closes the missing client-side entry
 // point. See lib/urls.ts `logoutUrl()`/`loginUrl()` for the mount-
@@ -58,7 +58,7 @@ describe("<Header> logout control", () => {
     ).toBeTruthy()
   })
 
-  it("POSTs to /agent-mcp/logout with the session cookie on click", async () => {
+  it("POSTs to /conexus/logout with the session cookie on click", async () => {
     renderHeader()
     fireEvent.click(screen.getByRole("button", { name: /log ?out/i }))
 

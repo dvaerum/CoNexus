@@ -2,7 +2,7 @@
 
 /**
  * TanStack Query hook for a project's membership list
- * (`GET /agent-mcp/api/router/projects/<name>/memberships`).
+ * (`GET /conexus/api/router/projects/<name>/memberships`).
  *
  * W6-followup-2 increment G2 (2026-08-11): project-memberships-modal used
  * to fetch via the hand-rolled `useRouterQuery` hook (with its

@@ -12,12 +12,12 @@
  * useEffects through React's render cycle.
  *
  * URL pattern (PR-B). Path-prefixed deployments mount the dashboard at
- * `/agent-mcp/app/<name>/...` (the always-on Python router URL-routes
+ * `/conexus/app/<name>/...` (the always-on Python router URL-routes
  * each `<name>` to a per-project systemd-template backend on a Unix
  * socket). When pathname matches, we derive:
  *   - projectName: the `<name>` segment (e.g. `washing-brothers`)
  *   - baseUrl:     the router-proxied API root for fetches
- *                  (`/agent-mcp/api/<name>`)
+ *                  (`/conexus/api/<name>`)
  *   - apiPrefix:   the same value, exposed separately for callers
  *                  building URLs that aren't simple `${baseUrl}/...`
  *                  concatenations
@@ -67,7 +67,7 @@ function derive(): {
   projectName: string | null
   isOverview: boolean
   // True when the dashboard is served behind the always-on Python
-  // router at `/agent-mcp/app/<name>/...` (multi-tenant deployment).
+  // router at `/conexus/app/<name>/...` (multi-tenant deployment).
   // Distinct from `projectName !== null` only in that consumers reading
   // this flag don't have to re-derive the standalone-mode case
   // themselves. Used by DashboardWrapper to skip the "Connect to MCP

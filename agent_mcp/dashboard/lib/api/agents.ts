@@ -199,7 +199,7 @@ export function agentsApi(core: ApiClient) {
       project_name?: string | null
       host?: string
       // ADR-0020: the client's external mount prefix (deriveMount()) —
-      // "" at a root front door, "/agent-mcp" on the tailnet — so the
+      // "" at a root front door, "/conexus" on the tailnet — so the
       // returned .mcp.json snippet URL matches the front door in use.
       mount_prefix?: string
     }): Promise<{

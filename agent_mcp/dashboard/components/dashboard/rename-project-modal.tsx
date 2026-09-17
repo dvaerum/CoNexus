@@ -2,7 +2,7 @@
 
 // Rename-project modal (Phase 3.5b — decision #4 + ADR-0010, alias-
 // with-grace-period rename). PATCHes the router-admin REST resource
-// at ``PATCH /agent-mcp/api/router/projects/<name>`` (ADR 0014); the
+// at ``PATCH /conexus/api/router/projects/<name>`` (ADR 0014); the
 // body's ``name`` field carries the new slug.
 //
 // Fields:

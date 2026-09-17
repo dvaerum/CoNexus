@@ -17,7 +17,7 @@ import { APP_PROJECT_PATH_RE, appUrl, overviewAppUrl } from "@/lib/urls"
 
 // Patched for the NixOS deployment. Upstream's picker switches
 // between server-store entries (each = (host, port)). Our router
-// addresses projects by URL path: /agent-mcp/app/<name>/ (PR-B
+// addresses projects by URL path: /conexus/app/<name>/ (PR-B
 // renamed from /__dashboard/<name>/). So the picker fetches the
 // project list from the router and picking an entry navigates the
 // browser instead of swapping a host:port pair.
@@ -27,7 +27,7 @@ import { APP_PROJECT_PATH_RE, appUrl, overviewAppUrl } from "@/lib/urls"
 // learn the router's tenancy mode in the same payload. Behaviour:
 //
 //   * Multi-tenant: prepend an "← All projects" entry that navigates
-//     to /agent-mcp/app/ (the cross-project overview).
+//     to /conexus/app/ (the cross-project overview).
 //   * Single-tenant: the dropdown is disabled, showing only the
 //     configured project name with a small "single-tenant" badge.
 //     There's nowhere else for the operator to go.

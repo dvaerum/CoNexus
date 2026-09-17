@@ -8,7 +8,7 @@ rewrite — see this repo's own commit history, `git log --grep=Phase`,
 for the full Python→Rust migration this project completed). External
 MCP clients
 (Claude Code, IDE plugins, ad-hoc scripts) authenticate against
-`/agent-mcp/mcp/<project>` with **per-agent bearer tokens** — this
+`/conexus/mcp/<project>` with **per-agent bearer tokens** — this
 document is the setup guide.
 
 This is the out-of-tree counterpart to the in-dashboard auth path
@@ -16,7 +16,7 @@ described in [ADR-0013](../adr/0013-operator-login.md) (which
 applies to browser-driven, cookie-based dashboard traffic — that
 cookie is resolved by `conexus-router`'s `session_gate.rs`, then
 forwarded to the per-project backend as a signed
-`X-Agent-MCP-Forwarded-Operator` header; see `CONTEXT.md` for the
+`X-CoNexus-Forwarded-Operator` header; see `CONTEXT.md` for the
 full identity/authorization vocabulary, including exactly which
 capabilities a `worker`- vs `manager`-role bearer carries).
 
@@ -27,12 +27,12 @@ capabilities a `worker`- vs `manager`-role bearer carries).
   column (`worker` or `manager`) controls which MCP tools the token
   can call — see `CONTEXT.md`'s "Role bundle" section for the exact
   capability sets. This is the only credential the backend's
-  `/agent-mcp/mcp/<project>` endpoint accepts for out-of-tree
+  `/conexus/mcp/<project>` endpoint accepts for out-of-tree
   clients (verified in `conexus-backend/src/principal_resolve.rs`).
 - **Operator cookie** — the dashboard's authentication. The router
   validates the cookie locally (`conexus-router::session_gate`) and
   forwards requests to the backend with a signed
-  `X-Agent-MCP-Forwarded-Operator` header. This path is
+  `X-CoNexus-Forwarded-Operator` header. This path is
   browser-friendly but not practical for CLI clients that don't
   manage cookies.
 - **Per-agent bearer is the only out-of-tree path.** There is no
@@ -42,7 +42,7 @@ capabilities a `worker`- vs `manager`-role bearer carries).
 ## Provision a worker agent for an external integration
 
 1. Log in to the dashboard at
-   `http://<host>:1337/agent-mcp/login` and open the project.
+   `http://<host>:1337/conexus/login` and open the project.
 2. Navigate to the Agents tab and click **Add Agent** (dispatches the
    `register_agent` MCP tool, `Cap(agents.register)` — operator-tier
    only; see `CONTEXT.md`).
@@ -87,7 +87,7 @@ capabilities a `worker`- vs `manager`-role bearer carries).
    {
      "mcpServers": {
        "agent-mcp-<project>": {
-         "url": "http://<host>:1337/agent-mcp/mcp/<project>",
+         "url": "http://<host>:1337/conexus/mcp/<project>",
          "headers": {
            "Authorization": "Bearer <per-agent-token>"
          }
@@ -106,9 +106,9 @@ by `dispatch()` against `Principal::has_capability`
 
 | Tier | How it authenticates | What it can do |
 | --- | --- | --- |
-| `worker` agent token | `Authorization: Bearer <token>` against `/agent-mcp/mcp/<project>` | `agent_role_bundle(Worker)` (query RAG, view/create/update tasks, send messages, self-assign/self-file per project toggle). Cannot register, edit, terminate, or rotate other agents' tokens, and cannot assign a task to a different agent. |
+| `worker` agent token | `Authorization: Bearer <token>` against `/conexus/mcp/<project>` | `agent_role_bundle(Worker)` (query RAG, view/create/update tasks, send messages, self-assign/self-file per project toggle). Cannot register, edit, terminate, or rotate other agents' tokens, and cannot assign a task to a different agent. |
 | `manager` agent token | Same bearer path | Worker capabilities **plus** `TasksAssign` (assign to a different agent) and `MemoriesUpdate`. Still cannot register/edit/terminate/rotate agents — that stays operator-tier only. |
-| Operator session (dashboard cookie → router-signed forwarding header → backend) | Cookie via `conexus-router::session_gate`, forwarded as `X-Agent-MCP-Forwarded-Operator` | Everything; including registering/editing/terminating agents, writing `config_*` keys, managing users, project administration. **No bearer equivalent for a `worker`/`manager` agent token** — a confirmed-operator-tier bearer can reach the same REST surface directly via `RestPrincipal::OperatorBearer`, but that requires an agent row with `agent_role == Manager` presented to a REST endpoint, not a `worker` token. |
+| Operator session (dashboard cookie → router-signed forwarding header → backend) | Cookie via `conexus-router::session_gate`, forwarded as `X-CoNexus-Forwarded-Operator` | Everything; including registering/editing/terminating agents, writing `config_*` keys, managing users, project administration. **No bearer equivalent for a `worker`/`manager` agent token** — a confirmed-operator-tier bearer can reach the same REST surface directly via `RestPrincipal::OperatorBearer`, but that requires an agent row with `agent_role == Manager` presented to a REST endpoint, not a `worker` token. |
 
 If an external integration genuinely needs operator-tier capabilities
 (modify project settings, manage users, install bootstrap config),
@@ -141,7 +141,7 @@ token:
 - **Dashboard** — open the agent's row in the Agents tab and click
   the copy button. The token is shown in full to operators
   authenticated for that project.
-- **API** — `GET /agent-mcp/api/<project>/tokens` returns the
+- **API** — `GET /conexus/api/<project>/tokens` returns the
   current per-agent tokens as
   `{"agent_tokens": [{"agent_id": "...", "token": "..."}, ...]}`.
   This endpoint is gated by operator session cookies; it is not
@@ -153,7 +153,7 @@ token:
 
 ## Troubleshooting
 
-**`401 invalid or missing agent bearer token` on `/agent-mcp/mcp/<project>`**
+**`401 invalid or missing agent bearer token` on `/conexus/mcp/<project>`**
 
 - The token doesn't match any row in the project's `agents` table.
   Common causes:
@@ -185,7 +185,7 @@ token:
   `RestPrincipal::OperatorBearer` entry — but this is a REST-only
   door, not available on the MCP bearer path).
 
-**MCP notifications (SSE) on `/agent-mcp/mcp/<project>`**
+**MCP notifications (SSE) on `/conexus/mcp/<project>`**
 
 - The bearer path works the same for SSE as for regular HTTP
   requests — set `Authorization: Bearer <per-agent-token>` on the
@@ -204,7 +204,7 @@ token:
   `is_operator_tier`/`is_confirmed_operator_tier`) with exact source
   locations in the `conexus-*` Rust crates.
 - `conexus-backend/src/principal_resolve.rs` — the bearer-vs-
-  forwarding-header gate at the HTTP edge for `/agent-mcp/mcp/<project>`.
+  forwarding-header gate at the HTTP edge for `/conexus/mcp/<project>`.
 - `conexus-auth/src/requirement.rs` / `conexus-auth/src/tool.rs` —
   per-tool authorization declarations (`Requirement::Cap`/`Policy`)
   and `dispatch()`, the single point every tool call's gate check

@@ -2,7 +2,7 @@
 
 /**
  * TanStack Query hook for the router-admin groups list
- * (`GET /agent-mcp/api/router/groups`).
+ * (`GET /conexus/api/router/groups`).
  *
  * W6-followup increment F4 (2026-08-11): groups-dashboard used to fetch
  * via the hand-rolled `useRouterQuery` hook (the router-admin sibling of

@@ -6,7 +6,7 @@
  * Role
  * ----
  * Boots the dashboard's subscription to the operator live-update SSE
- * stream (``GET /agent-mcp/api/<name>/events``). When a notification
+ * stream (``GET /conexus/api/<name>/events``). When a notification
  * arrives, the relevant zustand cache slice is invalidated — admin-
  * created prompts visible in other tabs within seconds, messages/tasks
  * lists updating without waiting for the 60s poll tick, etc.

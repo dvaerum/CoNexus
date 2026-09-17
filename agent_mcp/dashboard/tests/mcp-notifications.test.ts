@@ -18,13 +18,13 @@
  * ------------
  *
  * The dashboard derives `projectName` from `window.location.pathname`
- * (`/agent-mcp/__dashboard/<name>/...`) in `lib/project-context.ts`.
+ * (`/conexus/__dashboard/<name>/...`) in `lib/project-context.ts`.
  * The MCP Streamable HTTP endpoint for that project lives at
- * `/agent-mcp/<name>/mcp` — note this is NOT the `/__api/` REST prefix;
+ * `/conexus/<name>/mcp` — note this is NOT the `/__api/` REST prefix;
  * it's the router's MCP path served as the wrapped backend's `/mcp`.
  *
  * The `apiClient.createEventSource('/mcp')` helper would resolve to
- * `{baseUrl}/mcp` = `/agent-mcp/__api/<name>/mcp` which the router does
+ * `{baseUrl}/mcp` = `/conexus/__api/<name>/mcp` which the router does
  * not expose. We therefore build the MCP URL separately from `baseUrl`
  * (see `mcpUrlForProject()` in `lib/mcp-notifications.ts`).
  *
@@ -37,7 +37,7 @@
  *
  * Wave 2 (cleanup-wave-2, 2026-06-20) migrated the subscription off
  * bearer auth onto cookie auth. The fetch sends `credentials: "include"`;
- * the router's `backend_mcp_handler` validates the `agent_mcp_session`
+ * the router's `backend_mcp_handler` validates the `conexus_session`
  * cookie + project membership and injects the project's admin token
  * upstream so the backend's `AuthHeaderMiddleware` (still bearer-only)
  * sees a valid bearer. No admin token ever lives in JS memory anymore.
@@ -114,16 +114,16 @@ describe("mcp notifications module", () => {
   })
 
   it("MCP url uses the project prefix, not the __api prefix", () => {
-    // The MCP path is `/agent-mcp/<name>/mcp`, NOT
-    // `/agent-mcp/__api/<name>/mcp` (the latter is the REST proxy
+    // The MCP path is `/conexus/<name>/mcp`, NOT
+    // `/conexus/__api/<name>/mcp` (the latter is the REST proxy
     // prefix). Catches the bug where someone would naively call
     // `apiClient.createEventSource('/mcp')` and get a 404.
     const src = read("lib/mcp-notifications.ts")
     // The path-prefix literal — split-string forms are OK too, so we
     // search for the segments rather than a single full literal.
     expect(
-      src.includes("/agent-mcp/"),
-      "expected `/agent-mcp/` URL segment in mcp-notifications.ts — " +
+      src.includes("/conexus/"),
+      "expected `/conexus/` URL segment in mcp-notifications.ts — " +
         "the path-prefixed deployment serves MCP at this root",
     ).toBe(true)
     expect(
@@ -131,18 +131,18 @@ describe("mcp notifications module", () => {
       "expected `/mcp` URL segment in mcp-notifications.ts",
     ).toBe(true)
     // The most common bug: building `${baseUrl}/mcp` which resolves to
-    // `/agent-mcp/__api/<name>/mcp` (404).
+    // `/conexus/__api/<name>/mcp` (404).
     expect(
       /\$\{(?:[\w.]+\.)?baseUrl\}\/mcp/.test(src),
       "found `${...baseUrl}/mcp` in mcp-notifications.ts — that " +
-        "resolves to /agent-mcp/__api/<name>/mcp (404). Use " +
-        "/agent-mcp/<projectName>/mcp instead",
+        "resolves to /conexus/__api/<name>/mcp (404). Use " +
+        "/conexus/<projectName>/mcp instead",
     ).toBe(false)
     // And don't accidentally embed the __api prefix in the MCP URL.
     expect(
       /\/__api\/[^'"`]*\bmcp\b/.test(src),
       "found `/__api/.../mcp` literal in mcp-notifications.ts — the " +
-        "MCP transport is mounted under /agent-mcp/<name>/mcp directly, " +
+        "MCP transport is mounted under /conexus/<name>/mcp directly, " +
         "not under the REST prefix",
     ).toBe(false)
   })
@@ -171,7 +171,7 @@ describe("mcp notifications module", () => {
 
   it("dispatches resources/updated to a data-store refresh", () => {
     // `notifications/resources/updated` with
-    // `params.uri = agent-mcp://inbox/<agent_id>` (or status/...)
+    // `params.uri = conexus://inbox/<agent_id>` (or status/...)
     // must trigger a data-store refresh so message counters + ambient
     // state update without waiting for the 60s poll.
     const src = read("lib/mcp-notifications.ts")
@@ -179,10 +179,10 @@ describe("mcp notifications module", () => {
       src.includes("resources/updated"),
       "expected handling of `notifications/resources/updated` method",
     ).toBe(true)
-    // The agent-mcp:// URI scheme is the load-bearing namespace for
+    // The conexus:// URI scheme is the load-bearing namespace for
     // inbox / status resources.
     expect(
-      src.includes("agent-mcp://") ||
+      src.includes("conexus://") ||
         src.includes("inbox") ||
         src.includes("refreshData"),
       "expected the resources-updated branch to refresh data-store " +

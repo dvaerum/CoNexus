@@ -95,7 +95,7 @@ describe("SSE resources/updated → messages invalidation", () => {
 
     dispatchNotification({
       method: "notifications/resources/updated",
-      params: { uri: "agent-mcp://inbox/x" },
+      params: { uri: "conexus://inbox/x" },
     })
     // Nothing before the debounce elapses.
     expect(spy).not.toHaveBeenCalled()
@@ -117,7 +117,7 @@ describe("SSE resources/updated → messages invalidation", () => {
     for (let i = 0; i < 5; i++) {
       dispatchNotification({
         method: "notifications/resources/updated",
-        params: { uri: `agent-mcp://inbox/agent-${i}` },
+        params: { uri: `conexus://inbox/agent-${i}` },
       })
     }
     vi.advanceTimersByTime(300)

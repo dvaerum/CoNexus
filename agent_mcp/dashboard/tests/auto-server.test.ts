@@ -35,7 +35,7 @@ describe("dashboard path-prefix derivation (project-context singleton)", () => {
   it("derives the path prefix using the shared dashboard-path regex", () => {
     // The PathPrefix singleton must inspect window.location.pathname
     // for the deployment URL pattern so the dashboard self-bootstraps
-    // when mounted under /agent-mcp/app/<name>/ (PR-B renamed from
+    // when mounted under /conexus/app/<name>/ (PR-B renamed from
     // /__dashboard/). The regex literal moved to lib/urls.ts (PR-B
     // centralisation); project-context.ts imports the matcher.
     const src = read(PROJECT_CONTEXT)
@@ -46,8 +46,8 @@ describe("dashboard path-prefix derivation (project-context singleton)", () => {
     ).toBe(true)
     const urlsSrc = read("lib/urls.ts")
     expect(
-      urlsSrc.includes("/agent-mcp/app"),
-      "expected the path-prefix regex `/agent-mcp/app` in lib/urls.ts; " +
+      urlsSrc.includes("/conexus/app"),
+      "expected the path-prefix regex `/conexus/app` in lib/urls.ts; " +
         "derivation only works when the deployment URL pattern is detected",
     ).toBe(true)
     expect(

@@ -24,8 +24,8 @@ const read = () => readFileSync(PICKER, "utf8")
 describe("dashboard project picker", () => {
   it("fetches the router projects endpoint via useProjectsStore", () => {
     // As of Phase 3.5b the picker reads the project list from the
-    // cross-project useProjectsStore (backed by /agent-mcp/__overview)
-    // instead of fetching /agent-mcp/__projects directly. The store
+    // cross-project useProjectsStore (backed by /conexus/__overview)
+    // instead of fetching /conexus/__projects directly. The store
     // indirection lets the picker consume the same envelope the
     // overview cards do — one network round-trip per tab, and the
     // tenancy mode (multi vs single) is available in the same payload.
@@ -33,7 +33,7 @@ describe("dashboard project picker", () => {
     expect(
       src.includes("useProjectsStore"),
       "expected picker to consume useProjectsStore (the cross-" +
-        "project store backed by /agent-mcp/__overview) instead of " +
+        "project store backed by /conexus/__overview) instead of " +
         "fetching /__projects directly",
     ).toBe(true)
   })

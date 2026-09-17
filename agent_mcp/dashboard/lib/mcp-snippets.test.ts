@@ -15,7 +15,7 @@ import {
   type ClientTab,
 } from "@/lib/mcp-snippets"
 
-const URL = "https://example.test/agent-mcp/mcp/proj"
+const URL = "https://example.test/conexus/mcp/proj"
 const TOKEN = "0123456789abcdef0123456789abcdef"
 
 describe("buildSnippetBlocks", () => {
@@ -48,11 +48,11 @@ describe("buildSnippetBlocks", () => {
     }
   })
 
-  it("uses the fixed `agent-mcp` server key, never a per-agent one", () => {
+  it("uses the fixed `conexus` server key, never a per-agent one", () => {
     for (const { value } of CLIENT_TABS) {
       for (const block of buildSnippetBlocks(value, TOKEN, URL)) {
-        expect(block.content).toContain("agent-mcp")
-        expect(block.content).not.toMatch(/agent-mcp-[0-9a-z]/)
+        expect(block.content).toContain("conexus")
+        expect(block.content).not.toMatch(/conexus-[0-9a-z]/)
       }
     }
   })
@@ -64,7 +64,7 @@ describe("buildSnippetBlocks", () => {
 
   it("declares Streamable HTTP transport for the Claude Code tab", () => {
     const [cli, json] = buildSnippetBlocks("claude-code", TOKEN, URL)
-    expect(cli!.content).toContain("claude mcp add --transport http agent-mcp")
+    expect(cli!.content).toContain("claude mcp add --transport http conexus")
     expect(json!.content).toContain('"type": "http"')
   })
 

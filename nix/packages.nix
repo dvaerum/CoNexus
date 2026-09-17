@@ -51,7 +51,7 @@ let
   # Phase 4 (prancy-napping-pie): we deliberately do NOT set
   # `ASSET_PREFIX` here. The dashboard's `next.config.ts` now defaults
   # the assetPrefix to a literal sentinel string
-  # (`__AGENT_MCP_ASSET_PREFIX__`); the router substitutes the
+  # (`__CONEXUS_ASSET_PREFIX__`); the router substitutes the
   # configured runtime prefix on serve. One build artifact serves
   # every deployment URL — no rebuild needed when the operator points
   # the router at a different prefix.
@@ -72,7 +72,7 @@ let
     # above) so this build's baked-in number always matches what a
     # plain `npm run build` from the dashboard dir would also read.
     # See dashboard/next.config.ts resolveVersion().
-    NEXT_PUBLIC_AGENT_MCP_VERSION = version;
+    NEXT_PUBLIC_CONEXUS_VERSION = version;
     installPhase = ''
       runHook preInstall
       mkdir -p $out/share

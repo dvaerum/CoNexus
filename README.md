@@ -1,8 +1,8 @@
-# Agent-MCP
+# CoNexus
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rinadelph/Agent-MCP)
 
-> 🚀 **Advanced Tool Notice**: This framework is designed for experienced AI developers who need sophisticated multi-agent orchestration capabilities. Agent-MCP requires familiarity with AI coding workflows, MCP protocols, and distributed systems concepts. We're actively working to improve documentation and ease of use. If you're new to AI-assisted development, consider starting with simpler tools and returning when you need advanced multi-agent capabilities.
+> 🚀 **Advanced Tool Notice**: This framework is designed for experienced AI developers who need sophisticated multi-agent orchestration capabilities. CoNexus requires familiarity with AI coding workflows, MCP protocols, and distributed systems concepts. We're actively working to improve documentation and ease of use. If you're new to AI-assisted development, consider starting with simpler tools and returning when you need advanced multi-agent capabilities.
 >
 > 💬 **Join the Community**: Connect with us on [Discord](https://discord.gg/7Jm7nrhjGn) to get help, share experiences, and collaborate with other developers building multi-agent systems.
 
@@ -25,7 +25,7 @@ Beyond the philosophical issues, traditional AI coding assistants hit practical 
 
 ## The Multi-Agent Solution
 
-Agent-MCP transforms AI development from a single assistant to a coordinated team:
+CoNexus transforms AI development from a single assistant to a coordinated team:
 
 ### Core Capabilities
 
@@ -75,16 +75,16 @@ admin assumption). On a fresh install, choose ONE of three bootstrap
 paths:
 
 1. **Setup wizard** — easiest for desktop use. Open the dashboard at
-   `http://localhost:5454/agent-mcp/` and you'll be redirected to
-   `/agent-mcp/setup`. Choose a username and password; that account
+   `http://localhost:5454/conexus/` and you'll be redirected to
+   `/conexus/setup`. Choose a username and password; that account
    becomes the first operator and inherits membership in every
    existing project.
 2. **Env vars** — for declarative deployments (NixOS+sops, Docker
    Compose with a secrets file):
 
    ```bash
-   export AGENT_MCP_BOOTSTRAP_USERNAME="dennis"
-   export AGENT_MCP_BOOTSTRAP_PASSWORD="..."
+   export CONEXUS_BOOTSTRAP_USERNAME="dennis"
+   export CONEXUS_BOOTSTRAP_PASSWORD="..."
    conexus-router --port 5454
    ```
 
@@ -95,10 +95,10 @@ paths:
    alice` (prompts for password). Useful for adding subsequent
    operators after first boot.
 
-After first boot, navigate to `http://localhost:5454/agent-mcp/login`
+After first boot, navigate to `http://localhost:5454/conexus/login`
 to authenticate. The session cookie is HttpOnly + Secure +
-SameSite=Lax, scoped to `/agent-mcp/`. Agent-side MCP traffic
-(`/agent-mcp/mcp/<project>`) uses an `Authorization: Bearer
+SameSite=Lax, scoped to `/conexus/`. Agent-side MCP traffic
+(`/conexus/mcp/<project>`) uses an `Authorization: Bearer
 <agent_token>` header sourced from the `agents` table — agents don't
 need to be aware of the operator login.
 
@@ -114,11 +114,11 @@ need to be aware of the operator login.
 
 ### What is MCP?
 
-The **Model Context Protocol (MCP)** is an open standard that enables AI assistants to securely connect to external data sources and tools. Agent-MCP leverages MCP to provide seamless integration with various development tools and services.
+The **Model Context Protocol (MCP)** is an open standard that enables AI assistants to securely connect to external data sources and tools. CoNexus leverages MCP to provide seamless integration with various development tools and services.
 
-### Running Agent-MCP as an MCP Server
+### Running CoNexus as an MCP Server
 
-Agent-MCP exposes its multi-agent surface as an MCP server.
+CoNexus exposes its multi-agent surface as an MCP server.
 External clients (Claude Code, Claude Desktop, Cline, IDE plugins,
 ad-hoc scripts) authenticate with a per-agent bearer token
 provisioned from the dashboard.
@@ -128,7 +128,7 @@ single-tenant vs router URL forms, how to provision the bearer,
 and what to do when a token is lost — lives in
 [`docs/integrations/external-mcp-client.md`](./docs/integrations/external-mcp-client.md).
 
-The REST admin surface (`/agent-mcp/api/<project>/…`) requires
+The REST admin surface (`/conexus/api/<project>/…`) requires
 an explicit version-pinned `Accept` header — see
 [`docs/integrations/api-versioning.md`](./docs/integrations/api-versioning.md).
 
@@ -159,14 +159,14 @@ claude process).
 # export OPENAI_API_KEY="sk-..."                    # Switch to OpenAI cloud
 # export OPENAI_BASE_URL="http://127.0.0.1:11434/v1"
 # export OPENAI_MODEL="qwen3:1.7b"
-# export AGENT_MCP_EMBEDDING_MODEL="qwen3-embedding:0.6b"
-# export AGENT_MCP_EMBEDDING_DIMENSION="1024"
+# export CONEXUS_EMBEDDING_MODEL="qwen3-embedding:0.6b"
+# export CONEXUS_EMBEDDING_DIMENSION="1024"
 ```
 
 See [`docs/operator/getting-started.md`](./docs/operator/getting-started.md)
 for the full reference (including `MCP_PROJECT_DIR` and the
-bootstrap env vars `AGENT_MCP_BOOTSTRAP_USERNAME` /
-`AGENT_MCP_BOOTSTRAP_PASSWORD`).
+bootstrap env vars `CONEXUS_BOOTSTRAP_USERNAME` /
+`CONEXUS_BOOTSTRAP_PASSWORD`).
 
 ## How It Works: Breaking Complexity into Simple Steps
 
@@ -177,7 +177,7 @@ graph LR
     style E fill:#ff6b6b,color:#fff
 ```
 
-Every task can be broken down into linear steps. This is the core insight that makes Agent-MCP powerful.
+Every task can be broken down into linear steps. This is the core insight that makes CoNexus powerful.
 
 ### The Problem with Complex Tasks
 
@@ -198,7 +198,7 @@ graph TD
     style H fill:#666,color:#fff
 ```
 
-### The Agent-MCP Solution
+### The CoNexus Solution
 
 ```mermaid
 graph TD
@@ -290,7 +290,7 @@ like:
   "mcpServers": {
     "agent-mcp-<project>": {
       "type": "http",
-      "url": "https://<host>/agent-mcp/mcp/<project>",
+      "url": "https://<host>/conexus/mcp/<project>",
       "headers": {"Authorization": "Bearer <agent_token>"}
     }
   }
@@ -368,7 +368,7 @@ The dashboard provides real-time visibility into your AI development team:
 **Memory Health** - Ensure context remains fresh and accessible  
 **Activity Timeline** - See exactly what each agent is doing
 
-Access at `http://localhost:5454/agent-mcp/` after launching the router.
+Access at `http://localhost:5454/conexus/` after launching the router.
 
 ## Advanced Features
 
@@ -459,7 +459,7 @@ Most AI coding assistants maintain conversations across entire projects:
 - **Performance degrades over time** - every response processes irrelevant history
 - **Security vulnerability** - one carefully crafted prompt could expose your entire project
 
-### Agent-MCP's Ephemeral Agents
+### CoNexus's Ephemeral Agents
 Each agent is purpose-built for a single task:
 - **Minimal, focused context** - only what's needed for the specific task
 - **Crystal clear objectives** - one task, one goal, no ambiguity
@@ -479,7 +479,7 @@ try to piece this together from our 50+ message history...
 [Agent produces confused implementation mixing multiple patterns]
 ```
 
-**Agent-MCP Approach**: Same request, broken into focused tasks
+**CoNexus Approach**: Same request, broken into focused tasks
 ```
 Agent 1 (Database): Create auth tables with exactly these fields...
 Agent 2 (API): Implement /auth endpoints following REST patterns...
@@ -504,7 +504,7 @@ Most AI development approaches suffer from a fundamental flaw: they try to maint
 
 ### Our Solution: Ephemeral Agents with Shared Memory
 
-Agent-MCP implements a radically different approach:
+CoNexus implements a radically different approach:
 
 **Short-Lived, Focused Agents**  
 Each agent lives only as long as their specific task. They:
@@ -533,7 +533,7 @@ Traditional long-context agents are like giving someone your entire codebase, do
 
 ### The Cleanup Protocol: Keeping Your System Lean
 
-Agent-MCP enforces strict lifecycle management:
+CoNexus enforces strict lifecycle management:
 
 **Maximum 10 Active Agents**
 - Hard limit prevents resource exhaustion
@@ -557,7 +557,7 @@ This isn't just housekeeping - it's fundamental to the security and performance 
 
 **Any task that cannot be expressed as `Step 1 → Step 2 → Step N` is not atomic enough.**
 
-This principle drives everything in Agent-MCP:
+This principle drives everything in CoNexus:
 
 1. **Complex goals** must decompose into **linear sequences**
 2. **Linear sequences** can execute **in parallel** when independent
@@ -571,7 +571,7 @@ This principle drives everything in Agent-MCP:
 - Agents make different assumptions
 - Integration becomes a nightmare
 
-**Agent-MCP Approach**: 
+**CoNexus Approach**: 
 ```
 Chain 1: Database Layer
   1.1: Create users table with id, email, password_hash
@@ -594,7 +594,7 @@ Chain 3: Frontend Layer
 
 Each step is atomic, testable, and has zero ambiguity. Multiple agents can work these chains in parallel without conflict.
 
-## Why Developers Choose Agent-MCP
+## Why Developers Choose CoNexus
 
 **The Power of Parallel Development**  
 Instead of waiting for one agent to finish the backend before starting the frontend, deploy specialized agents to work simultaneously. Your development speed is limited only by how well you decompose tasks.
@@ -709,7 +709,7 @@ This project is licensed under the **GNU Affero General Public License v3.0 (AGP
 
 See the [LICENSE](LICENSE) file for complete terms and conditions.
 
-**Why AGPL?** We chose AGPL to ensure that improvements to Agent-MCP benefit the entire community, even when used in server/SaaS deployments. This prevents proprietary forks that don't contribute back to the ecosystem.
+**Why AGPL?** We chose AGPL to ensure that improvements to CoNexus benefit the entire community, even when used in server/SaaS deployments. This prevents proprietary forks that don't contribute back to the ecosystem.
 
 ---
 

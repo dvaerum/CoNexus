@@ -6,7 +6,7 @@ Accepted (2026-06-03).
 
 ## Context
 
-The router today serves an HTML index page at `/agent-mcp/` containing:
+The router today serves an HTML index page at `/conexus/` containing:
 
 - a list of registered projects with status
 - start/stop forms per project
@@ -24,11 +24,11 @@ recurring source of HTML-escaping concerns.
 ## Decision
 
 All ops functionality folds into the dashboard overview at
-`/agent-mcp/__dashboard/`. The router's `/agent-mcp/` HTML page is deleted
+`/conexus/__dashboard/`. The router's `/conexus/` HTML page is deleted
 and replaced by a redirect:
 
-- multi-tenant: redirect to `/agent-mcp/__dashboard/`
-- single-tenant: redirect to `/agent-mcp/__dashboard/<project>/`
+- multi-tenant: redirect to `/conexus/__dashboard/`
+- single-tenant: redirect to `/conexus/__dashboard/<project>/`
 
 One ops surface, audience-uniform. Both casual visitors and operators land
 in the same React app.
@@ -49,7 +49,7 @@ in the same React app.
 
 ## Alternatives considered
 
-- **Keep `/agent-mcp/` as a separate ops page.** Rejected: two-dashboards
+- **Keep `/conexus/` as a separate ops page.** Rejected: two-dashboards
   confusion, plus duplicate project-list rendering (one in Python f-strings,
   one in React).
 - **Move ops to `/__admin/` URL.** Rejected: same problem as above, just

@@ -12,7 +12,7 @@ Pre-Phase-1 agent-mcp authenticated two distinct populations with one
 secret. The router's `admin_token` was simultaneously:
 
 - The dashboard operator's bearer — anyone who could reach the
-  `/agent-mcp/` URL was implicitly admin, per the "dashboard admin
+  `/conexus/` URL was implicitly admin, per the "dashboard admin
   surface" decision in ADR-0009. Securing the URL was the deployer's
   job (nginx basic-auth, tailscale ACL, etc.).
 - Every admin-tier agent's MCP bearer — spawned agents whose name
@@ -33,11 +33,11 @@ the project* and *what can an agent do*. Two consequences:
 
 Operators must log in to the dashboard. The router gains:
 
-- A `/var/lib/agent-mcp/router.db` SQLite store for `users`,
+- A `/var/lib/conexus/router.db` SQLite store for `users`,
   `sessions`, and `project_membership`.
-- A `POST /agent-mcp/login` form that creates a server-side session
-  and sets an opaque `agent_mcp_session` cookie (HttpOnly, Secure,
-  SameSite=Lax, Path=/agent-mcp/).
+- A `POST /conexus/login` form that creates a server-side session
+  and sets an opaque `conexus_session` cookie (HttpOnly, Secure,
+  SameSite=Lax, Path=/conexus/).
 - A `require_operator_session` aiohttp middleware that gates every
   dashboard mutation/read on a valid session cookie + project
   membership (for project-scoped paths).
@@ -52,11 +52,11 @@ unchanged. Only the dashboard surface migrates to cookies.
 
 Three bootstrap paths cover the deploy matrix:
 
-1. **Env vars** (`AGENT_MCP_BOOTSTRAP_USERNAME` /
-   `AGENT_MCP_BOOTSTRAP_PASSWORD`) — for NixOS+sops deployments where
+1. **Env vars** (`CONEXUS_BOOTSTRAP_USERNAME` /
+   `CONEXUS_BOOTSTRAP_PASSWORD`) — for NixOS+sops deployments where
    the secret is sourced from a sops-encrypted file at activation
    time.
-2. **Setup wizard** — first-boot redirect to `/agent-mcp/setup` when
+2. **Setup wizard** — first-boot redirect to `/conexus/setup` when
    the `users` table is empty; the operator chooses username +
    password from the browser.
 3. **CLI** — `agent-mcp router create-operator --username <u>` for
@@ -71,8 +71,8 @@ deploys upgrade without losing access.
 
 - The "anyone with the URL is admin" assumption from ADR-0009 is
   retired on the dashboard surface. The router HTML / React
-  dashboard now bounces unauthenticated callers to `/agent-mcp/login`.
-- Agent-side MCP traffic (`/agent-mcp/mcp/<project>`) is unchanged.
+  dashboard now bounces unauthenticated callers to `/conexus/login`.
+- Agent-side MCP traffic (`/conexus/mcp/<project>`) is unchanged.
   Spawned agents continue to authenticate with the admin token; no
   agent-config migration is required for Phase 1.
 - Operators can now safely expose the dashboard URL on shared
@@ -127,7 +127,7 @@ several specifics have since changed:
 - The backend's `AuthHeaderMiddleware` no longer accepts
   `Authorization: Bearer <admin_token>` on any route (PR #208).
 - The body-token field documented in the Decision section is gone.
-- The legacy admin-token-bearer fallback for `/agent-mcp/mcp/<project>`
+- The legacy admin-token-bearer fallback for `/conexus/mcp/<project>`
   is also gone. Spawned agents and out-of-tree MCP clients
   authenticate exclusively with per-agent bearer tokens drawn from
   the `agents` table.

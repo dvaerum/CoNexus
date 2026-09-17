@@ -140,15 +140,15 @@ describe("SSE → single invalidation (ST-4)", () => {
     // mutation) arrives inside the debounce window.
     dispatchNotification({
       method: "notifications/resources/updated",
-      params: { uri: "agent-mcp://inbox/worker1" },
+      params: { uri: "conexus://inbox/worker1" },
     })
     dispatchNotification({
       method: "notifications/resources/updated",
-      params: { uri: "agent-mcp://status/worker1" },
+      params: { uri: "conexus://status/worker1" },
     })
     dispatchNotification({
       method: "notifications/resources/updated",
-      params: { uri: "agent-mcp://inbox/worker2" },
+      params: { uri: "conexus://inbox/worker2" },
     })
 
     // Nothing yet — the debounce hasn't elapsed.

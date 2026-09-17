@@ -152,7 +152,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
       open={open}
       onOpenChange={onOpenChange}
       title="Create Custom Prompt"
-      description="Create your own reusable prompt template for Agent-MCP workflows"
+      description="Create your own reusable prompt template for CoNexus workflows"
       icon={Sparkles}
       wide
       onSubmit={handleSubmit}

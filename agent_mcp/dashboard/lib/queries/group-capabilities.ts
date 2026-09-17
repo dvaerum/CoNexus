@@ -2,7 +2,7 @@
 
 /**
  * TanStack Query hook for a group's capability set
- * (`GET /agent-mcp/api/router/groups/<id>/capabilities`).
+ * (`GET /conexus/api/router/groups/<id>/capabilities`).
  *
  * W6-followup-2 increment G2 (2026-08-11): group-capabilities-section used
  * to fetch via the hand-rolled `useRouterQuery` hook. This module moves

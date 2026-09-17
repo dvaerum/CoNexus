@@ -70,7 +70,7 @@ describe("<RegisterAgentModal>", () => {
     registerAgent.mockResolvedValue({
       agent_id: "worker-1",
       agent_token: "tok",
-      mcp_snippet: '{"mcpServers": {"agent-mcp": {}}}',
+      mcp_snippet: '{"mcpServers": {"conexus": {}}}',
       message: "ok",
     })
     const input = await openModal()
@@ -78,7 +78,7 @@ describe("<RegisterAgentModal>", () => {
     await setupUser().click(screen.getByRole("button", { name: "Register" }))
 
     await waitFor(() => expect(screen.getByText("Agent registered")).toBeTruthy())
-    expect(screen.getByText('{"mcpServers": {"agent-mcp": {}}}')).toBeTruthy()
+    expect(screen.getByText('{"mcpServers": {"conexus": {}}}')).toBeTruthy()
     expect(screen.getByRole("button", { name: /Copy snippet/ })).toBeTruthy()
   })
 

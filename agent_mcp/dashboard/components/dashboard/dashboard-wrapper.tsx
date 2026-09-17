@@ -28,8 +28,8 @@ export function DashboardWrapper({ children }: DashboardWrapperProps) {
   }, [])
 
   // Router-served deployments mount the dashboard at
-  // `/agent-mcp/app/<name>/`. The URL already names the project, the
-  // always-on Python router already proxies `/agent-mcp/api/<name>` to
+  // `/conexus/app/<name>/`. The URL already names the project, the
+  // always-on Python router already proxies `/conexus/api/<name>` to
   // the per-project backend, and `project-context.ts` already pointed
   // `apiClient` at that root at module load. The connect-to-MCP gating
   // screen exists for standalone deployments (Electron / external tool)

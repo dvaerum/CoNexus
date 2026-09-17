@@ -12,14 +12,14 @@ the create-project → register-agent → add-tasks flow every run.
 ## Use
 
 ```sh
-AGENT_MCP_VM_DEV_PRELOAD=<name> nix run .#vm-dev
+CONEXUS_VM_DEV_PRELOAD=<name> nix run .#vm-dev
 # stack several (later files win per-path):
-AGENT_MCP_VM_DEV_PRELOAD=default,extra nix run .#vm-dev
+CONEXUS_VM_DEV_PRELOAD=default,extra nix run .#vm-dev
 ```
 
 Selection travels to the guest on the kernel command line (no rebuild).
 The restore runs **only on a fresh disk** (a marker at
-`/var/lib/agent-mcp/.vm-dev-preloaded` blocks re-runs, so a persistent
+`/var/lib/conexus/.vm-dev-preloaded` blocks re-runs, so a persistent
 VM keeps whatever you changed). To re-preload: `--ephemeral`, or delete
 `vm-dev-persistent-data/disk.qcow2`.
 

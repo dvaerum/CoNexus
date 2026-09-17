@@ -16,7 +16,7 @@
  * never actually connected against `/mcp`.
  *
  * Fix: a dedicated cookie-authenticated operator SSE endpoint,
- * `GET /agent-mcp/api/<name>/events`, backed by an in-process
+ * `GET /conexus/api/<name>/events`, backed by an in-process
  * operator-events hub (`features/operator_events.py`). The same
  * mutation choke point that fans `resources/updated` out to agent
  * sessions also publishes onto that hub, so this client receives the
@@ -27,10 +27,10 @@
  *
  * URL plumbing
  * ------------
- * The dashboard mounts at `/agent-mcp/app/<name>/...` and the REST API
- * at `/agent-mcp/api/<name>` (PR-B renamed both from /__dashboard/ and
+ * The dashboard mounts at `/conexus/app/<name>/...` and the REST API
+ * at `/conexus/api/<name>` (PR-B renamed both from /__dashboard/ and
  * /__api/ respectively). The operator events channel lives UNDER the
- * REST root at `/agent-mcp/api/<name>/events` — the router's `/api/...`
+ * REST root at `/conexus/api/<name>/events` — the router's `/api/...`
  * proxy streams response bodies chunk-by-chunk, so the SSE frames flow
  * through, and the operator session cookie carries the auth. See
  * `eventsUrl` in lib/urls.ts.
@@ -43,7 +43,7 @@
  *
  * Wave 2 (cleanup-wave-2) migrated this client off bearer auth and
  * onto cookie auth. The fetch opts into `credentials: "include"` so
- * the `agent_mcp_session` cookie (set by /agent-mcp/login) is sent
+ * the `conexus_session` cookie (set by /conexus/login) is sent
  * with the request. The router's `backend_mcp_handler` then validates
  * the cookie + project membership and injects the project's admin
  * token upstream so the backend `AuthHeaderMiddleware` (still
@@ -68,8 +68,8 @@
  * | method                                | dashboard reaction              |
  * |---------------------------------------|---------------------------------|
  * | notifications/resources/updated       | refreshData() → messages list,  |
- * |   (uri = agent-mcp://inbox/<id> OR    |   counters reflect the new      |
- * |    agent-mcp://status/<id>)           |   inbox row / status change     |
+ * |   (uri = conexus://inbox/<id> OR    |   counters reflect the new      |
+ * |    conexus://status/<id>)           |   inbox row / status change     |
  * | notifications/prompts/list_changed    | notifyPromptsListChanged() →    |
  * |                                       |   prompt-book reflects admin    |
  * |                                       |   create/update/delete          |
@@ -93,7 +93,7 @@ import { eventsUrl } from "./urls"
  * Build the operator live-update SSE endpoint URL for the active
  * project.
  *
- * Path-prefixed deployments: `/agent-mcp/api/<projectName>/events`
+ * Path-prefixed deployments: `/conexus/api/<projectName>/events`
  * (the cookie-authenticated operator events channel under the REST
  * proxy root — see `eventsUrl` in lib/urls.ts).
  *
@@ -271,10 +271,10 @@ export function dispatchNotification(payload: JsonRpcNotification): void {
     // window) so a tight succession of notifications surfaces each
     // change rather than coalescing into one invisible no-op.
     const uri = typeof payload.params?.uri === "string" ? payload.params.uri : ""
-    // Light filtering: known agent-mcp:// URIs trigger a refresh; an
+    // Light filtering: known conexus:// URIs trigger a refresh; an
     // unknown scheme still triggers (defensive: better to over-refresh
     // than miss) but only logs a debug line for traceability.
-    if (!uri.startsWith("agent-mcp://")) {
+    if (!uri.startsWith("conexus://")) {
       console.debug("[mcp-notifications] unknown resource uri:", uri)
     }
     scheduleDashboardRefresh()
@@ -316,7 +316,7 @@ const RECONNECT_MAX_DELAY_MS = 30000
 
 /**
  * Start an operator notification subscription against
- * `/agent-mcp/api/<name>/events` using the operator session cookie.
+ * `/conexus/api/<name>/events` using the operator session cookie.
  * Returns a handle whose `stop()` aborts the in-flight stream and
  * prevents further reconnects.
  *
@@ -363,7 +363,7 @@ export function openMcpNotificationStream(
         signal: abortCtrl.signal,
         cache: "no-store",
         // Wave 2 (cleanup-wave-2): cookie auth. The
-        // ``agent_mcp_session`` cookie set by /agent-mcp/login is
+        // ``conexus_session`` cookie set by /conexus/login is
         // sent automatically; the router's backend_mcp_handler
         // resolves it to the project's admin token and injects the
         // bearer upstream so the backend's AuthHeaderMiddleware
@@ -405,7 +405,7 @@ export function openMcpNotificationStream(
       // (Messages/Tasks) the same way a real notification does.
       dispatchNotification({
         method: "notifications/resources/updated",
-        params: { uri: "agent-mcp://reconnect" },
+        params: { uri: "conexus://reconnect" },
       })
 
       const reader = body.getReader()
@@ -474,13 +474,13 @@ export function openMcpNotificationStream(
  * Higher-level wiring entry point used by ``McpNotificationsProvider``.
  *
  * Opens the operator live-update SSE stream against
- * ``/agent-mcp/api/<name>/events`` (cookie-authenticated) and manages
+ * ``/conexus/api/<name>/events`` (cookie-authenticated) and manages
  * its lifecycle. Returns a cleanup that stops the stream and detaches
  * the visibility listener.
  *
  * History: this was a no-op between verify-all-v8 (2026-06-27) and the
  * introduction of the dedicated operator events endpoint. Before the
- * no-op, the client subscribed to ``GET /agent-mcp/mcp/<project>`` with
+ * no-op, the client subscribed to ``GET /conexus/mcp/<project>`` with
  * cookie-only auth, which the router rejects with 405 (that GET stream
  * derives ``agent_id`` from a per-agent bearer the cookie can't carry),
  * generating 60+ ``=> 405`` lines within seconds of any project page

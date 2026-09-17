@@ -259,4 +259,4 @@ These four chapters together provide a comprehensive foundation:
 3. **[Tools as Extensions](./chapter-3-tools-extensions.md)** - Enabling AI embodiment through appropriate tools
 4. **[Intelligent Judgment](./chapter-4-intelligent-judgment.md)** - Fostering shared understanding and reasoned decision-making
 
-**Together, they enable the synergistic human-AI partnerships that Agent-MCP facilitates.**
+**Together, they enable the synergistic human-AI partnerships that CoNexus facilitates.**

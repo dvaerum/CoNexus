@@ -2,7 +2,7 @@
 
 /**
  * TanStack Query hook for the router SSO config
- * (`GET /agent-mcp/api/router/sso/config`).
+ * (`GET /conexus/api/router/sso/config`).
  *
  * W6-followup-2 increment G2 (2026-08-11): sso-dashboard used to fetch via
  * the hand-rolled `useRouterQuery` hook. This module moves the read onto

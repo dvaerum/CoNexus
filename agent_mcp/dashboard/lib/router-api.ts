@@ -1,5 +1,5 @@
 // Router-admin API client — the single fetch seam for the
-// ``/agent-mcp/api/router/*`` surface (users / groups / SSO /
+// ``/conexus/api/router/*`` surface (users / groups / SSO /
 // memberships / aliases / project lifecycle).
 //
 // WHY this exists: the per-project REST surface has always had a deep
@@ -35,10 +35,10 @@ import { loginUrl } from "./urls"
 // Accept-header gate. A plain ``application/json`` value is rejected
 // with 406. Defined ONCE here — the per-component ``STRICT_HEADERS``
 // copies were deleted in favour of this seam.
-const ACCEPT = "application/vnd.agent-mcp.v1+json"
+const ACCEPT = "application/vnd.conexus.v1+json"
 
 /**
- * Fetch a ``/agent-mcp/api/router/*`` endpoint with the router-admin
+ * Fetch a ``/conexus/api/router/*`` endpoint with the router-admin
  * conventions applied: strict Accept media type, the operator session
  * cookie (``credentials: 'include'``), a typed ``ApiError`` on !ok, and
  * a 401→login bounce.
@@ -89,7 +89,7 @@ export async function request<T>(
     const errorText = await r.text().catch(() => "Unknown error")
 
     // On a 401 the operator's session cookie has expired (or was never
-    // set). Bounce to /agent-mcp/login and preserve the current path in
+    // set). Bounce to /conexus/login and preserve the current path in
     // ?next= so we land back here post-login. Guard with the standard
     // SSR check (typeof window) so this stays safe to call from Next.js
     // server components / node-env tests that import the module, and
@@ -98,7 +98,7 @@ export async function request<T>(
       r.status === 401 &&
       typeof window !== "undefined" &&
       // ADR-0020: mount-derived login path (loginUrl() = `${ROOT}/login`)
-      // so the loop-guard holds at both /agent-mcp/login and /login.
+      // so the loop-guard holds at both /conexus/login and /login.
       !window.location.pathname.endsWith(loginUrl())
     ) {
       const next = window.location.pathname + window.location.search

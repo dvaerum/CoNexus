@@ -4,7 +4,7 @@ const { spawn } = require('child_process');
 const net = require('net');
 
 // Use a fixed port that's unlikely to conflict
-const DASHBOARD_PORT = 3847; // Uncommon port for Agent-MCP dashboard
+const DASHBOARD_PORT = 3847; // Uncommon port for CoNexus dashboard
 
 // Check if a port is available
 function isPortAvailable(port) {
@@ -71,7 +71,7 @@ function getResponsiveBanner() {
 async function startDev() {
   try {
     console.log(getResponsiveBanner());
-    console.log('🚀 Starting Agent-MCP Dashboard...\n');
+    console.log('🚀 Starting CoNexus Dashboard...\n');
     
     // Check if our preferred port is available
     const portAvailable = await isPortAvailable(DASHBOARD_PORT);
@@ -114,4 +114,4 @@ async function startDev() {
 }
 
 // Run the script
-startDev();
+startDev();

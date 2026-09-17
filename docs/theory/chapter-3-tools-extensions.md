@@ -194,7 +194,7 @@ The principles of **Empathy** (understanding the AI's need for explicit tool gui
 
 ## Practical Applications
 
-### For Agent-MCP Users:
+### For CoNexus Users:
 - **Choose tools deliberately** based on your project's needs
 - **Integrate multiple sensory modalities** for comprehensive capability
 - **Design tool combinations** that create emergent intelligence
@@ -210,4 +210,4 @@ The principles of **Empathy** (understanding the AI's need for explicit tool gui
 
 > **Next**: [Chapter 4: Programming as Intelligent Judgment](./chapter-4-intelligent-judgment.md) - Explore how programming with AI becomes an exercise in intelligent judgment and decision-making.
 
-> **Previous**: [Chapter 2: Context Foundation](./chapter-2-context-foundation.md)
+> **Previous**: [Chapter 2: Context Foundation](./chapter-2-context-foundation.md)

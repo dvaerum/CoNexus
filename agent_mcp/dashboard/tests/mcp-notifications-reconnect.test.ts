@@ -51,6 +51,6 @@ describe("operator events SSE reconnect catch-up", () => {
     expect(
       seen,
       `expected a reconnect catch-up; saw ${JSON.stringify(seen)}`,
-    ).toContain("agent-mcp://reconnect")
+    ).toContain("conexus://reconnect")
   })
 })

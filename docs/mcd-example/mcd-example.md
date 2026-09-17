@@ -102,7 +102,7 @@
 *   **Target Directory/Module:** `/agent-mcp`
 *   **File Structure Plan:**
     ```
-    /agent-mcp/
+    /conexus/
     ├── __init__.py
     ├── main.py                 # Server implementation
     ├── mcp_client.py           # Client library
@@ -128,7 +128,7 @@
 *   **Environment Variables:** 
     * `OPENAI_API_KEY` - (Optional) OpenAI API key; defaults to local Ollama when unset
     * `OPENAI_BASE_URL` / `OPENAI_MODEL` - Override the Ollama defaults
-    * `AGENT_MCP_EMBEDDING_MODEL` / `AGENT_MCP_EMBEDDING_DIMENSION` - Embedding wiring
+    * `CONEXUS_EMBEDDING_MODEL` / `CONEXUS_EMBEDDING_DIMENSION` - Embedding wiring
     * `MCP_PROJECT_DIR` - Advanced; normally set by `--project-dir`
 
 ---
@@ -189,4 +189,4 @@
 *   **Processing Order:** Start with environment setup, then update code, finally create documentation.
 *   **File Locking:** Check file status before editing shared files.
 *   **Assistance/Partitioning:** Environment variable implementation can be parallelized across different files.
-*   **Code Style:** Follow PEP 8 guidelines for Python code.
+*   **Code Style:** Follow PEP 8 guidelines for Python code.

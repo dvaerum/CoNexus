@@ -4,7 +4,7 @@
  * History
  * -------
  * The GET /mcp 405-spam loop (verify-all-v8, 2026-06-27): the dashboard
- * subscribed to the agent-scoped ``GET /agent-mcp/mcp/<project>`` with
+ * subscribed to the agent-scoped ``GET /conexus/mcp/<project>`` with
  * cookie-only auth, which the router rejects with 405 (that GET stream
  * derives ``agent_id`` from a per-agent bearer the cookie can't carry).
  * A user reproduction showed 60+ ``=> 405`` lines within seconds of a
@@ -13,7 +13,7 @@
  *
  * The real fix is a dedicated cookie-authenticated operator events
  * endpoint (``features/operator_events.py`` + ``GET /api/events``,
- * proxied as ``/agent-mcp/api/<name>/events``). This test now pins the
+ * proxied as ``/conexus/api/<name>/events``). This test now pins the
  * re-wired contract:
  *
  *   1. ``subscribeMcpNotifications()`` opens exactly one stream at mount,

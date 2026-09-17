@@ -1,7 +1,7 @@
-// Agent-MCP/agent_mcp/dashboard/lib/stores/projects-store.ts
+// CoNexus/agent_mcp/dashboard/lib/stores/projects-store.ts
 //
 // Cross-project overview store (Phase 3.5a). Backed by the router's
-// `GET /agent-mcp/api/router/overview` endpoint (ADR 0014).
+// `GET /conexus/api/router/overview` endpoint (ADR 0014).
 //
 // Distinct from `useDataStore` (which fetches a single project's
 // agents / tasks / context via `/api/all-data`). The overview lives
@@ -79,7 +79,7 @@ export const useProjectsStore = create<ProjectsStore>((set, get) => ({
     try {
       const r = await fetch(OVERVIEW_ENDPOINT, {
         cache: 'no-store',
-        headers: { Accept: 'application/vnd.agent-mcp.v1+json' },
+        headers: { Accept: 'application/vnd.conexus.v1+json' },
       })
       if (!r.ok) {
         throw new Error(`overview endpoint returned HTTP ${r.status}`)
