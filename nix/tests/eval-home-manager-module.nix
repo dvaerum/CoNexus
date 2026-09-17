@@ -57,7 +57,7 @@ let
       homeManagerStub
       ../home-manager-module.nix
       {
-        services.agent-mcp = {
+        services.conexus = {
           enable = true;
           source = src;
           router = {
@@ -73,7 +73,7 @@ let
           conexusRouterPackage = pkgs.hello;
           conexusLauncherPackage = pkgs.hello;
           conexusDaemonAgentPackage = pkgs.hello;
-          # One daemon-agent instance so the `agent-mcp-daemon-agent@`
+          # One daemon-agent instance so the `conexus-daemon-agent@`
           # template unit actually materializes (default `daemonAgents
           # = []` emits none). `tokenPath` is never read at eval time
           # (only interpolated into the wrapper's ExecStart string), so
@@ -108,12 +108,12 @@ in {
 
   # RuntimeDirectoryPreserve regression guard (live incident,
   # 2026-09-07): `conexus-router` declares a BARE
-  # `RuntimeDirectory = "agent-mcp"`, a strict parent of `conexus@`'s
-  # own `agent-mcp/%i`. Per systemd.exec(5), that bare value IS the
+  # `RuntimeDirectory = "conexus"`, a strict parent of `conexus@`'s
+  # own `conexus/%i`. Per systemd.exec(5), that bare value IS the
   # router unit's own "innermost subdirectory", so without
   # `RuntimeDirectoryPreserve = "yes"` EVERY stop of the router unit
   # (a crash-loop, a redeploy) recursively removes the WHOLE
-  # `%t/agent-mcp/` tree -- including every live per-project backend's
+  # `%t/conexus/` tree -- including every live per-project backend's
   # own subdirectory and UDS socket, unrelated units still own and are
   # actively listening on. See each unit's own inline comment in
   # ../home-manager-module.nix for the full incident writeup this test
@@ -131,7 +131,7 @@ in {
   # `conexus-router` is the only router, this is unconditional; this
   # test pins that the dependency still points at the right unit name.
   daemonAgentRouterDependency = let
-    unit = units."agent-mcp-daemon-agent@demo-proj--worker-1".Unit;
+    unit = units."conexus-daemon-agent@demo-proj--worker-1".Unit;
   in {
     after = unit.After;
     wants = unit.Wants;
@@ -144,5 +144,5 @@ in {
   # callers that want to BUILD rather than inspect.
   drvs = installed;
 
-  dashboardOut = cfg.services.agent-mcp.dashboard.package.outPath;
+  dashboardOut = cfg.services.conexus.dashboard.package.outPath;
 }

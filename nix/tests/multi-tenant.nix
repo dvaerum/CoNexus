@@ -93,9 +93,9 @@ pkgs.testers.nixosTest {
           # (see the module docstring above), so this was equally
           # dormant; fixed to match module.nix rather than leave a
           # known-wrong default for the next test that does.
-          "CONEXUS_SOCK_DIR=/run/agent-mcp"
+          "CONEXUS_SOCK_DIR=/run/conexus"
         ];
-        RuntimeDirectory = "agent-mcp/%i";
+        RuntimeDirectory = "conexus/%i";
         RuntimeDirectoryMode = "0700";
         # See conexus-router's own RuntimeDirectoryPreserve comment
         # below -- same bare-parent-vs-%i-child sharing, same fix.
@@ -105,7 +105,7 @@ pkgs.testers.nixosTest {
         # bind over an existing sock file) kept as the second step.
         ExecStartPre = [
           "${pkgs.runtimeShell} -c 'test -f \"$RUNTIME_DIRECTORY/forwarding_hmac\" || { ${pkgs.coreutils}/bin/head -c 32 /dev/urandom > \"$RUNTIME_DIRECTORY/forwarding_hmac\" && ${pkgs.coreutils}/bin/chmod 600 \"$RUNTIME_DIRECTORY/forwarding_hmac\"; }'"
-          "${pkgs.coreutils}/bin/rm -f /run/agent-mcp/%i/backend.sock"
+          "${pkgs.coreutils}/bin/rm -f /run/conexus/%i/backend.sock"
         ];
         ExecStart = ''
           ${conexusPkgs.conexusLauncher}/bin/conexus-launcher %i
@@ -120,9 +120,9 @@ pkgs.testers.nixosTest {
     # that the Python one (`agent-mcp-router`) was retired. Most of
     # Python's env-var-only config surface is a real CLI flag on
     # `conexus-router` (see its own `Cli` struct doc in rust/
-    # conexus-router/src/main.rs); `AGENT_MCP_ROUTER_HOST`/
-    # `AGENT_MCP_SYSTEMCTL_MODE`/`AGENT_MCP_BOOTSTRAP_*`/
-    # `AGENT_MCP_ROUTER_DB` have no CLI-flag equivalent (env-var-only
+    # conexus-router/src/main.rs); `CONEXUS_ROUTER_HOST`/
+    # `CONEXUS_SYSTEMCTL_MODE`/`CONEXUS_BOOTSTRAP_*`/
+    # `CONEXUS_ROUTER_DB` have no CLI-flag equivalent (env-var-only
     # on the Python router too) and stay environment variables.
     # `AGENT_MCP_README_HTML`/`AGENT_MCP_INSTALLER_TEMPLATE` are
     # dropped -- `conexus-router` doesn't consume them yet, and
@@ -135,7 +135,7 @@ pkgs.testers.nixosTest {
       environment = {
         # Phase 1 PR B (prancy-napping-pie): router runs its schema
         # migrations against this DB at startup. Default
-        # /var/lib/agent-mcp is not writable by testuser; point at
+        # /var/lib/conexus is not writable by testuser; point at
         # testuser's home so the ExecStartPre mkdir below covers both.
         CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
         # Phase 1 PR C: seed a sentinel operator via env-var bootstrap
@@ -169,14 +169,14 @@ pkgs.testers.nixosTest {
         # RuntimeDirectoryPreserve=yes (live incident 2026-09-07, see
         # nix/home-manager-module.nix's conexus-router unit for the
         # full writeup): this bare, single-component RuntimeDirectory
-        # is a strict parent of conexus@'s own "agent-mcp/%i" above --
+        # is a strict parent of conexus@'s own "conexus/%i" above --
         # per systemd.exec(5), that makes it THIS unit's own innermost
         # subdirectory, so without `=yes` every stop of this router
         # (crash-loop, redeploy) recursively deletes the whole
-        # /run/agent-mcp tree, including any live per-project backend's
+        # /run/conexus tree, including any live per-project backend's
         # own subdirectory and socket -- exactly the multi-tenant
         # scenario this test exists to exercise.
-        RuntimeDirectory = "agent-mcp";
+        RuntimeDirectory = "conexus";
         RuntimeDirectoryMode = "0700";
         RuntimeDirectoryPreserve = "yes";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/agent-mcp /home/testuser/projects";
@@ -184,7 +184,7 @@ pkgs.testers.nixosTest {
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/agent-mcp/projects.local.json "
-          + "--sock-dir /run/agent-mcp "
+          + "--sock-dir /run/conexus "
           + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400";
@@ -225,7 +225,7 @@ pkgs.testers.nixosTest {
     # `ci-sentinel` user from the env-var bootstrap; log in here so
     # the cookie jar persists across the rest of the test.
     machine.succeed(
-        "curl -fsS -c /tmp/agent-mcp-cookies.txt "
+        "curl -fsS -c /tmp/conexus-cookies.txt "
         "--data 'username=ci-sentinel&password=ci-sentinel-pw' "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/login"
     )
@@ -241,7 +241,7 @@ pkgs.testers.nixosTest {
 
     # Project list starts empty.
     out = machine.succeed(
-        f"curl -fsS -b /tmp/agent-mcp-cookies.txt {accept_header} "
+        f"curl -fsS -b /tmp/conexus-cookies.txt {accept_header} "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
     assert '"projects": []' in out or '"projects":[]' in out, (
@@ -251,14 +251,14 @@ pkgs.testers.nixosTest {
     # 1. Register two projects via POST /api/router/projects.
     for name in ("alpha", "beta"):
         machine.succeed(
-            f"curl -fsSL -b /tmp/agent-mcp-cookies.txt -o /dev/null "
+            f"curl -fsSL -b /tmp/conexus-cookies.txt -o /dev/null "
             f"{json_header} -X POST "
             f"--data '{{\"name\": \"{name}\"}}' "
             f"http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
         )
 
     out = machine.succeed(
-        f"curl -fsS -b /tmp/agent-mcp-cookies.txt {accept_header} "
+        f"curl -fsS -b /tmp/conexus-cookies.txt {accept_header} "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
     assert '"alpha"' in out and '"beta"' in out, (
@@ -270,7 +270,7 @@ pkgs.testers.nixosTest {
     # answer here. PR-B Shape-3: the dashboard surface moved from
     # /conexus/__dashboard/<name>/ to /conexus/app/<name>/.
     code = machine.succeed(
-        "curl -fsS -b /tmp/agent-mcp-cookies.txt "
+        "curl -fsS -b /tmp/conexus-cookies.txt "
         "-o /dev/null -w '%{http_code}' "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/app/alpha/"
     )
@@ -282,7 +282,7 @@ pkgs.testers.nixosTest {
     # along with the rest of the `__` namespace, so the cookie is now
     # required to reach the 404 (middleware would otherwise 401 first).
     out_404 = machine.succeed(
-        "curl -s -b /tmp/agent-mcp-cookies.txt -o /dev/null -w '%{http_code}' "
+        "curl -s -b /tmp/conexus-cookies.txt -o /dev/null -w '%{http_code}' "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/__sse/alpha"
     )
     assert out_404 == "404", f"expected 404 on legacy SSE; got {out_404}"
@@ -290,7 +290,7 @@ pkgs.testers.nixosTest {
     # 4. Create / delete / rename are NOT 410 in multi-tenant mode —
     # they're the documented multi-tenant write surface.
     code_create = machine.succeed(
-        f"curl -s -b /tmp/agent-mcp-cookies.txt "
+        f"curl -s -b /tmp/conexus-cookies.txt "
         f"-o /dev/null -w '%{{http_code}}' "
         f"{json_header} -X POST "
         f"--data '{{\"name\": \"gamma\"}}' "
@@ -306,7 +306,7 @@ pkgs.testers.nixosTest {
     # default `/conexus/assets` on serve. A leak here = a broken
     # white dashboard in the browser.
     sentinel_count = machine.succeed(
-        "curl -fsS -b /tmp/agent-mcp-cookies.txt "
+        "curl -fsS -b /tmp/conexus-cookies.txt "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/app/alpha/"
         " | grep -c '__CONEXUS_ASSET_PREFIX__' || true"
     ).strip()
@@ -320,7 +320,7 @@ pkgs.testers.nixosTest {
     # Asset URLs in the served HTML must now reference the configured
     # runtime prefix (PR-B Shape-3 default: /conexus/assets).
     served = machine.succeed(
-        "curl -fsS -b /tmp/agent-mcp-cookies.txt "
+        "curl -fsS -b /tmp/conexus-cookies.txt "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/app/alpha/"
     )
     assert "/conexus/assets/_next/" in served, (
@@ -391,7 +391,7 @@ pkgs.testers.nixosTest {
         # middleware (PR D) so no cookie is needed; /conexus/app/...
         # RSC paths do need it.
         body = machine.succeed(
-            f"curl -fsS -b /tmp/agent-mcp-cookies.txt {base}{url}"
+            f"curl -fsS -b /tmp/conexus-cookies.txt {base}{url}"
         )
         if "__CONEXUS_ASSET_PREFIX__" in body:
             offenders.append(url)

@@ -5,9 +5,9 @@
 #
 # Bundle selection arrives on the kernel command line
 # (agent_mcp_preload=<name>[,<name>...]), placed there by
-# nix/run-vm-dev.sh from $AGENT_MCP_VM_DEV_PRELOAD — a pure runtime
+# nix/run-vm-dev.sh from $CONEXUS_VM_DEV_PRELOAD — a pure runtime
 # concern, no VM rebuild to switch datasets. Fixtures are baked into the
-# image at $AGENT_MCP_FIXTURES_DIR as <name>.tar.zst: a raw tar of the
+# image at $CONEXUS_FIXTURES_DIR as <name>.tar.zst: a raw tar of the
 # state-dir subtree captured from a seeded VM
 # (`nix run .#capture-vm-dev-fixture`).
 #
@@ -17,8 +17,8 @@
 # the current schema, the app's Alembic upgrade runs forward on first
 # open, so a slightly-stale bundle still boots.
 
-state_dir="${AGENT_MCP_STATE_DIR:?AGENT_MCP_STATE_DIR must be set}"
-fixtures_dir="${AGENT_MCP_FIXTURES_DIR:?AGENT_MCP_FIXTURES_DIR must be set}"
+state_dir="${CONEXUS_STATE_DIR:?CONEXUS_STATE_DIR must be set}"
+fixtures_dir="${CONEXUS_FIXTURES_DIR:?CONEXUS_FIXTURES_DIR must be set}"
 marker="$state_dir/.vm-dev-preloaded"
 
 # Parse agent_mcp_preload=<names> from the kernel cmdline. Last wins if

@@ -84,8 +84,8 @@ fi
 #                 the user can wipe disk.qcow2 without forcing
 #                 a ~620 MB embedding-model redownload.
 export NIX_DISK_IMAGE="$state_dir/disk.qcow2"
-export AGENT_MCP_OLLAMA_DIR="$state_dir/ollama"
-mkdir -p -- "$AGENT_MCP_OLLAMA_DIR"
+export CONEXUS_OLLAMA_DIR="$state_dir/ollama"
+mkdir -p -- "$CONEXUS_OLLAMA_DIR"
 export TMPDIR="$state_dir"
 export USE_TMPDIR=1
 

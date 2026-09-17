@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }:
 
-# Home-manager module exposing agent-mcp as user-scope systemd units.
+# Home-manager module exposing conexus as user-scope systemd units.
 #
 # This module ships in the dvaerum/CoNexus fork (Phase 2 of the
 # router-upstream plan, prancy-napping-pie). It mirrors the
@@ -12,17 +12,17 @@
 # Shape:
 #
 #   - One declared list `daemonAgents` → N systemd template instances
-#     (agent-mcp-daemon-agent@<project>--<agent_id>.service), each
+#     (conexus-daemon-agent@<project>--<agent_id>.service), each
 #     running an event-driven wait_for_events loop against the router.
 #   - A thin always-on router (conexus-router.service, the CoNexus Rust
 #     router — see `conexusRouterPackage` below) on 127.0.0.1:<port>
 #     (default 1337) does URL-path routing + activity tracking, calls
 #     systemctl --user start/stop for lazy spawn + idle shutdown, and
-#     serves the Next.js static dashboard at /agent-mcp/app/<name>/.
+#     serves the Next.js static dashboard at /conexus/app/<name>/.
 #   - Per-project backends (conexus@<name>.service template — see
 #     `conexusLauncherPackage` below) are lazy-started by the router on
 #     first MCP request and idle-stopped after
-#     services.agent-mcp.router.idleSec seconds.
+#     services.conexus.router.idleSec seconds.
 #
 # The Python implementation (agent-mcp@<name>.service /
 # agent-mcp-router.service, and the `router.impl` A/B flip between
@@ -32,28 +32,28 @@
 # and this file's own `router.impl` removal for the cutover.
 #
 # Project membership is *not* declared in nix. Every project is
-# registered at runtime via POST /agent-mcp/api/router/projects
+# registered at runtime via POST /conexus/api/router/projects
 # (dashboard form or `curl`, JSON body), recorded in
 # ~/.config/agent-mcp/projects.local.json. The module materialises the
 # router + systemd template + the daemon-agent wiring; project list
 # lives outside source control.
 #
-# `services.agent-mcp.multiTenant` (default true) picks the deployment
+# `services.conexus.multiTenant` (default true) picks the deployment
 # shape. When set to false, the operator additionally declares
-# `services.agent-mcp.singleProject = { name, workspace }`; the
+# `services.conexus.singleProject = { name, workspace }`; the
 # module seeds a one-entry projects.local.json via ExecStartPre on
 # the router unit and passes --single-tenant / --single-workspace
 # to the router so its write endpoints 410 and W1 redirects fire
 # (decision #1 + #9; ADR-0008).
 
 let
-  cfg = config.services.agent-mcp;
+  cfg = config.services.conexus;
 
   # The package set the module was instantiated with. Named so the
-  # `services.agent-mcp.pkgs` option below can default to it without
+  # `services.conexus.pkgs` option below can default to it without
   # the attribute name shadowing the module argument.
   #
-  # Scope boundary: `cfg.pkgs` governs agent-mcp's OWN derivations —
+  # Scope boundary: `cfg.pkgs` governs conexus's OWN derivations —
   # the ones coupled to a single interpreter and to each other. The
   # generic shell utilities this file reaches for directly (`pkgs.jq`,
   # `pkgs.coreutils`, `pkgs.runtimeShell` in the unit ExecStartPre
@@ -71,7 +71,7 @@ let
   # Nothing may be spliced onto the result afterwards; an attribute
   # added with `//` here would be read by nothing, because
   # packages.nix has already closed over its own package set by the
-  # time it returns. (That was the `services.agent-mcp.package` bug,
+  # time it returns. (That was the `services.conexus.package` bug,
   # back when this import also built the Python tree: a silently
   # ineffective override. The option is gone — see the
   # mkRemovedOptionModule in `imports` — and
@@ -161,7 +161,7 @@ let
 
 in {
   imports = [
-    # `services.agent-mcp.package` was a single-derivation override of
+    # `services.conexus.package` was a single-derivation override of
     # the Python tree. It never reached anything that runs.
     #
     # The module spliced it onto the *result* of nix/packages.nix
@@ -185,10 +185,10 @@ in {
     # would fail to import.
     #
     # The coherent knob is the whole package SET —
-    # `services.agent-mcp.pkgs` — which moves app, interpreter,
+    # `services.conexus.pkgs` — which moves app, interpreter,
     # wrappers and dashboard together.
     (lib.mkRemovedOptionModule [ "services" "agent-mcp" "package" ] ''
-      services.agent-mcp.package has been removed: it was a silent
+      services.conexus.package has been removed: it was a silent
       no-op. The override was applied AFTER nix/packages.nix had
       already built the router / backend / launcher / daemon-agent
       wrappers against its own internal derivation, so the systemd
@@ -198,21 +198,21 @@ in {
       site-packages layout the wrappers need, so the option could not
       be fixed in place.
 
-      Use `services.agent-mcp.pkgs` to build every agent-mcp
+      Use `services.conexus.pkgs` to build every conexus
       derivation from a different package set (the supported way to
       escape a stable channel's Python security lag), and/or
-      `services.agent-mcp.source` to build from a different source
+      `services.conexus.source` to build from a different source
       tree.
     '')
   ];
 
-  options.services.agent-mcp = {
-    enable = lib.mkEnableOption "agent-mcp (multi-tenant router + daemon agents)";
+  options.services.conexus = {
+    enable = lib.mkEnableOption "conexus (multi-tenant router + daemon agents)";
 
     source = lib.mkOption {
       type = lib.types.path;
       description = ''
-        Path to the agent-mcp source tree. Defaults to the fork's
+        Path to the conexus source tree. Defaults to the fork's
         repo root via the flake's `homeModules.default`
         wrapper; override to pin a different source tree.
       '';
@@ -243,7 +243,7 @@ in {
       description = ''
         The CoNexus Rust reference daemon-agent binary
         (`nix/conexus.nix`'s `conexusDaemonAgentWrapper`), for
-        `agent-mcp-daemon-agent@<instance>.service` -- the ONLY
+        `conexus-daemon-agent@<instance>.service` -- the ONLY
         daemon-agent implementation now that the Python pair
         (`agentMcpDaemonAgentRunner`/`Wrapper`) was retired with the
         rest of the Python tree.
@@ -328,27 +328,27 @@ in {
         is whatever crates.io advisories land against the `rust/`
         workspace's dependency graph, or the dashboard's npm tree).
         Pointing this option at a fresher package set rebuilds
-        agent-mcp's own derivations — and, through the flake wrapper,
+        conexus's own derivations — and, through the flake wrapper,
         the Rust toolchain they compile against — against it; the rest
         of the home-manager profile stays on the stable channel:
 
         ```nix
-        services.agent-mcp.pkgs = import agent-mcp.inputs.nixpkgs {
+        services.conexus.pkgs = import agent-mcp.inputs.nixpkgs {
           inherit (pkgs.stdenv.hostPlatform) system;
         };
         ```
 
-        Note that agent-mcp's own flake pin does NOT do this for you.
+        Note that conexus's own flake pin does NOT do this for you.
         The module builds from the *consumer's* package set by
         construction, so dropping `inputs.agent-mcp.inputs.nixpkgs.follows`
-        in your flake changes only what `nix build` inside agent-mcp's
+        in your flake changes only what `nix build` inside conexus's
         own flake produces — not your deployed closure. This option is
         the switch that does.
 
         It must be a whole package set, not a single derivation — a
         derivation from one channel paired with a toolchain/stdenv from
         another does not merely mix closures, it can fail to build or
-        import. (That mismatch is also why `services.agent-mcp.package`
+        import. (That mismatch is also why `services.conexus.package`
         was removed, back when this option's own derivation was the
         Python application specifically.)
       '';
@@ -380,7 +380,7 @@ in {
           wiring-help panel URLs so the same file works from other
           devices (laptop, phone), not only this host's loopback.
 
-          Required when `services.agent-mcp.enable = true`.
+          Required when `services.conexus.enable = true`.
         '';
       };
 
@@ -388,7 +388,7 @@ in {
         type = lib.types.str;
         example = "/home/alice/.local/share/agent-mcp/projects";
         description = ''
-          Where POST /agent-mcp/api/router/projects puts a project's
+          Where POST /conexus/api/router/projects puts a project's
           workspace when the user leaves the "Workspace" form field
           blank. Each project then lives at
           `''${defaultWorkspaceParent}/<name>/`.
@@ -415,7 +415,7 @@ in {
         type = lib.types.package;
         default = pkgs'.agentMcpDashboard;
         defaultText = lib.literalMD
-          "the dashboard built from `services.agent-mcp.source` using `services.agent-mcp.pkgs`";
+          "the dashboard built from `services.conexus.source` using `services.conexus.pkgs`";
         description = "Dashboard derivation (Next.js static export).";
       };
     };
@@ -426,11 +426,11 @@ in {
       description = ''
         When true (default), the router runs in multi-tenant mode:
         projects are registered at runtime via
-        POST /agent-mcp/api/router/projects and the dashboard's
+        POST /conexus/api/router/projects and the dashboard's
         overview lists them all.
 
         When false, the router runs in single-tenant mode (N=1):
-        `services.agent-mcp.singleProject` declares the only project,
+        `services.conexus.singleProject` declares the only project,
         the module seeds projects.local.json before the router starts,
         and the router 410s every project-lifecycle write endpoint
         plus 302-redirects any wrong-project URL to the configured one
@@ -453,7 +453,7 @@ in {
           options = {
             issuer = lib.mkOption {
               type = lib.types.str;
-              example = "https://keycloak.example.com/realms/agent-mcp";
+              example = "https://keycloak.example.com/realms/conexus";
               description = ''
                 OIDC issuer URL. The router fetches its discovery
                 document at `''${issuer}/.well-known/openid-configuration`
@@ -462,12 +462,12 @@ in {
             };
             clientId = lib.mkOption {
               type = lib.types.str;
-              example = "agent-mcp";
+              example = "conexus";
               description = "RP client identifier registered with the IdP.";
             };
             clientSecretFile = lib.mkOption {
               type = lib.types.path;
-              example = "/run/secrets/agent-mcp-oidc-client-secret";
+              example = "/run/secrets/conexus-oidc-client-secret";
               description = ''
                 Path to a chmod-0600 file holding the OIDC client
                 secret. The router reads it once at startup; secret
@@ -493,13 +493,13 @@ in {
                 "*" = "";
               };
               description = ''
-                Map IdP-supplied group claims to agent-mcp groups.
+                Map IdP-supplied group claims to conexus groups.
                 Each entry is `oidc_group_name = agent_mcp_group_name`.
                 Unmapped claims are silently ignored.
 
                 Special: an entry with key `"*"` enables the wildcard
                 JIT escape — every unmatched group claim auto-creates
-                a sanitized agent-mcp group (lowercase, dashes only)
+                a sanitized conexus group (lowercase, dashes only)
                 and the user is added.
               '';
             };
@@ -515,10 +515,10 @@ in {
             redirectUrl = lib.mkOption {
               type = lib.types.nullOr lib.types.str;
               default = null;
-              example = "https://router.example.com/agent-mcp/sso/callback";
+              example = "https://router.example.com/conexus/sso/callback";
               description = ''
                 Override the redirect URL handed to the IdP.
-                Defaults to `''${externalUrl}/agent-mcp/sso/callback`
+                Defaults to `''${externalUrl}/conexus/sso/callback`
                 — only set this if the IdP's registered redirect URI
                 differs from the natural one.
               '';
@@ -626,7 +626,7 @@ in {
             example = "washing-brothers";
             description = ''
               Project slug. Must match an existing project registered
-              via POST /agent-mcp/api/router/projects.
+              via POST /conexus/api/router/projects.
             '';
           };
           agentId = lib.mkOption {
@@ -652,7 +652,7 @@ in {
       default = [ ];
       description = ''
         Daemon-agent instances to enable. Each entry expands to one
-        `agent-mcp-daemon-agent@<project>--<agent_id>.service` unit,
+        `conexus-daemon-agent@<project>--<agent_id>.service` unit,
         WantedBy `default.target` so it's symlinked from
         `default.target.wants/`.
       '';
@@ -666,18 +666,18 @@ in {
       {
         assertion = cfg.multiTenant -> cfg.singleProject == null;
         message = ''
-          services.agent-mcp.singleProject must be null when
-          services.agent-mcp.multiTenant = true (multi-tenant mode
+          services.conexus.singleProject must be null when
+          services.conexus.multiTenant = true (multi-tenant mode
           discovers projects at runtime via
-          POST /agent-mcp/api/router/projects; the singleProject
+          POST /conexus/api/router/projects; the singleProject
           option only applies to single-tenant mode).
         '';
       }
       {
         assertion = (!cfg.multiTenant) -> cfg.singleProject != null;
         message = ''
-          services.agent-mcp.multiTenant = false requires
-          services.agent-mcp.singleProject = { name = "<slug>";
+          services.conexus.multiTenant = false requires
+          services.conexus.singleProject = { name = "<slug>";
           workspace = "<abs-path>"; }. The router refuses to start
           without a configured project in single-tenant mode (the
           dashboard would have no project to point at).
@@ -689,7 +689,7 @@ in {
         # operator never reaches the runtime SSOConfigError.
         assertion = !(cfg.sso.oidc != null && cfg.sso.proxyHeader != null);
         message = ''
-          services.agent-mcp.sso.oidc and services.agent-mcp.sso.proxyHeader
+          services.conexus.sso.oidc and services.conexus.sso.proxyHeader
           are mutually exclusive. Pick one: OIDC (authorization-code
           flow against an external IdP) OR proxy-header trust
           (upstream proxy supplies the username). Setting both would
@@ -708,7 +708,7 @@ in {
     # missing package to fall back to, so an operator who never sets
     # `conexusRouterPackage` gets no router, not a Python one.
     home.packages =
-      lib.optional (daemonAgentWrapper != null) daemonAgentWrapper  # invoked by agent-mcp-daemon-agent@.service via %i
+      lib.optional (daemonAgentWrapper != null) daemonAgentWrapper  # invoked by conexus-daemon-agent@.service via %i
       ++ [
         pkgs'.agentMcpDaemonAgentPrecompactHook  # operator-installed PreCompact hook
       ];
@@ -730,7 +730,7 @@ in {
     #   "conexus-router"         — always-on router (URL-keyed,
     #                              idle-stop), omitted when
     #                              `conexusRouterPackage` is null.
-    #   "agent-mcp-daemon-agent@<instance>"
+    #   "conexus-daemon-agent@<instance>"
     #                            — per-instance daemon-agent runner,
     #                              one entry per cfg.daemonAgents
     #                              element, each WantedBy default.target
@@ -750,7 +750,7 @@ in {
       # that the Python one (`agent-mcp@<name>.service`) was retired
       # together with the rest of the Python source tree.
       #
-      # `RuntimeDirectory = "agent-mcp/%i"` (not `conexus/%i`) is a
+      # `RuntimeDirectory = "conexus/%i"` (not `conexus/%i`) is a
       # historical holdover from when this path was shared with the
       # since-deleted `agent-mcp@` template so a `backend_impl` flip
       # was a same-path process swap (Decision #1, 2026-09-04,
@@ -768,19 +768,19 @@ in {
         };
         Service = {
           Type = "simple";
-          RuntimeDirectory = "agent-mcp/%i";
+          RuntimeDirectory = "conexus/%i";
           RuntimeDirectoryMode = "0700";
           # RuntimeDirectoryPreserve=yes ported from nix/module.nix's
           # already-correct system-mode template -- without it, this
           # unit's own stop/restart is free to tear down its own leaf
-          # of the shared %t/agent-mcp/ tree on every cycle rather than
+          # of the shared %t/conexus/ tree on every cycle rather than
           # just on uninstall (same class of bug as `conexus-router`'s
           # own RuntimeDirectoryPreserve incident below, one level up
           # the tree).
           RuntimeDirectoryPreserve = "yes";
           ExecStartPre = [
             "${pkgs.runtimeShell} -c 'test -f \"$RUNTIME_DIRECTORY/forwarding_hmac\" || { ${pkgs.coreutils}/bin/head -c 32 /dev/urandom > \"$RUNTIME_DIRECTORY/forwarding_hmac\" && ${pkgs.coreutils}/bin/chmod 600 \"$RUNTIME_DIRECTORY/forwarding_hmac\"; }'"
-            "${pkgs.coreutils}/bin/rm -f %t/agent-mcp/%i/backend.sock"
+            "${pkgs.coreutils}/bin/rm -f %t/conexus/%i/backend.sock"
           ];
           ExecStart = "${cfg.conexusLauncherPackage}/bin/conexus-launcher %i";
           Restart = "on-failure";
@@ -867,25 +867,25 @@ in {
             }"
           ];
           # RuntimeDirectoryPreserve=yes is NOT optional here (live
-          # incident, 2026-09-07): `RuntimeDirectory=agent-mcp` is a
+          # incident, 2026-09-07): `RuntimeDirectory=conexus` is a
           # BARE, single-component value -- per systemd.exec(5)'s
           # RuntimeDirectory= section, that bare path IS this unit's
           # "innermost subdirectory", so on every stop (a crash-loop
-          # restart, a redeploy) systemd rm's the ENTIRE %t/agent-mcp/
+          # restart, a redeploy) systemd rm's the ENTIRE %t/conexus/
           # tree by default -- including every live per-project
           # `conexus@%i` subdirectory and UDS socket unrelated units
           # still own and are actively listening on. Confirmed live:
           # `conexus-router` restarting (during this very cutover's
           # home-manager switch, back when the retired Python router
           # unit could also crash-loop against the same port) wiped
-          # %t/agent-mcp/ on each cycle, so `ss` kept showing
+          # %t/conexus/ on each cycle, so `ss` kept showing
           # per-project sockets LISTEN (the kernel remembers the bind)
           # while every new connect() to the now-unlinked path failed --
           # indistinguishable from "backend not ready" at every layer
           # above this. `=yes` makes this unit's OWN stop leave the
           # tree alone, matching nix/module.nix's system-mode template
           # (which already carries the equivalent guard on ITS units).
-          RuntimeDirectory = "agent-mcp";
+          RuntimeDirectory = "conexus";
           RuntimeDirectoryMode = "0700";
           RuntimeDirectoryPreserve = "yes";
           ExecStartPre = lib.mkIf (!cfg.multiTenant) [
@@ -896,7 +896,7 @@ in {
               commonFlags =
                 "--port ${toString cfg.router.port} "
                 + "--projects-file %h/.config/agent-mcp/projects.local.json "
-                + "--sock-dir %t/agent-mcp "
+                + "--sock-dir %t/conexus "
                 + "--dashboard-dir ${cfg.dashboard.package}/share/agent-mcp-dashboard "
                 + "--external-url ${lib.escapeShellArg cfg.router.externalUrl} "
                 + "--idle-sec ${toString cfg.router.idleSec}";
@@ -923,7 +923,7 @@ in {
         Install.WantedBy = [ "default.target" ];
       };
     } // lib.listToAttrs (map (a: {
-      name = "agent-mcp-daemon-agent@${daemonAgentInstanceName a}";
+      name = "conexus-daemon-agent@${daemonAgentInstanceName a}";
       # Omitted when `conexusDaemonAgentPackage` is null -- see that
       # option's own doc for why this mirrors `conexus@`/`conexus-router`'s
       # "no package, no unit" idiom rather than a no-default required

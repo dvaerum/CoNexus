@@ -46,7 +46,7 @@ out="nix/vm-dev/fixtures/${name}.tar.zst"
 host_port="${CAPTURE_HOST_PORT:-18090}"
 ssh_port="${CAPTURE_SSH_PORT:-18232}"
 base="http://127.0.0.1:${host_port}"
-V='Accept: application/vnd.agent-mcp.v1+json'
+V='Accept: application/vnd.conexus.v1+json'
 CT='Content-Type: application/json'
 ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -p "$ssh_port")
 ssh_host="root@127.0.0.1"
@@ -61,15 +61,15 @@ cleanup() {
 trap cleanup EXIT
 
 echo "capture-vm-dev-fixture: booting ephemeral vm-dev (dash :$host_port, ssh :$ssh_port)"
-AGENT_MCP_VM_DEV_HOST_PORT="$host_port" \
-AGENT_MCP_VM_DEV_SSH_PORT="$ssh_port" \
+CONEXUS_VM_DEV_HOST_PORT="$host_port" \
+CONEXUS_VM_DEV_SSH_PORT="$ssh_port" \
   "$VM_DEV_RUN" --ephemeral >"$workdir/vm.log" 2>&1 &
 vm_pid=$!
 
 echo "capture-vm-dev-fixture: waiting for router readiness..."
 ready=0
 for _ in $(seq 1 120); do
-  if curl -fsS --max-time 4 -H "$V" "$base/agent-mcp/api/router/health" 2>/dev/null | grep -q '"ok": *true'; then
+  if curl -fsS --max-time 4 -H "$V" "$base/conexus/api/router/health" 2>/dev/null | grep -q '"ok": *true'; then
     ready=1; break
   fi
   kill -0 "$vm_pid" 2>/dev/null || { echo "capture-vm-dev-fixture: VM exited early — see $workdir/vm.log" >&2; tail -20 "$workdir/vm.log" >&2 || true; exit 1; }
@@ -84,14 +84,14 @@ curl -fsS -c "$cj" -X POST "$base/agent-mcp/login" \
 api() { curl -fsS -b "$cj" -H "$V" -H "$CT" "$@"; }
 
 slug="demo"
-api -X POST "$base/agent-mcp/api/router/projects" -d "{\"name\":\"$slug\"}" -o /dev/null
+api -X POST "$base/conexus/api/router/projects" -d "{\"name\":\"$slug\"}" -o /dev/null
 for a in '{"agent_id":"alice","role":"worker"}' '{"agent_id":"bob","role":"manager"}'; do
-  api -X POST "$base/agent-mcp/api/$slug/agents/register" -d "$a" -o /dev/null
+  api -X POST "$base/conexus/api/$slug/agents/register" -d "$a" -o /dev/null
 done
-root_id="$(api -X POST "$base/agent-mcp/api/$slug/tasks" -d '{"task_title":"Demo root task"}' \
+root_id="$(api -X POST "$base/conexus/api/$slug/tasks" -d '{"task_title":"Demo root task"}' \
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["task_id"])')"
 for t in "Wire the dashboard" "Write the tests"; do
-  api -X POST "$base/agent-mcp/api/$slug/tasks" \
+  api -X POST "$base/conexus/api/$slug/tasks" \
     -d "{\"task_title\":\"$t\",\"parent_task\":\"$root_id\"}" -o /dev/null
 done
 echo "capture-vm-dev-fixture: seeded project '$slug' (root $root_id + 2 children, alice/bob)"
@@ -104,11 +104,11 @@ mkdir -p "$(dirname "$out")"
 # Raw tar of the state-dir CONTENTS (rooted at the dir), zstd-compressed
 # on the host side so the guest needs no extra tooling.
 sshpass -p '' ssh "${ssh_opts[@]}" "$ssh_host" \
-  "tar -C /var/lib/agent-mcp -cpf - ." | zstd -q -19 -o "$out" -f
+  "tar -C /var/lib/conexus -cpf - ." | zstd -q -19 -o "$out" -f
 
 sshpass -p '' ssh "${ssh_opts[@]}" "$ssh_host" "poweroff" 2>/dev/null || true
 sleep 2
 
 sz="$(du -h "$out" | cut -f1)"
 echo "capture-vm-dev-fixture: wrote $out ($sz)"
-echo "capture-vm-dev-fixture: commit it, then: AGENT_MCP_VM_DEV_PRELOAD=$name nix run .#vm-dev"
+echo "capture-vm-dev-fixture: commit it, then: CONEXUS_VM_DEV_PRELOAD=$name nix run .#vm-dev"

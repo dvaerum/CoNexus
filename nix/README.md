@@ -1,4 +1,4 @@
-# agent-mcp home-manager module
+# conexus home-manager module
 
 [Agent-MCP](https://github.com/rinadelph/Agent-MCP), packaged via
 the [`dvaerum/CoNexus`](https://github.com/dvaerum/CoNexus)
@@ -21,12 +21,12 @@ Three groups of user-scope systemd units:
 - **`conexus@<name>.service`** (systemd template; the retired Python
   one was `agent-mcp@<name>.service`) — one instance per registered
   project, started lazily by the router on first MCP request, stopped
-  after `services.agent-mcp.router.idleSec` seconds of inactivity.
+  after `services.conexus.router.idleSec` seconds of inactivity.
   Listens on a Unix domain socket under
   `$XDG_RUNTIME_DIR/conexus/<name>/backend.sock`.
-- **`agent-mcp-daemon-agent@<project>--<agent_id>.service`** (systemd
+- **`conexus-daemon-agent@<project>--<agent_id>.service`** (systemd
   template) — one instance per entry in
-  `services.agent-mcp.daemonAgents`. Runs an event-driven
+  `services.conexus.daemonAgents`. Runs an event-driven
   `wait_for_events` long-poll loop so the agent reacts to messages /
   task assignments without anyone keeping a Claude session open.
 
@@ -55,7 +55,7 @@ In your home-manager flake:
           home.homeDirectory = "/home/alice";
           home.stateVersion = "25.11";
 
-          services.agent-mcp = {
+          services.conexus = {
             enable = true;
             router = {
               # Default; uncomment to change.
@@ -105,23 +105,23 @@ dashboard's overview.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `services.agent-mcp.enable` | bool | `false` | Enable the router, template, and daemon-agent units. |
-| `services.agent-mcp.source` | path | `self` (the flake) | Source tree the module builds from. Override to pin a local checkout. |
-| `services.agent-mcp.pkgs` | package set | the consumer's `pkgs` | Package set every agent-mcp derivation is built from. See [Building from a different nixpkgs](#building-from-a-different-nixpkgs). |
-| `services.agent-mcp.router.port` | port | `1337` | Router's loopback port. |
-| `services.agent-mcp.router.idleSec` | int (positive) | `14400` | Seconds of inactivity before the router stops a per-project backend. |
-| `services.agent-mcp.router.externalUrl` | str | (required) | Base URL the host can be reached at; used in `.mcp.json` snippets. |
-| `services.agent-mcp.router.defaultWorkspaceParent` | str | (required) | Where new project workspaces are created when the form's Workspace field is empty. |
-| `services.agent-mcp.dashboard.enable` | bool | `true` | Build and serve the Next.js dashboard. |
-| `services.agent-mcp.dashboard.package` | package | computed | Override the dashboard derivation. |
-| `services.agent-mcp.daemonAgents` | list of submodules | `[]` | Each entry expands to one `agent-mcp-daemon-agent@<project>--<agent_id>.service` unit. |
-| `services.agent-mcp.multiTenant` | bool | `true` | `true`: the router runs multi-tenant (projects registered at runtime). `false`: single-tenant (N=1) — requires `singleProject` to be set; an assertion enforces the pairing. |
-| `services.agent-mcp.singleProject` | nullable submodule (`name`, `workspace`) | `null` | Required when `multiTenant = false`, must stay `null` when `true`. Declares the single project a single-tenant deploy serves. |
-| `services.agent-mcp.sso.oidc` | nullable submodule | `null` | OIDC authorization-code+PKCE config (`issuer`, `clientId`, `clientSecretFile`, `providerName`, `groupMapping`, `scopes`, `redirectUrl`). Mutually exclusive with `sso.proxyHeader` — the router refuses to start if both are set. |
-| `services.agent-mcp.sso.proxyHeader` | nullable submodule | `null` | Trust-an-upstream-proxy SSO config (`trustHeader`, `trustedIps`, `defaultIsSysadmin`). Mutually exclusive with `sso.oidc`. |
-| `services.agent-mcp.conexusLauncherPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The `conexus@<name>.service` backend launcher. `null` with no override (i.e. bypassing the flake wrapper) ships no per-project backend at all. |
-| `services.agent-mcp.conexusRouterPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The `conexus-router` singleton service package. `null` with no override ships no router at all. |
-| `services.agent-mcp.conexusDaemonAgentPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The daemon-agent binary for every `daemonAgents` unit. `null` with no override omits every daemon-agent unit entirely. |
+| `services.conexus.enable` | bool | `false` | Enable the router, template, and daemon-agent units. |
+| `services.conexus.source` | path | `self` (the flake) | Source tree the module builds from. Override to pin a local checkout. |
+| `services.conexus.pkgs` | package set | the consumer's `pkgs` | Package set every conexus derivation is built from. See [Building from a different nixpkgs](#building-from-a-different-nixpkgs). |
+| `services.conexus.router.port` | port | `1337` | Router's loopback port. |
+| `services.conexus.router.idleSec` | int (positive) | `14400` | Seconds of inactivity before the router stops a per-project backend. |
+| `services.conexus.router.externalUrl` | str | (required) | Base URL the host can be reached at; used in `.mcp.json` snippets. |
+| `services.conexus.router.defaultWorkspaceParent` | str | (required) | Where new project workspaces are created when the form's Workspace field is empty. |
+| `services.conexus.dashboard.enable` | bool | `true` | Build and serve the Next.js dashboard. |
+| `services.conexus.dashboard.package` | package | computed | Override the dashboard derivation. |
+| `services.conexus.daemonAgents` | list of submodules | `[]` | Each entry expands to one `conexus-daemon-agent@<project>--<agent_id>.service` unit. |
+| `services.conexus.multiTenant` | bool | `true` | `true`: the router runs multi-tenant (projects registered at runtime). `false`: single-tenant (N=1) — requires `singleProject` to be set; an assertion enforces the pairing. |
+| `services.conexus.singleProject` | nullable submodule (`name`, `workspace`) | `null` | Required when `multiTenant = false`, must stay `null` when `true`. Declares the single project a single-tenant deploy serves. |
+| `services.conexus.sso.oidc` | nullable submodule | `null` | OIDC authorization-code+PKCE config (`issuer`, `clientId`, `clientSecretFile`, `providerName`, `groupMapping`, `scopes`, `redirectUrl`). Mutually exclusive with `sso.proxyHeader` — the router refuses to start if both are set. |
+| `services.conexus.sso.proxyHeader` | nullable submodule | `null` | Trust-an-upstream-proxy SSO config (`trustHeader`, `trustedIps`, `defaultIsSysadmin`). Mutually exclusive with `sso.oidc`. |
+| `services.conexus.conexusLauncherPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The `conexus@<name>.service` backend launcher. `null` with no override (i.e. bypassing the flake wrapper) ships no per-project backend at all. |
+| `services.conexus.conexusRouterPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The `conexus-router` singleton service package. `null` with no override ships no router at all. |
+| `services.conexus.conexusDaemonAgentPackage` | nullable package | `null` (auto-wired by the flake's `homeModules.default`) | The daemon-agent binary for every `daemonAgents` unit. `null` with no override omits every daemon-agent unit entirely. |
 
 The three `conexus*Package` options are auto-wired to a `crane`-built
 binary when the module is consumed via this flake's own
@@ -151,7 +151,7 @@ That matters when the host tracks a NixOS **stable** branch. Stable
 branches don't take routine Python security backports, so the router's
 aiohttp stays on whatever that branch froze on for the life of the
 release, advisories included, while unstable already ships the fix.
-`services.agent-mcp.pkgs` rebuilds agent-mcp — and only agent-mcp —
+`services.conexus.pkgs` rebuilds conexus — and only conexus —
 from a set you choose, leaving the rest of the profile on stable:
 
 ```nix
@@ -160,7 +160,7 @@ from a set you choose, leaving the rest of the profile on stable:
 {
   imports = [ agent-mcp.homeModules.default ];
 
-  services.agent-mcp.pkgs = import agent-mcp.inputs.nixpkgs {
+  services.conexus.pkgs = import agent-mcp.inputs.nixpkgs {
     inherit (pkgs.stdenv.hostPlatform) system;
   };
 }
@@ -170,7 +170,7 @@ The Python tree, the interpreter the units exec, the wrappers and the
 dashboard all come from that one set — mixing them is not offered,
 because a wrapper that execs one channel's interpreter against another
 channel's site-packages does not run. That is also why there is no
-single-derivation override; `services.agent-mcp.package` was removed
+single-derivation override; `services.conexus.package` was removed
 (setting it now fails evaluation with a pointer here). The full
 rationale is in the `pkgs` option's description in
 [`home-manager-module.nix`](./home-manager-module.nix).
@@ -216,7 +216,7 @@ exhaustive):
 
 Every `/conexus/api/router/*` route above is also mounted with an
 `/conexus/api/router/.../` trailing-slash twin and a root-mounted
-alias without the `/agent-mcp` prefix (ADR-0020, mount-agnostic). No
+alias without the `/conexus` prefix (ADR-0020, mount-agnostic). No
 `client-config`/`installer` curl-installable-snippet route exists
 today — the router's own CLI carries an `--installer-template` flag
 wired up alongside those routes, but they're deferred indefinitely
@@ -239,7 +239,7 @@ build artifact serves any deployment URL.
   (the documented path) need no configuration.
 * **Custom mount**: the prefix is resolved per-request
   (`mount::external_prefix`), not from a static flag — a request that
-  arrived under `/agent-mcp` gets that prefix; a request a TRUSTED
+  arrived under `/conexus` gets that prefix; a request a TRUSTED
   reverse proxy forwarded with an `X-Forwarded-Prefix` header gets
   that header's value instead (only honoured when the peer is on the
   trusted-proxy list). Deploying behind a reverse proxy mounted at a
@@ -271,10 +271,10 @@ sentinel into served bytes and render the dashboard blank. Don't.
 
 ## Multi-tenant vs. single-tenant
 
-`services.agent-mcp.multiTenant` (default `true`, [ADR-0008](../docs/adr/0008-single-tenant-url-parity.md))
+`services.conexus.multiTenant` (default `true`, [ADR-0008](../docs/adr/0008-single-tenant-url-parity.md))
 picks the deployment shape. `true` (default): the router runs
 multi-tenant, projects are registered at runtime, `singleProject` must
-stay `null`. `false`: single-tenant (N=1) — `services.agent-mcp.singleProject`
+stay `null`. `false`: single-tenant (N=1) — `services.conexus.singleProject`
 (`name`/`workspace`) declares the sole project, the module seeds
 `projects.local.json` before the router starts, and the router 410s
 every project-lifecycle write endpoint plus 302-redirects any
