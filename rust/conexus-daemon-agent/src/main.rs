@@ -106,14 +106,14 @@ fn state_home() -> PathBuf {
 
 fn token_path(project: &str, agent_id: &str) -> PathBuf {
     config_home()
-        .join("agent-mcp")
+        .join("conexus")
         .join("tokens")
         .join(format!("{project}--{agent_id}.token"))
 }
 
 fn cursor_path(project: &str, agent_id: &str) -> PathBuf {
     state_home()
-        .join("agent-mcp-daemons")
+        .join("conexus-daemons")
         .join(format!("{project}--{agent_id}.cursor"))
 }
 
@@ -461,7 +461,7 @@ async fn main() -> Result<()> {
     let bearer = read_bearer(&token_path(&project, &agent_id))?;
     let cfg = DaemonConfig {
         mcp_url: format!(
-            "http://127.0.0.1:{}/agent-mcp/mcp/{}",
+            "http://127.0.0.1:{}/conexus/mcp/{}",
             cli.router_port, project
         ),
         cursor_file: cursor_path(&project, &agent_id),
@@ -616,11 +616,11 @@ mod tests {
         std::env::set_var("XDG_STATE_HOME", "/tmp/xdgstate-test");
         assert_eq!(
             token_path("proj", "agent"),
-            PathBuf::from("/tmp/xdgcfg-test/agent-mcp/tokens/proj--agent.token")
+            PathBuf::from("/tmp/xdgcfg-test/conexus/tokens/proj--agent.token")
         );
         assert_eq!(
             cursor_path("proj", "agent"),
-            PathBuf::from("/tmp/xdgstate-test/agent-mcp-daemons/proj--agent.cursor")
+            PathBuf::from("/tmp/xdgstate-test/conexus-daemons/proj--agent.cursor")
         );
         std::env::remove_var("XDG_CONFIG_HOME");
         std::env::remove_var("XDG_STATE_HOME");

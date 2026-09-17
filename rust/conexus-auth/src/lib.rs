@@ -7,7 +7,7 @@
 //! `agent_mcp/core/authorize.py` — the registration LIST itself,
 //! Python's `all_tools()`/`register_tool(...)` call sites, lives one
 //! layer up in `conexus-tools`, not here), and [`forwarding_header`]
-//! (the signed `X-Agent-MCP-Forwarded-Operator` header the router
+//! (the signed `X-Conexus-Forwarded-Operator` header the router
 //! attaches when proxying a cookie-authenticated request to a
 //! per-project backend). See
 //! `/home/dennis/.claude/plans/prancy-napping-pie.md`.

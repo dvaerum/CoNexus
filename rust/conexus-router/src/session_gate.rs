@@ -86,7 +86,7 @@ pub struct GateRequest<'a> {
     pub login_url: &'a str,
     /// Step 10 (`sso-admin-config`): the raw, untrimmed value of
     /// whichever header `ProxyHeaderSettings.trust_header` names
-    /// (e.g. `X-Agent-MCP-SSO-User`) -- the caller extracts it
+    /// (e.g. `X-Conexus-SSO-User`) -- the caller extracts it
     /// generically since this module doesn't know the configured
     /// header NAME (that's inside `sso_settings`, resolved once per
     /// request by the caller, not this pure-decision module).
@@ -98,14 +98,14 @@ pub struct GateRequest<'a> {
 /// layer matches exhaustively.
 #[derive(Debug)]
 pub enum SessionGateOutcome {
-    /// Not a `/agent-mcp/*` path, an unauth-allowlisted path, an
+    /// Not a `/conexus/*` path, an unauth-allowlisted path, an
     /// ADR-0021 delivery route, or single-tenant bypass -- proceed to
     /// the handler with no principal. `warm_authorized` mirrors
     /// Python's `request["_warm_authorized"]` stash: only the
     /// single-tenant bypass sets it (SC-R6-1), never the bare unauth/
     /// delivery passthroughs.
     PassThrough { warm_authorized: bool },
-    /// A non-member's `/agent-mcp/app/<project>/...` request -- proceed
+    /// A non-member's `/conexus/app/<project>/...` request -- proceed
     /// to the handler (the bare SPA shell has no project data behind
     /// it), but do NOT stash a principal or authorize a warm-start.
     PublicAppShell,
@@ -327,10 +327,10 @@ pub fn evaluate_session_gate(
     extra_trusted_uids: &HashSet<u32>,
 ) -> Result<SessionGateOutcome, IdentityError> {
     // Defensive parity with Python -- mount::canonical_path always
-    // yields an `/agent-mcp`-prefixed path in practice, so this never
+    // yields an `/conexus`-prefixed path in practice, so this never
     // actually fires for a caller following this crate's own
     // convention; kept for a 1:1 branch match.
-    if !req.path.starts_with("/agent-mcp") {
+    if !req.path.starts_with("/conexus") {
         return Ok(SessionGateOutcome::PassThrough {
             warm_authorized: false,
         });
@@ -403,7 +403,7 @@ pub fn evaluate_session_gate(
             .ok()
             .flatten();
             if role.is_none() {
-                if req.path.starts_with("/agent-mcp/app/") {
+                if req.path.starts_with("/conexus/app/") {
                     return Ok(SessionGateOutcome::PublicAppShell);
                 }
                 return Ok(SessionGateOutcome::Reject(unknown_project_response(
@@ -540,7 +540,7 @@ mod tests {
             method: "GET",
             accept_header: None,
             cookie_header: cookie,
-            login_url: "/agent-mcp/login",
+            login_url: "/conexus/login",
             proxy_header_value: None,
         }
     }
@@ -589,7 +589,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/login", None);
+        let req = base_req("/conexus/login", None);
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         assert!(matches!(
             outcome,
@@ -605,7 +605,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/api/proj-a/delivery/stream", None);
+        let req = base_req("/conexus/api/proj-a/delivery/stream", None);
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         assert!(matches!(
             outcome,
@@ -624,7 +624,7 @@ mod tests {
             single_tenant_name: Some("proj-a".to_string()),
             ..Default::default()
         };
-        let req = base_req("/agent-mcp/api/proj-a/tasks", None);
+        let req = base_req("/conexus/api/proj-a/tasks", None);
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         assert!(matches!(
             outcome,
@@ -640,7 +640,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/api/proj-a/tasks", None);
+        let req = base_req("/conexus/api/proj-a/tasks", None);
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Reject(resp) = outcome else {
             panic!("expected Reject, got {outcome:?}");
@@ -658,9 +658,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let mut req = base_req("/agent-mcp/app/proj-a/", None);
+        let mut req = base_req("/conexus/app/proj-a/", None);
         req.accept_header = Some("text/html,application/xhtml+xml");
-        req.raw_path_qs = "/agent-mcp/app/proj-a/?page=memories";
+        req.raw_path_qs = "/conexus/app/proj-a/?page=memories";
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Reject(resp) = outcome else {
             panic!("expected Reject, got {outcome:?}");
@@ -672,7 +672,7 @@ mod tests {
             .find(|(k, _)| k == "Location")
             .map(|(_, v)| v.as_str())
             .unwrap();
-        assert!(location.starts_with("/agent-mcp/login?next="));
+        assert!(location.starts_with("/conexus/login?next="));
         assert!(location.contains("%3F")); // the embedded `?` stays percent-encoded
     }
 
@@ -684,7 +684,7 @@ mod tests {
         let cookie = cookie_for(&db, &uid).await;
         let registry = registry_with(dir.path(), "proj-a", now_dt());
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/api/proj-a/tasks", Some(&cookie));
+        let req = base_req("/conexus/api/proj-a/tasks", Some(&cookie));
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Allow(identity) = outcome else {
@@ -707,7 +707,7 @@ mod tests {
         let cookie = cookie_for(&db, &uid).await;
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/api/router/agents", Some(&cookie));
+        let req = base_req("/conexus/api/router/agents", Some(&cookie));
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Allow(identity) = outcome else {
@@ -742,7 +742,7 @@ mod tests {
         let cookie = cookie_for(&db, &uid2).await;
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/api/does-not-exist/tasks", Some(&cookie));
+        let req = base_req("/conexus/api/does-not-exist/tasks", Some(&cookie));
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Allow(identity) = outcome else {
@@ -771,7 +771,7 @@ mod tests {
         let cookie = cookie_for(&db, &bob).await;
         let registry = registry_with(dir.path(), "proj-a", now_dt());
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/app/proj-a/", Some(&cookie));
+        let req = base_req("/conexus/app/proj-a/", Some(&cookie));
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         assert!(matches!(outcome, SessionGateOutcome::PublicAppShell));
@@ -813,7 +813,7 @@ mod tests {
         let cookie = cookie_for(&db, &bob).await;
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/app/ghost-tenant-proj/", Some(&cookie));
+        let req = base_req("/conexus/app/ghost-tenant-proj/", Some(&cookie));
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Allow(identity) = outcome else {
@@ -837,13 +837,13 @@ mod tests {
         let registry = registry_with(dir.path(), "existing-tenant-proj", now_dt());
         let cfg = SessionGateConfig::default();
 
-        let existing_req = base_req("/agent-mcp/api/existing-tenant-proj/agents", None);
+        let existing_req = base_req("/conexus/api/existing-tenant-proj/agents", None);
         let existing_outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &existing_req).unwrap();
         let SessionGateOutcome::Reject(existing_resp) = existing_outcome else {
             panic!("expected Reject, got {existing_outcome:?}");
         };
 
-        let ghost_req = base_req("/agent-mcp/api/ghost-tenant-proj/agents", None);
+        let ghost_req = base_req("/conexus/api/ghost-tenant-proj/agents", None);
         let ghost_outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &ghost_req).unwrap();
         let SessionGateOutcome::Reject(ghost_resp) = ghost_outcome else {
             panic!("expected Reject, got {ghost_outcome:?}");
@@ -879,7 +879,7 @@ mod tests {
         let cookie = cookie_for(&db, &bob).await;
         let registry = registry_with(dir.path(), "proj-a", now_dt());
         let cfg = SessionGateConfig::default();
-        let mut req = base_req("/agent-mcp/api/proj-a/tasks", Some(&cookie));
+        let mut req = base_req("/conexus/api/proj-a/tasks", Some(&cookie));
         req.accept_header = Some(mcp_handler::API_MEDIA_TYPE);
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
@@ -909,7 +909,7 @@ mod tests {
         let cookie = cookie_for(&db, &bob).await;
         let registry = registry_with(dir.path(), "proj-a", now_dt());
         let cfg = SessionGateConfig::default();
-        let req = base_req("/agent-mcp/api/proj-a/tasks", Some(&cookie));
+        let req = base_req("/conexus/api/proj-a/tasks", Some(&cookie));
 
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Reject(resp) = outcome else {
@@ -944,14 +944,14 @@ mod tests {
         let registry = registry_with(dir.path(), "proj-a", now_dt());
         let cfg = SessionGateConfig::default();
 
-        let read_req = base_req("/agent-mcp/api/proj-a/tasks", Some(&cookie));
+        let read_req = base_req("/conexus/api/proj-a/tasks", Some(&cookie));
         let read_outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &read_req).unwrap();
         let SessionGateOutcome::Allow(identity) = read_outcome else {
             panic!("expected Allow for a read, got {read_outcome:?}");
         };
         assert_eq!(identity.project_role, Some(ProjectRole::Viewer));
 
-        let mut write_req = base_req("/agent-mcp/api/proj-a/tasks", Some(&cookie));
+        let mut write_req = base_req("/conexus/api/proj-a/tasks", Some(&cookie));
         write_req.method = "POST";
         let write_outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &write_req).unwrap();
         let SessionGateOutcome::Reject(resp) = write_outcome else {
@@ -990,7 +990,7 @@ mod tests {
         let registry = registry_with(dir.path(), "proj-a", now_dt());
         let cfg = SessionGateConfig::default();
 
-        let mut req = base_req("/agent-mcp/api/proj-a/tasks", Some(&cookie));
+        let mut req = base_req("/conexus/api/proj-a/tasks", Some(&cookie));
         req.method = "POST";
         let outcome = call_gate(&mut c, &registry, &cfg, now_dt(), &req).unwrap();
         let SessionGateOutcome::Allow(identity) = outcome else {
@@ -1003,7 +1003,7 @@ mod tests {
 
     fn proxy_settings(trusted_ip: &str) -> sso::ProxyHeaderSettings {
         sso::ProxyHeaderSettings {
-            trust_header: "X-Agent-MCP-SSO-User".to_string(),
+            trust_header: "X-Conexus-SSO-User".to_string(),
             trusted_ips: std::collections::HashSet::from([trusted_ip.parse().unwrap()]),
             default_is_sysadmin: false,
         }
@@ -1034,7 +1034,7 @@ mod tests {
             oidc: None,
             proxy: Some(proxy_settings("10.0.0.5")),
         };
-        let mut req = base_req("/agent-mcp/api/router/overview", None);
+        let mut req = base_req("/conexus/api/router/overview", None);
         req.proxy_header_value = Some("bob@corp.example");
 
         let outcome = evaluate_session_gate(
@@ -1069,7 +1069,7 @@ mod tests {
             oidc: None,
             proxy: Some(proxy_settings("10.0.0.5")),
         };
-        let mut req = base_req("/agent-mcp/api/router/overview", None);
+        let mut req = base_req("/conexus/api/router/overview", None);
         req.proxy_header_value = Some("bob@corp.example");
 
         let outcome = evaluate_session_gate(
@@ -1100,7 +1100,7 @@ mod tests {
             oidc: None,
             proxy: Some(proxy_settings("10.0.0.5")),
         };
-        let mut req = base_req("/agent-mcp/api/router/overview", None);
+        let mut req = base_req("/conexus/api/router/overview", None);
         req.proxy_header_value = Some("bob@corp.example");
 
         // A DIFFERENT source IP than the one `proxy_settings` trusts.
@@ -1132,7 +1132,7 @@ mod tests {
             oidc: None,
             proxy: Some(proxy_settings("10.0.0.5")),
         };
-        let req = base_req("/agent-mcp/api/router/overview", None); // proxy_header_value: None
+        let req = base_req("/conexus/api/router/overview", None); // proxy_header_value: None
 
         let outcome = evaluate_session_gate(
             &mut c,
@@ -1163,7 +1163,7 @@ mod tests {
             oidc: None,
             proxy: Some(proxy_settings("10.0.0.5")),
         };
-        let mut req = base_req("/agent-mcp/api/router/overview", Some(&cookie));
+        let mut req = base_req("/conexus/api/router/overview", Some(&cookie));
         req.proxy_header_value = Some("someone-else@corp.example");
 
         let outcome = evaluate_session_gate(

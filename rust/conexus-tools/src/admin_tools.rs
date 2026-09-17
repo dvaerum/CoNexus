@@ -148,10 +148,10 @@ pub fn redact_agent_row(
 }
 
 /// Last-resort host for the `.mcp.json` snippet when neither the
-/// caller's request nor `$AGENT_MCP_EXTERNAL_URL` says where this
+/// caller's request nor `$CONEXUS_EXTERNAL_URL` says where this
 /// deployment is reachable from. Obviously fake so an operator who
 /// pastes the snippet realizes they need to substitute the real host.
-const DEFAULT_REGISTER_AGENT_URL_BASE: &str = "https://REPLACE_WITH_YOUR_AGENT_MCP_HOST";
+const DEFAULT_REGISTER_AGENT_URL_BASE: &str = "https://REPLACE_WITH_YOUR_CONEXUS_HOST";
 
 /// Port of `_resolve_snippet_host`. `get_env` is an explicit lookup
 /// (not a direct `std::env::var` read) matching this crate's own
@@ -167,7 +167,7 @@ pub fn resolve_snippet_host(
             return trimmed.trim_end_matches('/').to_string();
         }
     }
-    if let Some(env_host) = get_env("AGENT_MCP_EXTERNAL_URL") {
+    if let Some(env_host) = get_env("CONEXUS_EXTERNAL_URL") {
         let trimmed = env_host.trim();
         if !trimmed.is_empty() {
             return trimmed.trim_end_matches('/').to_string();
@@ -195,9 +195,9 @@ pub fn resolve_snippet_project(
 /// Port of `_build_mcp_config_snippet`. Pretty-printed (`indent=2`,
 /// matching Python's `json.dumps(..., indent=2)`) so a caller can drop
 /// the result straight into a `<pre>` block. The server key is the
-/// fixed string `"agent-mcp"` regardless of `project` (see Python's
+/// fixed string `"conexus"` regardless of `project` (see Python's
 /// own doc: a namespaced key would produce an ugly
-/// `agent-mcp-<project>:` slash-command prefix; project scoping lives
+/// `conexus-<project>:` slash-command prefix; project scoping lives
 /// in the URL, not the key).
 pub fn build_mcp_config_snippet(
     project: Option<&str>,
@@ -211,7 +211,7 @@ pub fn build_mcp_config_snippet(
     };
     let snippet = serde_json::json!({
         "mcpServers": {
-            "agent-mcp": {
+            "conexus": {
                 "type": "http",
                 "url": url,
                 "headers": {"Authorization": format!("Bearer {token}")},
@@ -839,7 +839,7 @@ impl Tool for RegisterAgentTool {
             let mount_prefix = arguments
                 .get("mount_prefix")
                 .and_then(Value::as_str)
-                .unwrap_or("/agent-mcp");
+                .unwrap_or("/conexus");
             let snippet = build_mcp_config_snippet(
                 project_for_snippet.as_deref(),
                 &new_agent_token,
@@ -857,7 +857,7 @@ impl Tool for RegisterAgentTool {
                 })),
                 message: Some(format!(
                     "Agent '{agent_id}' registered. Paste the snippet into the user's claude \
-                     .mcp.json — agent-mcp no longer spawns the claude session itself."
+                     .mcp.json — conexus no longer spawns the claude session itself."
                 )),
             }
         })
@@ -2299,7 +2299,7 @@ mod tests {
     #[test]
     fn snippet_host_falls_back_to_env_then_the_placeholder() {
         assert_eq!(
-            resolve_snippet_host(None, |k| if k == "AGENT_MCP_EXTERNAL_URL" {
+            resolve_snippet_host(None, |k| if k == "CONEXUS_EXTERNAL_URL" {
                 Some("https://from-env.example/".to_string())
             } else {
                 None
@@ -2361,30 +2361,25 @@ mod tests {
 
     #[test]
     fn mcp_config_snippet_includes_the_project_segment_when_present() {
-        let snippet = build_mcp_config_snippet(
-            Some("demo"),
-            "tok-123",
-            "https://host.example",
-            "/agent-mcp",
-        );
+        let snippet =
+            build_mcp_config_snippet(Some("demo"), "tok-123", "https://host.example", "/conexus");
         let parsed: Value = serde_json::from_str(&snippet).unwrap();
         assert_eq!(
-            parsed["mcpServers"]["agent-mcp"]["url"],
-            "https://host.example/agent-mcp/mcp/demo"
+            parsed["mcpServers"]["conexus"]["url"],
+            "https://host.example/conexus/mcp/demo"
         );
         assert_eq!(
-            parsed["mcpServers"]["agent-mcp"]["headers"]["Authorization"],
+            parsed["mcpServers"]["conexus"]["headers"]["Authorization"],
             "Bearer tok-123"
         );
     }
 
     #[test]
     fn mcp_config_snippet_drops_the_project_segment_when_absent() {
-        let snippet =
-            build_mcp_config_snippet(None, "tok-123", "https://host.example", "/agent-mcp");
+        let snippet = build_mcp_config_snippet(None, "tok-123", "https://host.example", "/conexus");
         let parsed: Value = serde_json::from_str(&snippet).unwrap();
         assert_eq!(
-            parsed["mcpServers"]["agent-mcp"]["url"],
+            parsed["mcpServers"]["conexus"]["url"],
             "https://host.example/mcp"
         );
     }
@@ -3106,8 +3101,8 @@ mod tests {
         assert_eq!(data["project_name"], "demo");
         let snippet: Value = serde_json::from_str(data["mcp_snippet"].as_str().unwrap()).unwrap();
         assert_eq!(
-            snippet["mcpServers"]["agent-mcp"]["url"],
-            "https://host.example/agent-mcp/mcp/demo"
+            snippet["mcpServers"]["conexus"]["url"],
+            "https://host.example/conexus/mcp/demo"
         );
     }
 

@@ -73,12 +73,12 @@ pub fn resolve(
     match env_nonempty(&get_env, "OPENAI_API_KEY") {
         Some(api_key) => {
             let model = env_nonempty(&get_env, "OPENAI_MODEL").ok_or(CompletionConfigError)?;
-            // AGENT_MCP_LLM_BASE_URL overrides the chat endpoint for
+            // CONEXUS_LLM_BASE_URL overrides the chat endpoint for
             // EITHER provider (see this module's Python source doc);
             // unset falls back to OPENAI_BASE_URL (the SDK's own env
             // pickup this port replicates explicitly), then the cloud
             // default.
-            let base_url = env_nonempty(&get_env, "AGENT_MCP_LLM_BASE_URL")
+            let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
                 .or_else(|| env_nonempty(&get_env, "OPENAI_BASE_URL"))
                 .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
             Ok(CompletionClient {
@@ -90,7 +90,7 @@ pub fn resolve(
         None => {
             let model = env_nonempty(&get_env, "OLLAMA_MODEL")
                 .unwrap_or_else(|| OLLAMA_DEFAULT_MODEL.to_string());
-            let base_url = env_nonempty(&get_env, "AGENT_MCP_LLM_BASE_URL")
+            let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
                 .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string());
             Ok(CompletionClient {
                 base_url,
@@ -114,7 +114,7 @@ pub fn resolve_from_process_env() -> Result<CompletionClient, CompletionConfigEr
 /// fall back to the Ollama default when nothing is set, matching the
 /// original source exactly (a probe with no URL just can't run).
 pub fn resolve_chat_base_url(get_env: impl Fn(&str) -> Option<String>) -> Option<String> {
-    env_nonempty(&get_env, "AGENT_MCP_LLM_BASE_URL")
+    env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
         .or_else(|| env_nonempty(&get_env, "OPENAI_BASE_URL"))
 }
 
@@ -255,7 +255,7 @@ mod tests {
         let client = resolve(env(&[
             ("OPENAI_API_KEY", "sk-real"),
             ("OPENAI_MODEL", "gpt-4.1"),
-            ("AGENT_MCP_LLM_BASE_URL", "http://fast-igpu:11435/v1"),
+            ("CONEXUS_LLM_BASE_URL", "http://fast-igpu:11435/v1"),
             ("OPENAI_BASE_URL", "https://ignored.example/v1"),
         ]))
         .unwrap();
@@ -284,7 +284,7 @@ mod tests {
     fn chat_base_url_prefers_agent_mcp_llm_base_url_over_openai_base_url() {
         assert_eq!(
             resolve_chat_base_url(env(&[
-                ("AGENT_MCP_LLM_BASE_URL", "http://a"),
+                ("CONEXUS_LLM_BASE_URL", "http://a"),
                 ("OPENAI_BASE_URL", "http://b"),
             ])),
             Some("http://a".to_string())

@@ -76,8 +76,8 @@ use clap::Parser;
 /// `agent-mcp router`'s real flag surface (`router_cmd` in
 /// `agent_mcp/cli.py`). `--host`/router-DB-path/single-tenant-safety
 /// knobs have NO CLI flag in Python either (env-var-only:
-/// `AGENT_MCP_ROUTER_HOST`/`AGENT_MCP_ROUTER_DB`/
-/// `AGENT_MCP_ALLOW_INSECURE_BIND`/`AGENT_MCP_REQUIRE_SECURE_COOKIES`)
+/// `CONEXUS_ROUTER_HOST`/`CONEXUS_ROUTER_DB`/
+/// `CONEXUS_ALLOW_INSECURE_BIND`/`CONEXUS_REQUIRE_SECURE_COOKIES`)
 /// -- this struct deliberately does not invent flags Python's own CLI
 /// doesn't have; `main()` reads those straight from the process
 /// environment via `boot`, matching the real interface exactly.
@@ -137,29 +137,29 @@ async fn health() -> &'static str {
     "ok"
 }
 
-/// Redirect target hardcoded to the `/agent-mcp/`-prefixed URL,
+/// Redirect target hardcoded to the `/conexus/`-prefixed URL,
 /// regardless of which path (canonical or a root-mounted alias, see
 /// `mount_aliases` below) reached this handler -- ports Python's own
 /// closure-reuse quirk (`_add_root_aliases` re-registers the IDENTICAL
 /// closure object at the alias path, so a root-mounted `/app` request
-/// is still redirected to `/agent-mcp/app/`, never a root-relative
+/// is still redirected to `/conexus/app/`, never a root-relative
 /// target). A named fn reused at both registration sites is this
 /// crate's equivalent of Python's "same closure object" preservation.
 async fn redirect_to_app_index() -> axum::response::Response {
-    dashboard_handlers::moved_permanently("/agent-mcp/app/")
+    dashboard_handlers::moved_permanently("/conexus/app/")
 }
 
 /// Same hardcoded-target preservation as [`redirect_to_app_index`],
-/// for the per-project `/agent-mcp/app/{name}` -> `/agent-mcp/app/{name}/`
+/// for the per-project `/conexus/app/{name}` -> `/conexus/app/{name}/`
 /// redirect.
 async fn redirect_to_app_page(
     axum::extract::Path(name): axum::extract::Path<String>,
 ) -> axum::response::Response {
-    dashboard_handlers::moved_permanently(&format!("/agent-mcp/app/{name}/"))
+    dashboard_handlers::moved_permanently(&format!("/conexus/app/{name}/"))
 }
 
 /// ADR-0020/R5-F6 4-variant alias registration for an
-/// `/agent-mcp/api/router/...` route, as a chainable
+/// `/conexus/api/router/...` route, as a chainable
 /// `.admin_api_route(...)` -- see `main`'s own comment above
 /// `admin_router` for why all 4 (canonical, trailing-slash, root,
 /// root+trailing-slash) are real, distinct routes Python's two-
@@ -181,8 +181,8 @@ impl AdminApiAliasExt for Router<std::sync::Arc<state::RouterState>> {
         methods: axum::routing::MethodRouter<std::sync::Arc<state::RouterState>>,
     ) -> Self {
         let root = canonical
-            .strip_prefix(mount::INTERNAL_MOUNT)
-            .expect("admin_api_route canonical path must start with /agent-mcp");
+            .strip_prefix(mount::CONEXUS_MOUNT)
+            .expect("admin_api_route canonical path must start with /conexus");
         self.route(canonical, methods.clone())
             .route(&format!("{canonical}/"), methods.clone())
             .route(root, methods.clone())
@@ -191,8 +191,8 @@ impl AdminApiAliasExt for Router<std::sync::Arc<state::RouterState>> {
 }
 
 /// Port of `router_cmd`'s own `--projects-file` default resolution:
-/// `$XDG_CONFIG_HOME/agent-mcp/projects.local.json`, falling back to
-/// `$HOME/.config/agent-mcp/projects.local.json`. No new dependency
+/// `$XDG_CONFIG_HOME/conexus/projects.local.json`, falling back to
+/// `$HOME/.config/conexus/projects.local.json`. No new dependency
 /// (a `dirs`/`home`-style crate) for a two-env-var lookup Python
 /// itself does inline.
 fn default_projects_file(get_env: impl Fn(&str) -> Option<String>) -> std::path::PathBuf {
@@ -205,17 +205,17 @@ fn default_projects_file(get_env: impl Fn(&str) -> Option<String>) -> std::path:
         })
         .unwrap_or_else(|| ".config".to_string());
     std::path::PathBuf::from(config_home)
-        .join("agent-mcp")
+        .join("conexus")
         .join("projects.local.json")
 }
 
-/// Port of `app.py`'s `DEFAULT_WORKSPACE_PARENT`: `$AGENT_MCP_DEFAULT_WORKSPACE`,
-/// falling back to `$HOME/.local/share/agent-mcp/projects` -- unlike
+/// Port of `app.py`'s `DEFAULT_WORKSPACE_PARENT`: `$CONEXUS_DEFAULT_WORKSPACE`,
+/// falling back to `$HOME/.local/share/conexus/projects` -- unlike
 /// `default_projects_file` above, Python's own default here is NOT
 /// XDG-aware (`Path.home()` directly), so this deliberately does not
 /// reuse that helper's `$XDG_CONFIG_HOME` branch.
 fn default_workspace_parent(get_env: impl Fn(&str) -> Option<String>) -> std::path::PathBuf {
-    if let Some(v) = get_env("AGENT_MCP_DEFAULT_WORKSPACE").filter(|s| !s.is_empty()) {
+    if let Some(v) = get_env("CONEXUS_DEFAULT_WORKSPACE").filter(|s| !s.is_empty()) {
         return std::path::PathBuf::from(v);
     }
     let home = get_env("HOME").filter(|s| !s.is_empty());
@@ -223,27 +223,27 @@ fn default_workspace_parent(get_env: impl Fn(&str) -> Option<String>) -> std::pa
         Some(h) => std::path::PathBuf::from(h)
             .join(".local")
             .join("share")
-            .join("agent-mcp")
+            .join("conexus")
             .join("projects"),
-        None => std::path::PathBuf::from(".local/share/agent-mcp/projects"),
+        None => std::path::PathBuf::from(".local/share/conexus/projects"),
     }
 }
 
-/// Port of `admin_api.py::_token_dir()`: `$AGENT_MCP_TOKENS_DIR`,
-/// falling back to `$HOME/.config/agent-mcp/tokens`. Branches on the
+/// Port of `admin_api.py::_token_dir()`: `$CONEXUS_TOKENS_DIR`,
+/// falling back to `$HOME/.config/conexus/tokens`. Branches on the
 /// env var's PRESENCE explicitly (SEC FINDING 5's own fix -- an
 /// unset var must not resolve to `Path("")`, which is truthy and
 /// silently points at the process CWD). Returns `None` only when
 /// there is no `$HOME` to fall back to either (never expected in a
 /// real production boot).
 fn resolve_token_dir(get_env: impl Fn(&str) -> Option<String>) -> Option<std::path::PathBuf> {
-    if let Some(v) = get_env("AGENT_MCP_TOKENS_DIR").filter(|s| !s.is_empty()) {
+    if let Some(v) = get_env("CONEXUS_TOKENS_DIR").filter(|s| !s.is_empty()) {
         return Some(std::path::PathBuf::from(v));
     }
     get_env("HOME").filter(|s| !s.is_empty()).map(|h| {
         std::path::PathBuf::from(h)
             .join(".config")
-            .join("agent-mcp")
+            .join("conexus")
             .join("tokens")
     })
 }
@@ -256,7 +256,7 @@ fn resolve_token_dir(get_env: impl Fn(&str) -> Option<String>) -> Option<std::pa
 /// `secure_cookie_warning` fail-closed guards) but never actually
 /// reached the real listener. Harmless on a host with nothing else on
 /// the target port, but a genuinely different failure mode from what
-/// `AGENT_MCP_ROUTER_HOST` promises: a tighter multi-host bind
+/// `CONEXUS_ROUTER_HOST` promises: a tighter multi-host bind
 /// (`127.0.0.1,10.14.255.10`, this migration's own real production
 /// config) silently became an unrestricted `0.0.0.0` bind instead --
 /// and on a host where an unrelated process already holds a specific
@@ -358,19 +358,19 @@ async fn main() -> Result<()> {
 
     let rate_limit_config = rate_limit::RateLimitConfig::resolve_from_process_env();
     let ensure_config = orchestrator::ensure::EnsureConfig::from_env(get_env);
-    let max_streams_per_agent = get_env("AGENT_MCP_MAX_SSE_PER_AGENT")
+    let max_streams_per_agent = get_env("CONEXUS_MAX_SSE_PER_AGENT")
         .and_then(|v| v.parse().ok())
         .unwrap_or(4);
-    let max_streams_global = get_env("AGENT_MCP_MAX_SSE_GLOBAL")
+    let max_streams_global = get_env("CONEXUS_MAX_SSE_GLOBAL")
         .and_then(|v| v.parse().ok())
         .unwrap_or(64);
 
     let sock_dir = cli
         .sock_dir
         .clone()
-        .or_else(|| get_env("AGENT_MCP_SOCK_DIR").map(std::path::PathBuf::from))
+        .or_else(|| get_env("CONEXUS_SOCK_DIR").map(std::path::PathBuf::from))
         .context(
-            "--sock-dir (or $AGENT_MCP_SOCK_DIR) is required: the router can't resolve any \
+            "--sock-dir (or $CONEXUS_SOCK_DIR) is required: the router can't resolve any \
              project's backend socket without it",
         )?;
 
@@ -415,7 +415,7 @@ async fn main() -> Result<()> {
         // `admin_api_route` (defined below `main`) registers all 4
         // real, distinct routes Python's own two-mechanism alias
         // pipeline produces for each of these 16 endpoints:
-        // canonical (`/agent-mcp/api/router/...`), its R5-F6
+        // canonical (`/conexus/api/router/...`), its R5-F6
         // trailing-slash alias, and BOTH of those root-mounted
         // (ADR-0020) -- `_add_admin_trailing_slash_aliases` runs
         // BEFORE `_add_root_aliases` in the real `make_app()`, so the
@@ -425,80 +425,80 @@ async fn main() -> Result<()> {
         // suggest). `mount::canonical_path` (already threaded through
         // `session_gate_layer`/`rate_limit_layer`/
         // `empty_users_redirect_layer`) normalises a root-mounted
-        // request back to its `/agent-mcp`-prefixed form before any
+        // request back to its `/conexus`-prefixed form before any
         // auth/path-policy check runs, so the 2 root variants gate
-        // identically to their 2 `/agent-mcp`-prefixed twins with no
+        // identically to their 2 `/conexus`-prefixed twins with no
         // policy-table change needed -- confirmed live (see the PR
         // body), not merely assumed.
         .admin_api_route(
-            "/agent-mcp/api/router/health",
+            "/conexus/api/router/health",
             get(lifecycle_rest::health_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects",
+            "/conexus/api/router/projects",
             get(lifecycle_rest::list_projects_handler).post(lifecycle_rest::create_project_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects/{name}",
+            "/conexus/api/router/projects/{name}",
             axum::routing::delete(lifecycle_rest::delete_project_handler)
                 .patch(lifecycle_rest::rename_project_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects/{name}/stop",
+            "/conexus/api/router/projects/{name}/stop",
             axum::routing::post(lifecycle_rest::stop_project_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects/{name}/aliases",
+            "/conexus/api/router/projects/{name}/aliases",
             get(lifecycle_rest::alias_usage_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects/{name}/aliases/{alias}",
+            "/conexus/api/router/projects/{name}/aliases/{alias}",
             axum::routing::delete(lifecycle_rest::remove_alias_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/overview",
+            "/conexus/api/router/overview",
             get(lifecycle_rest::overview_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/users",
+            "/conexus/api/router/users",
             get(users_groups_rest::list_users_handler).post(users_groups_rest::create_user_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/users/{user_id}",
+            "/conexus/api/router/users/{user_id}",
             axum::routing::patch(users_groups_rest::edit_user_handler)
                 .delete(users_groups_rest::delete_user_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/groups",
+            "/conexus/api/router/groups",
             get(users_groups_rest::list_groups_handler)
                 .post(users_groups_rest::create_group_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/groups/{group_id}",
+            "/conexus/api/router/groups/{group_id}",
             axum::routing::patch(users_groups_rest::edit_group_handler)
                 .delete(users_groups_rest::delete_group_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/groups/{group_id}/members",
+            "/conexus/api/router/groups/{group_id}/members",
             get(users_groups_rest::list_group_members_handler)
                 .post(users_groups_rest::add_group_member_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/groups/{group_id}/members/{member_id}",
+            "/conexus/api/router/groups/{group_id}/members/{member_id}",
             axum::routing::delete(users_groups_rest::remove_group_member_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/groups/{group_id}/capabilities",
+            "/conexus/api/router/groups/{group_id}/capabilities",
             get(users_groups_rest::list_group_capabilities_handler)
                 .put(users_groups_rest::replace_group_capabilities_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects/{name}/memberships",
+            "/conexus/api/router/projects/{name}/memberships",
             get(users_groups_rest::list_project_memberships_handler)
                 .post(users_groups_rest::add_project_membership_handler),
         )
         .admin_api_route(
-            "/agent-mcp/api/router/projects/{name}/memberships/{membership_id}",
+            "/conexus/api/router/projects/{name}/memberships/{membership_id}",
             axum::routing::patch(users_groups_rest::change_project_membership_role_handler)
                 .delete(users_groups_rest::delete_project_membership_handler),
         )
@@ -507,7 +507,7 @@ async fn main() -> Result<()> {
         // it gets the identical 4-variant treatment as every other
         // admin API route above.
         .admin_api_route(
-            "/agent-mcp/api/router/sso/config",
+            "/conexus/api/router/sso/config",
             get(sso_config_rest::get_sso_config_handler),
         )
         // ── Dashboard-static surface (step 8) + its own ADR-0020
@@ -515,7 +515,7 @@ async fn main() -> Result<()> {
         //
         // None of these get mechanism 1 (R5-F6 trailing-slash
         // aliasing) -- Python's own `_add_admin_trailing_slash_aliases`
-        // scopes to `_ADMIN_API_PREFIX` only (the `/agent-mcp/api/
+        // scopes to `_ADMIN_API_PREFIX` only (the `/conexus/api/
         // router/...` routes above), confirmed by direct source
         // read. Each still gets its ADR-0020 root-mounted alias,
         // registered by hand below (dashboard routes have no shared
@@ -523,27 +523,27 @@ async fn main() -> Result<()> {
         // exact paths, a single dynamic segment, and 2 wildcard
         // tail-matches, so `admin_api_route`'s blind `path + "/"`
         // helper doesn't apply here).
-        .route("/agent-mcp/", get(dashboard_handlers::index_handler))
+        .route("/conexus/", get(dashboard_handlers::index_handler))
         .route(
-            "/agent-mcp",
-            get(|| async { dashboard_handlers::moved_permanently("/agent-mcp/") }),
+            "/conexus",
+            get(|| async { dashboard_handlers::moved_permanently("/conexus/") }),
         )
         .route(
-            "/agent-mcp/assets/{*rest}",
+            "/conexus/assets/{*rest}",
             get(dashboard_handlers::dashboard_assets_handler),
         )
         .route(
-            "/agent-mcp/app/",
+            "/conexus/app/",
             get(dashboard_handlers::overview_dashboard_handler),
         )
-        .route("/agent-mcp/app", get(redirect_to_app_index))
-        .route("/agent-mcp/app/{name}", get(redirect_to_app_page))
+        .route("/conexus/app", get(redirect_to_app_index))
+        .route("/conexus/app/{name}", get(redirect_to_app_page))
         .route(
-            "/agent-mcp/app/{name}/",
+            "/conexus/app/{name}/",
             get(dashboard_handlers::dashboard_index_handler),
         )
         .route(
-            "/agent-mcp/app/{name}/{*rest}",
+            "/conexus/app/{name}/{*rest}",
             get(dashboard_handlers::dashboard_handler),
         )
         // Login / logout / setup-wizard HTML surface (step 4,
@@ -552,36 +552,36 @@ async fn main() -> Result<()> {
         // documents -- `session_gate_layer` PassThroughs these
         // unconditionally.
         .route(
-            "/agent-mcp/login",
+            "/conexus/login",
             get(login_setup_rest::login_get_handler).post(login_setup_rest::login_post_handler),
         )
         .route(
-            "/agent-mcp/logout",
+            "/conexus/logout",
             get(login_setup_rest::logout_get_handler).post(login_setup_rest::logout_post_handler),
         )
         .route(
-            "/agent-mcp/setup",
+            "/conexus/setup",
             get(login_setup_rest::setup_get_handler).post(login_setup_rest::setup_post_handler),
         )
         // OIDC authorization-code-flow routes (Phase E2 PR22 step 7,
         // `conexus-router-oidc-handlers`). Same UNAUTH_PREFIXES
-        // exemption (`/agent-mcp/sso/`) as login/logout/setup above.
+        // exemption (`/conexus/sso/`) as login/logout/setup above.
         .route(
-            "/agent-mcp/sso/login",
+            "/conexus/sso/login",
             get(oidc_handlers::init_oidc_login_handler),
         )
         .route(
-            "/agent-mcp/sso/callback",
+            "/conexus/sso/callback",
             get(oidc_handlers::handle_oidc_callback),
         )
         // Dedup rule (confirmed against the real Python
-        // `_add_root_aliases` loop): `/agent-mcp` (the bare 301
-        // redirect) and `/agent-mcp/` (`index_handler`) both compute
+        // `_add_root_aliases` loop): `/conexus` (the bare 301
+        // redirect) and `/conexus/` (`index_handler`) both compute
         // root_path `/` -- Python's registration-order `seen` set
-        // means `/agent-mcp/`'s `index_handler` wins root `/`, so the
+        // means `/conexus/`'s `index_handler` wins root `/`, so the
         // bare-redirect's OWN root alias is silently skipped. Ported
         // by simply never registering a root alias for the bare
-        // `/agent-mcp` redirect below.
+        // `/conexus` redirect below.
         .route("/", get(dashboard_handlers::index_handler))
         .route("/app/", get(dashboard_handlers::overview_dashboard_handler))
         .route("/app", get(redirect_to_app_index))
@@ -609,7 +609,7 @@ async fn main() -> Result<()> {
         // Explicit tail-match root alias #1/3 (Python hand-lists
         // these separately since `resource.canonical` strips a
         // `{rest:.*}`'s regex, which a programmatic re-add would
-        // corrupt -- their `/agent-mcp/`-prefixed canonical paths are
+        // corrupt -- their `/conexus/`-prefixed canonical paths are
         // excluded from the plain-prefix-strip set above).
         .route(
             "/assets/{*rest}",
@@ -626,15 +626,15 @@ async fn main() -> Result<()> {
         ));
     let proxy_router: Router<std::sync::Arc<state::RouterState>> = Router::new()
         .route(
-            "/agent-mcp/mcp/{name}",
+            "/conexus/mcp/{name}",
             axum::routing::any(proxy_routes::mcp_proxy_handler),
         )
         .route(
-            "/agent-mcp/api/{name}",
+            "/conexus/api/{name}",
             axum::routing::any(proxy_routes::api_proxy_handler_no_rest),
         )
         .route(
-            "/agent-mcp/api/{name}/{*rest}",
+            "/conexus/api/{name}/{*rest}",
             axum::routing::any(proxy_routes::api_proxy_handler),
         )
         // ADR-0020 root-mount aliases for the proxy surface -- these
@@ -779,7 +779,7 @@ mod tests {
             "--idle-sec",
             "60",
             "--asset-prefix",
-            "/agent-mcp/__dashboard",
+            "/conexus/__dashboard",
             "--single-tenant",
             "demo",
             "--single-workspace",
@@ -825,7 +825,7 @@ mod tests {
     #[tokio::test]
     async fn bind_listeners_binds_every_explicit_host_in_a_multi_host_list() {
         // Mirrors this migration's own real production config
-        // (`AGENT_MCP_ROUTER_HOST=127.0.0.1,10.14.255.10`) in shape --
+        // (`CONEXUS_ROUTER_HOST=127.0.0.1,10.14.255.10`) in shape --
         // two real loopback-reachable addresses, port 0 each so they
         // never collide.
         let host = boot::BindHost::Hosts(vec!["127.0.0.1".to_string(), "127.0.0.2".to_string()]);
@@ -875,14 +875,14 @@ mod tests {
     #[test]
     fn resolve_token_dir_default_resolves_to_config_not_cwd() {
         let got = resolve_token_dir(|key| match key {
-            "AGENT_MCP_TOKENS_DIR" => None,
+            "CONEXUS_TOKENS_DIR" => None,
             "HOME" => Some("/home/example".to_string()),
             _ => None,
         });
         assert_eq!(
             got,
             Some(std::path::PathBuf::from(
-                "/home/example/.config/agent-mcp/tokens"
+                "/home/example/.config/conexus/tokens"
             ))
         );
         // The historical bug: an unset env var must never resolve to
@@ -896,14 +896,14 @@ mod tests {
         // An explicitly-empty env var is treated as "unset" -- `Path("")`
         // being truthy in Python is exactly the bug this fix closes.
         let got = resolve_token_dir(|key| match key {
-            "AGENT_MCP_TOKENS_DIR" => Some(String::new()),
+            "CONEXUS_TOKENS_DIR" => Some(String::new()),
             "HOME" => Some("/home/example".to_string()),
             _ => None,
         });
         assert_eq!(
             got,
             Some(std::path::PathBuf::from(
-                "/home/example/.config/agent-mcp/tokens"
+                "/home/example/.config/conexus/tokens"
             ))
         );
     }
@@ -911,7 +911,7 @@ mod tests {
     #[test]
     fn resolve_token_dir_honours_the_env_var_when_set() {
         let got = resolve_token_dir(|key| match key {
-            "AGENT_MCP_TOKENS_DIR" => Some("/custom/tokens".to_string()),
+            "CONEXUS_TOKENS_DIR" => Some("/custom/tokens".to_string()),
             "HOME" => Some("/home/example".to_string()),
             _ => None,
         });

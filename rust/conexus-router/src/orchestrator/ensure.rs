@@ -125,8 +125,8 @@ impl std::error::Error for EnsureError {}
 /// Every env-overridable timing/behavior knob `ensure()` reads, ported
 /// from the module-level constants Python reads once at import time
 /// (`ENSURE_FAILURE_COOLDOWN_SEC`/`BOOT_GRACE_SEC`/
-/// `_SYSTEMCTL_TIMEOUT_SEC`/`AGENT_MCP_SYSTEMCTL_MODE`) plus the
-/// per-call env read (`AGENT_MCP_ENSURE_SOCKET_ATTEMPTS`) -- unified
+/// `_SYSTEMCTL_TIMEOUT_SEC`/`CONEXUS_SYSTEMCTL_MODE`) plus the
+/// per-call env read (`CONEXUS_ENSURE_SOCKET_ATTEMPTS`) -- unified
 /// into one explicit struct rather than scattered module globals, this
 /// crate's own established convention.
 #[derive(Debug, Clone)]
@@ -168,22 +168,22 @@ impl EnsureConfig {
             systemctl_program: "systemctl".to_string(),
             systemctl_mode: SystemctlMode::from_env(&get_env),
             systemctl_timeout: Duration::from_secs_f64(f64_env(
-                "AGENT_MCP_SYSTEMCTL_TIMEOUT_SEC",
+                "CONEXUS_SYSTEMCTL_TIMEOUT_SEC",
                 30.0,
             )),
             ensure_failure_cooldown: Duration::from_secs_f64(f64_env(
-                "AGENT_MCP_ENSURE_FAILURE_COOLDOWN_SEC",
+                "CONEXUS_ENSURE_FAILURE_COOLDOWN_SEC",
                 5.0,
             )),
-            boot_grace: Duration::from_secs_f64(f64_env("AGENT_MCP_BOOT_GRACE_SEC", 90.0)),
-            socket_poll_attempts: get_env("AGENT_MCP_ENSURE_SOCKET_ATTEMPTS")
+            boot_grace: Duration::from_secs_f64(f64_env("CONEXUS_BOOT_GRACE_SEC", 90.0)),
+            socket_poll_attempts: get_env("CONEXUS_ENSURE_SOCKET_ATTEMPTS")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(200),
-            max_restart_attempts: get_env("AGENT_MCP_ENSURE_MAX_RESTART_ATTEMPTS")
+            max_restart_attempts: get_env("CONEXUS_ENSURE_MAX_RESTART_ATTEMPTS")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(5),
             giveup_cooldown: Duration::from_secs_f64(f64_env(
-                "AGENT_MCP_ENSURE_GIVEUP_COOLDOWN_SEC",
+                "CONEXUS_ENSURE_GIVEUP_COOLDOWN_SEC",
                 600.0,
             )),
         }
@@ -661,7 +661,7 @@ exit 0
         let cfg = EnsureConfig::from_env(|_| None);
         assert!(
             cfg.boot_grace >= Duration::from_secs_f64(44.0),
-            "default AGENT_MCP_BOOT_GRACE_SEC must cover the ~44s cold boot, got {:?}",
+            "default CONEXUS_BOOT_GRACE_SEC must cover the ~44s cold boot, got {:?}",
             cfg.boot_grace
         );
     }
@@ -734,7 +734,7 @@ exit 0
         let registry = registry_with(dir.path(), "proj-a", "python");
         let store = RuntimeStore::new();
 
-        let secret = "/nix/store/SECRET-unit-path/agent-mcp-leaky-backend.service";
+        let secret = "/nix/store/SECRET-unit-path/conexus-leaky-backend.service";
         let log = dir.path().join("calls.log");
         let script_path = dir.path().join("fake-systemctl-secret.sh");
         std::fs::write(

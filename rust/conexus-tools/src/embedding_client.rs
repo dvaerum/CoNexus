@@ -52,7 +52,7 @@ use serde_json::json;
 const OLLAMA_DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
 const OPENAI_DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
-/// `AGENT_MCP_LLM_CLIENT_TIMEOUT_SECONDS` default -- R12-F2 defense in
+/// `CONEXUS_LLM_CLIENT_TIMEOUT_SECONDS` default -- R12-F2 defense in
 /// depth (see Python's identically-named constant): an unreachable
 /// provider must degrade in a bounded number of seconds, not the HTTP
 /// stack's own much longer default.
@@ -95,23 +95,23 @@ pub struct EmbeddingClient {
 /// `conexus-backend`'s own "deliberately not ported" list).
 ///
 /// `OPENAI_API_KEY` unset/empty ⇒ local Ollama: `base_url` from
-/// `AGENT_MCP_LLM_BASE_URL` (verified against Python's actual
+/// `CONEXUS_LLM_BASE_URL` (verified against Python's actual
 /// `OllamaEmbeddingClient.__init__` -- NOT `OPENAI_BASE_URL`, despite
 /// this module's own Python docstring claiming the embedding seam
-/// "deliberately does NOT consult `AGENT_MCP_LLM_BASE_URL`"; that
+/// "deliberately does NOT consult `CONEXUS_LLM_BASE_URL`"; that
 /// claim only holds for the OpenAI branch), else the bundled-Ollama
 /// default; `api_key` is the `"ollama"` sentinel; model/dimension
 /// default to `qwen3-embedding:0.6b`/1024 (Python's own
 /// zero-config-VM defaults).
 ///
-/// `AGENT_MCP_EMBEDDING_MODEL`/`AGENT_MCP_EMBEDDING_DIMENSION`, when
+/// `CONEXUS_EMBEDDING_MODEL`/`CONEXUS_EMBEDDING_DIMENSION`, when
 /// present, override the model/dimension in EITHER branch (matches
 /// Python: an explicit setting always wins over either provider's
 /// default).
 pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> EmbeddingClient {
-    let model_override = env_nonempty(&get_env, "AGENT_MCP_EMBEDDING_MODEL");
+    let model_override = env_nonempty(&get_env, "CONEXUS_EMBEDDING_MODEL");
     let dimension_override =
-        env_nonempty(&get_env, "AGENT_MCP_EMBEDDING_DIMENSION").and_then(|v| v.parse::<u32>().ok());
+        env_nonempty(&get_env, "CONEXUS_EMBEDDING_DIMENSION").and_then(|v| v.parse::<u32>().ok());
 
     match env_nonempty(&get_env, "OPENAI_API_KEY") {
         Some(api_key) => EmbeddingClient {
@@ -122,7 +122,7 @@ pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> EmbeddingClient {
             dimension: dimension_override.unwrap_or(1536),
         },
         None => EmbeddingClient {
-            base_url: env_nonempty(&get_env, "AGENT_MCP_LLM_BASE_URL")
+            base_url: env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
                 .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string()),
             api_key: "ollama".to_string(),
             model: model_override.unwrap_or_else(|| "qwen3-embedding:0.6b".to_string()),
@@ -219,10 +219,7 @@ mod tests {
 
     #[test]
     fn ollama_branch_honours_agent_mcp_llm_base_url_override() {
-        let client = resolve(env(&[(
-            "AGENT_MCP_LLM_BASE_URL",
-            "http://gpu-box:11434/v1",
-        )]));
+        let client = resolve(env(&[("CONEXUS_LLM_BASE_URL", "http://gpu-box:11434/v1")]));
         assert_eq!(client.base_url, "http://gpu-box:11434/v1");
     }
 
@@ -252,16 +249,16 @@ mod tests {
     #[test]
     fn explicit_model_and_dimension_override_win_in_either_branch() {
         let ollama = resolve(env(&[
-            ("AGENT_MCP_EMBEDDING_MODEL", "custom-model"),
-            ("AGENT_MCP_EMBEDDING_DIMENSION", "768"),
+            ("CONEXUS_EMBEDDING_MODEL", "custom-model"),
+            ("CONEXUS_EMBEDDING_DIMENSION", "768"),
         ]));
         assert_eq!(ollama.model, "custom-model");
         assert_eq!(ollama.dimension, 768);
 
         let openai = resolve(env(&[
             ("OPENAI_API_KEY", "sk-real"),
-            ("AGENT_MCP_EMBEDDING_MODEL", "custom-model"),
-            ("AGENT_MCP_EMBEDDING_DIMENSION", "768"),
+            ("CONEXUS_EMBEDDING_MODEL", "custom-model"),
+            ("CONEXUS_EMBEDDING_DIMENSION", "768"),
         ]));
         assert_eq!(openai.model, "custom-model");
         assert_eq!(openai.dimension, 768);
@@ -278,7 +275,7 @@ mod tests {
 
     #[test]
     fn an_unparseable_dimension_override_falls_back_to_the_provider_default() {
-        let client = resolve(env(&[("AGENT_MCP_EMBEDDING_DIMENSION", "not-a-number")]));
+        let client = resolve(env(&[("CONEXUS_EMBEDDING_DIMENSION", "not-a-number")]));
         assert_eq!(client.dimension, 1024);
     }
 

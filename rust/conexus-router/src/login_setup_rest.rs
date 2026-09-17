@@ -8,15 +8,15 @@
 //!
 //! Registered on `admin_router` (session-gated), same as every other
 //! dashboard route -- `path_policy::UNAUTH_PREFIXES` already lists
-//! `/agent-mcp/login`/`/agent-mcp/logout`/`/agent-mcp/setup`, so
+//! `/conexus/login`/`/conexus/logout`/`/conexus/setup`, so
 //! `session_gate_layer` resolves these to `PassThrough` and never
 //! blocks them; these handlers do their OWN independent cookie
 //! resolution (`login::resolve_current_user`) rather than relying on
 //! a gate-supplied `GateIdentity`.
 //!
 //! `empty_users_redirect_layer` (already wired, `middleware.rs`) is
-//! what bounces every OTHER `/agent-mcp/...` request to `/setup`
-//! while the users table is empty; `/agent-mcp/setup` itself is
+//! what bounces every OTHER `/conexus/...` request to `/setup`
+//! while the users table is empty; `/conexus/setup` itself is
 //! `path_policy::REDIRECT_EXEMPT_PREFIXES`-listed so it doesn't loop.
 
 use std::net::SocketAddr;
@@ -194,7 +194,7 @@ fn registered_project_names(state: &RouterState) -> Vec<String> {
         .unwrap_or_default()
 }
 
-// ── GET/POST /agent-mcp/login ───────────────────────────────────────
+// ── GET/POST /conexus/login ───────────────────────────────────────
 
 pub async fn login_get_handler(
     State(state): State<Arc<RouterState>>,
@@ -367,13 +367,13 @@ pub async fn login_post_handler(
 /// than hand-rolling a second one.
 pub(crate) fn require_secure_cookies_env() -> bool {
     crate::rate_limit::env_truthy(
-        std::env::var("AGENT_MCP_REQUIRE_SECURE_COOKIES")
+        std::env::var("CONEXUS_REQUIRE_SECURE_COOKIES")
             .ok()
             .as_deref(),
     )
 }
 
-// ── POST/GET /agent-mcp/logout ──────────────────────────────────────
+// ── POST/GET /conexus/logout ──────────────────────────────────────
 
 pub async fn logout_post_handler(
     State(state): State<Arc<RouterState>>,
@@ -404,24 +404,24 @@ pub async fn logout_post_handler(
         "http",
     );
     let cookie = login::clear_session_cookie(&mount_ctx.external_path(""), secure);
-    // Python hardcodes this redirect target literally (`"/agent-mcp/login"`),
+    // Python hardcodes this redirect target literally (`"/conexus/login"`),
     // never mount-aware -- the SAME preserved, deliberate quirk
     // documented for step 9's `redirect_to_app_index`/
     // `redirect_to_app_page` closures (a root-mounted alias still
-    // bounces to the `/agent-mcp/`-prefixed URL). Ported identically,
+    // bounces to the `/conexus/`-prefixed URL). Ported identically,
     // not "fixed" into a smarter same-mount redirect.
-    see_other_with_cookie("/agent-mcp/login", &cookie)
+    see_other_with_cookie("/conexus/login", &cookie)
 }
 
-/// `GET /agent-mcp/logout` -- port of `logout_get_handler`. Logout
+/// `GET /conexus/logout` -- port of `logout_get_handler`. Logout
 /// itself stays POST-only (CSRF: a cross-site image/link tag must not
 /// force a session drop); a GET just bounces to `/login`, matching
 /// Python's own hardcoded, non-mount-aware target exactly.
 pub async fn logout_get_handler() -> Response {
-    see_other("/agent-mcp/login")
+    see_other("/conexus/login")
 }
 
-// ── GET/POST /agent-mcp/setup ────────────────────────────────────────
+// ── GET/POST /conexus/setup ────────────────────────────────────────
 
 pub async fn setup_get_handler(State(state): State<Arc<RouterState>>) -> Response {
     let empty = match users_table_is_empty(&state).await {
@@ -429,7 +429,7 @@ pub async fn setup_get_handler(State(state): State<Arc<RouterState>>) -> Respons
         Err(()) => return internal_error(),
     };
     match login::setup_get_outcome(empty) {
-        SetupGetOutcome::RedirectToLogin => see_other("/agent-mcp/login"),
+        SetupGetOutcome::RedirectToLogin => see_other("/conexus/login"),
         SetupGetOutcome::RenderForm => {
             let html = templates::render_setup(&SetupPageContext {
                 error: None,
@@ -491,7 +491,7 @@ pub async fn setup_post_handler(
     if !empty {
         // A POST after the wizard's already completed -- most likely a
         // back-button replay. Bounce to /login rather than a 409.
-        return see_other("/agent-mcp/login");
+        return see_other("/conexus/login");
     }
 
     let Ok(Form(body)) = form else {
@@ -526,7 +526,7 @@ pub async fn setup_post_handler(
     .await;
 
     match outcome {
-        SetupPostOutcome::AlreadySetUp => see_other("/agent-mcp/login"),
+        SetupPostOutcome::AlreadySetUp => see_other("/conexus/login"),
         SetupPostOutcome::Invalid(err) => {
             let message = setup_error_message(&err);
             let html = templates::render_setup(&SetupPageContext {
@@ -568,7 +568,7 @@ pub async fn setup_post_handler(
             // Port of `setup_post_handler`'s own hardcoded, non-mount-
             // aware redirect target -- same preserved quirk as
             // logout's.
-            see_other_with_cookie("/agent-mcp/", &cookie)
+            see_other_with_cookie("/conexus/", &cookie)
         }
     }
 }
@@ -706,7 +706,7 @@ mod http_tests {
 
     fn test_state_config() -> RouterStateConfig {
         RouterStateConfig {
-            sock_dir: std::path::PathBuf::from("/tmp/agent-mcp-sockets"),
+            sock_dir: std::path::PathBuf::from("/tmp/conexus-sockets"),
             dashboard_dir: None,
             external_url: None,
             idle_sec: 14400,
@@ -715,7 +715,7 @@ mod http_tests {
             single_tenant_workspace: None,
             max_streams_per_agent: 4,
             max_streams_global: 64,
-            default_workspace_parent: std::path::PathBuf::from("/tmp/agent-mcp-projects"),
+            default_workspace_parent: std::path::PathBuf::from("/tmp/conexus-projects"),
             token_dir: None,
         }
     }
@@ -723,7 +723,7 @@ mod http_tests {
     /// A real login/setup axum sub-router over a freshly built
     /// file-backed `RouterState` -- no session gate / rate-limit /
     /// empty-users-redirect middleware layered on (irrelevant to the
-    /// 3 findings above: `/agent-mcp/login`+`/agent-mcp/setup` are
+    /// 3 findings above: `/conexus/login`+`/conexus/setup` are
     /// `path_policy::UNAUTH_PREFIXES`-exempt from all three in the
     /// real app anyway). `_dir` must outlive the router (the project
     /// registry's backing file AND the shared sqlite file both live
@@ -754,11 +754,11 @@ mod http_tests {
         ));
         let router = Router::new()
             .route(
-                "/agent-mcp/login",
+                "/conexus/login",
                 get(login_get_handler).post(login_post_handler),
             )
             .route(
-                "/agent-mcp/setup",
+                "/conexus/setup",
                 get(setup_get_handler).post(setup_post_handler),
             )
             .with_state(Arc::clone(&state));
@@ -852,7 +852,7 @@ mod http_tests {
         let body = multipart_body("XBOUNDARY", true, true);
         let (status, _headers) = post(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "multipart/form-data; boundary=XBOUNDARY",
             body,
         )
@@ -878,7 +878,7 @@ mod http_tests {
         let body = multipart_body("XBOUNDARY", false, true);
         let (status, _headers) = post(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "multipart/form-data; boundary=XBOUNDARY",
             body,
         )
@@ -892,7 +892,7 @@ mod http_tests {
         let body = multipart_body("XBOUNDARY", true, false);
         let (status, _headers) = post(
             &router,
-            "/agent-mcp/setup",
+            "/conexus/setup",
             "multipart/form-data; boundary=XBOUNDARY",
             body,
         )
@@ -919,7 +919,7 @@ mod http_tests {
         .unwrap();
         let (status, headers) = post(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             b"username=carol&password=hunter2pw123".to_vec(),
         )
@@ -938,7 +938,7 @@ mod http_tests {
         let (_dir, state, router) = test_app().await;
         let (status, headers) = post(
             &router,
-            "/agent-mcp/setup",
+            "/conexus/setup",
             "application/x-www-form-urlencoded",
             b"username=first_op&password=secret-pw-1234&password_confirm=secret-pw-1234".to_vec(),
         )
@@ -971,7 +971,7 @@ mod http_tests {
         .unwrap();
         let (status, headers) = post(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             b"username=sso-victim&password=anything".to_vec(),
         )
@@ -1026,7 +1026,7 @@ mod http_tests {
         let body = b"username=probe-user&password=guess".to_vec();
         let (status_sso, body_sso) = post_body(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             body.clone(),
         )
@@ -1039,7 +1039,7 @@ mod http_tests {
         }
         let (status_missing, body_missing) = post_body(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             body,
         )
@@ -1084,14 +1084,14 @@ mod http_tests {
 
         let (status_sso, body_sso) = post_body(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             b"username=sso-user&password=guess".to_vec(),
         )
         .await;
         let (status_badpw, body_badpw) = post_body(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             b"username=pw-real&password=guess".to_vec(),
         )
@@ -1110,7 +1110,7 @@ mod http_tests {
         let (_dir, _state, router) = test_app().await;
         let (status, headers) = post(
             &router,
-            "/agent-mcp/login",
+            "/conexus/login",
             "application/x-www-form-urlencoded",
             b"{\"k\":\"\xff\xfe\xfd\"}".to_vec(),
         )
@@ -1124,7 +1124,7 @@ mod http_tests {
         let (_dir, _state, router) = test_app().await;
         let (status, _headers) = post(
             &router,
-            "/agent-mcp/setup",
+            "/conexus/setup",
             "application/x-www-form-urlencoded",
             b"{\"k\":\"\xff\xfe\xfd\"}".to_vec(),
         )

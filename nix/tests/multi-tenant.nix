@@ -86,14 +86,14 @@ pkgs.testers.nixosTest {
           "XDG_RUNTIME_DIR=/run/user/1500"
           "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
           "OPENAI_API_KEY=fake"
-          "AGENT_MCP_EMBEDDING_MODEL=fake-zero-vector"
-          "AGENT_MCP_EMBEDDING_DIMENSION=1024"
+          "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
+          "CONEXUS_EMBEDDING_DIMENSION=1024"
           # R8-F2 class-sweep: same fix as single-tenant.nix — see its
           # comment. Nothing here exercises the backend today either
           # (see the module docstring above), so this was equally
           # dormant; fixed to match module.nix rather than leave a
           # known-wrong default for the next test that does.
-          "AGENT_MCP_SOCK_DIR=/run/agent-mcp"
+          "CONEXUS_SOCK_DIR=/run/agent-mcp"
         ];
         RuntimeDirectory = "agent-mcp/%i";
         RuntimeDirectoryMode = "0700";
@@ -137,20 +137,20 @@ pkgs.testers.nixosTest {
         # migrations against this DB at startup. Default
         # /var/lib/agent-mcp is not writable by testuser; point at
         # testuser's home so the ExecStartPre mkdir below covers both.
-        AGENT_MCP_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
+        CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
         # Phase 1 PR C: seed a sentinel operator via env-var bootstrap
         # so the empty-users redirect middleware is dormant — this
         # test asserts routing behaviour (e.g. /api/router/projects,
         # /app/) that predates auth and shouldn't be wedged behind
         # the first-boot wizard.
-        AGENT_MCP_BOOTSTRAP_USERNAME = "ci-sentinel";
-        AGENT_MCP_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
-        AGENT_MCP_ROUTER_HOST = "0.0.0.0";
+        CONEXUS_BOOTSTRAP_USERNAME = "ci-sentinel";
+        CONEXUS_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
+        CONEXUS_ROUTER_HOST = "0.0.0.0";
         # `--default-workspace` has no CLI-flag equivalent on
         # `conexus-router` (env-var-only); without it, projects created
         # via __create/api/router/projects would land under the wrong
         # fallback path (see home-manager-module.nix's own comment).
-        AGENT_MCP_DEFAULT_WORKSPACE = "/home/testuser/projects";
+        CONEXUS_DEFAULT_WORKSPACE = "/home/testuser/projects";
         # R8-F2 class-sweep: same dormant mismatch fixed in
         # single-tenant.nix — the router defaults to `systemctl
         # --user`, but this VM's conexus@%i template is a
@@ -160,7 +160,7 @@ pkgs.testers.nixosTest {
         # here too; fixing it now to match module.nix / the other VM
         # tests rather than leave a known-wrong default for whoever
         # extends this test to touch the backend next.
-        AGENT_MCP_SYSTEMCTL_MODE = "system";
+        CONEXUS_SYSTEMCTL_MODE = "system";
       };
       serviceConfig = {
         Type = "simple";
@@ -220,29 +220,29 @@ pkgs.testers.nixosTest {
     machine.wait_for_open_port(${toString ports.routerPort})
 
     # Phase 1 PR D (prancy-napping-pie): the router now requires an
-    # operator session cookie on every /agent-mcp/... mutation +
+    # operator session cookie on every /conexus/... mutation +
     # most reads. The router's startup hook seeds the
     # `ci-sentinel` user from the env-var bootstrap; log in here so
     # the cookie jar persists across the rest of the test.
     machine.succeed(
         "curl -fsS -c /tmp/agent-mcp-cookies.txt "
         "--data 'username=ci-sentinel&password=ci-sentinel-pw' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/login"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/login"
     )
 
     # The router-admin surface (ADR 0014) lives at /api/router/...
     # Every endpoint except /api/router/health requires an operator
     # session cookie. The strict Accept header is required by PR-A.
-    accept_header = "-H 'Accept: application/vnd.agent-mcp.v1+json'"
+    accept_header = "-H 'Accept: application/vnd.conexus.v1+json'"
     json_header = (
-        "-H 'Accept: application/vnd.agent-mcp.v1+json' "
+        "-H 'Accept: application/vnd.conexus.v1+json' "
         "-H 'Content-Type: application/json'"
     )
 
     # Project list starts empty.
     out = machine.succeed(
         f"curl -fsS -b /tmp/agent-mcp-cookies.txt {accept_header} "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/router/projects"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
     assert '"projects": []' in out or '"projects":[]' in out, (
         f"expected empty project list; got: {out!r}"
@@ -254,12 +254,12 @@ pkgs.testers.nixosTest {
             f"curl -fsSL -b /tmp/agent-mcp-cookies.txt -o /dev/null "
             f"{json_header} -X POST "
             f"--data '{{\"name\": \"{name}\"}}' "
-            f"http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/router/projects"
+            f"http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
         )
 
     out = machine.succeed(
         f"curl -fsS -b /tmp/agent-mcp-cookies.txt {accept_header} "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/router/projects"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
     assert '"alpha"' in out and '"beta"' in out, (
         f"both alpha and beta should be listed; got: {out!r}"
@@ -268,11 +268,11 @@ pkgs.testers.nixosTest {
     # 2. Deep link into a project's dashboard — handler serves the
     # static index.html for any project segment, so 200 is the right
     # answer here. PR-B Shape-3: the dashboard surface moved from
-    # /agent-mcp/__dashboard/<name>/ to /agent-mcp/app/<name>/.
+    # /conexus/__dashboard/<name>/ to /conexus/app/<name>/.
     code = machine.succeed(
         "curl -fsS -b /tmp/agent-mcp-cookies.txt "
         "-o /dev/null -w '%{http_code}' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/app/alpha/"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/app/alpha/"
     )
     assert code == "200", f"expected 200 from dashboard handler; got {code}"
 
@@ -283,7 +283,7 @@ pkgs.testers.nixosTest {
     # required to reach the 404 (middleware would otherwise 401 first).
     out_404 = machine.succeed(
         "curl -s -b /tmp/agent-mcp-cookies.txt -o /dev/null -w '%{http_code}' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/__sse/alpha"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/__sse/alpha"
     )
     assert out_404 == "404", f"expected 404 on legacy SSE; got {out_404}"
 
@@ -294,21 +294,21 @@ pkgs.testers.nixosTest {
         f"-o /dev/null -w '%{{http_code}}' "
         f"{json_header} -X POST "
         f"--data '{{\"name\": \"gamma\"}}' "
-        f"http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/router/projects"
+        f"http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
     assert code_create != "410", (
         f"create must not 410 in multi-tenant mode; got {code_create}"
     )
 
     # 5. Phase 4 runtime asset-prefix substitution: the dashboard build
-    # emits `__AGENT_MCP_ASSET_PREFIX__` everywhere Next.js would have
+    # emits `__CONEXUS_ASSET_PREFIX__` everywhere Next.js would have
     # baked in a build-time assetPrefix; the router must substitute the
-    # default `/agent-mcp/assets` on serve. A leak here = a broken
+    # default `/conexus/assets` on serve. A leak here = a broken
     # white dashboard in the browser.
     sentinel_count = machine.succeed(
         "curl -fsS -b /tmp/agent-mcp-cookies.txt "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/app/alpha/"
-        " | grep -c '__AGENT_MCP_ASSET_PREFIX__' || true"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/app/alpha/"
+        " | grep -c '__CONEXUS_ASSET_PREFIX__' || true"
     ).strip()
     assert sentinel_count == "0", (
         "Phase 4 regression: the asset-prefix sentinel leaked into "
@@ -318,12 +318,12 @@ pkgs.testers.nixosTest {
     )
 
     # Asset URLs in the served HTML must now reference the configured
-    # runtime prefix (PR-B Shape-3 default: /agent-mcp/assets).
+    # runtime prefix (PR-B Shape-3 default: /conexus/assets).
     served = machine.succeed(
         "curl -fsS -b /tmp/agent-mcp-cookies.txt "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/app/alpha/"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/app/alpha/"
     )
-    assert "/agent-mcp/assets/_next/" in served, (
+    assert "/conexus/assets/_next/" in served, (
         "Phase 4: expected substituted asset URLs in served HTML; "
         f"first 400 bytes: {served[:400]!r}"
     )
@@ -337,23 +337,41 @@ pkgs.testers.nixosTest {
     # sentinel passed through unsubstituted. The HTML check above
     # alone did NOT catch it because the bug lived in the chunk
     # responses, not the index HTML. This step curls every
-    # `/agent-mcp/assets/...` reference + every `.txt` RSC payload
+    # `/conexus/assets/...` reference + every `.txt` RSC payload
     # the client-side router would fetch on navigation, and asserts
-    # zero `__AGENT_MCP_ASSET_PREFIX__` occurrences in the bytes.
+    # zero `__CONEXUS_ASSET_PREFIX__` occurrences in the bytes.
     import re
     base = "http://127.0.0.1:${toString ports.routerPort}"
-    # Pattern matches quoted /agent-mcp/assets/<path> in src= and
+    # Pattern matches quoted /conexus/assets/<path> in src= and
     # href= attributes; group(1) captures up to the first
     # query/fragment/quote terminator. Built via string concat (not
     # a Python raw string) to dodge Nix indented-string close-token
     # ambiguity around double-apostrophe sequences.
     asset_re = re.compile(
-        "[\"']" + "(/agent-mcp/assets/[^\"'?# \\\\<>]+)"
+        "[\"']" + "(/conexus/assets/[^\"'?# \\\\<>]+)"
     )
-    asset_urls = sorted(set(asset_re.findall(served)))
+    # Next.js's flight-streaming serializer can flush its output
+    # buffer mid-string at a content-dependent byte offset (see
+    # `conexus-router::asset_prefix`'s own `SENTINEL_WITH_OPTIONAL_
+    # SPLIT` doc) -- when that boundary happens to fall INSIDE an
+    # asset path rather than inside the sentinel itself, the raw
+    # HTTP response legitimately contains a quoted fragment like
+    # `".../assets/_"` immediately followed by
+    # `self.__next_f.push([N,"next/static/chunks/...")`. The browser
+    # reassembles this correctly (it's valid React Flight streaming,
+    # not a bug); this regex has no flight-payload awareness and
+    # would otherwise treat the truncated fragment as its own "URL".
+    # Filter to real asset references (a recognised static-asset
+    # extension) so a shifted split boundary can't make this
+    # regression guard curl a bogus, un-servable path and fail for a
+    # reason unrelated to the sentinel-leak it's meant to catch.
+    asset_urls = sorted(
+        u for u in set(asset_re.findall(served))
+        if u.endswith((".js", ".css", ".map", ".txt"))
+    )
     assert asset_urls, (
         "PR #165 guard pre-condition: expected at least one "
-        "/agent-mcp/assets/... reference in the served HTML so the "
+        "/conexus/assets/... reference in the served HTML so the "
         "downstream chunk check has something to curl; got none. "
         f"HTML head: {served[:400]!r}"
     )
@@ -366,16 +384,16 @@ pkgs.testers.nixosTest {
         "find ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
         "-name '*.txt' -printf '%P\n'"
     ).split()
-    rsc_urls = [f"/agent-mcp/app/alpha/{p}" for p in txt_paths]
+    rsc_urls = [f"/conexus/app/alpha/{p}" for p in txt_paths]
     offenders = []
     for url in asset_urls + rsc_urls:
-        # /agent-mcp/assets/... is allow-listed by the operator-session
-        # middleware (PR D) so no cookie is needed; /agent-mcp/app/...
+        # /conexus/assets/... is allow-listed by the operator-session
+        # middleware (PR D) so no cookie is needed; /conexus/app/...
         # RSC paths do need it.
         body = machine.succeed(
             f"curl -fsS -b /tmp/agent-mcp-cookies.txt {base}{url}"
         )
-        if "__AGENT_MCP_ASSET_PREFIX__" in body:
+        if "__CONEXUS_ASSET_PREFIX__" in body:
             offenders.append(url)
     assert not offenders, (
         "PR #165 regression: the asset-prefix sentinel leaked into "

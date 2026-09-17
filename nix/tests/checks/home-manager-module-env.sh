@@ -24,8 +24,8 @@
 # `--sock-dir`, `--dashboard-dir`, `--external-url`, `--idle-sec`,
 # `--port`. A handful have NO CLI-flag equivalent (env-var-only on the
 # Rust router, mirroring the Python router's own env-var-only knobs) and
-# must still be set via `Environment`: `AGENT_MCP_ROUTER_DB`,
-# `AGENT_MCP_ROUTER_HOST`, `AGENT_MCP_DEFAULT_WORKSPACE`.
+# must still be set via `Environment`: `CONEXUS_ROUTER_DB`,
+# `CONEXUS_ROUTER_HOST`, `CONEXUS_DEFAULT_WORKSPACE`.
 #
 # This check parses the home-manager module's router-service
 # `Environment` block for the env-var-only knobs and its `ExecStart`
@@ -113,26 +113,26 @@ EXEC_START="$(extract_router_exec_start "$ROUTER_BLOCK")"
 
 fail=0
 
-# test_router_environment_sets_AGENT_MCP_ROUTER_DB:
-# The router service must set `AGENT_MCP_ROUTER_DB` to an
+# test_router_environment_sets_CONEXUS_ROUTER_DB:
+# The router service must set `CONEXUS_ROUTER_DB` to an
 # XDG_DATA_HOME path. Without this, user-mode systemd falls back to
 # conexus-router's own compiled-in `/var/lib/agent-mcp/router.db`
 # default, which it can't write, and the router restart-loops
 # forever (see header comment).
-if ! grep -qF 'AGENT_MCP_ROUTER_DB' <<<"$ENV_BLOCK"; then
-  echo "FAIL: home-manager-module.nix must set AGENT_MCP_ROUTER_DB on " \
+if ! grep -qF 'CONEXUS_ROUTER_DB' <<<"$ENV_BLOCK"; then
+  echo "FAIL: home-manager-module.nix must set CONEXUS_ROUTER_DB on " \
     "conexus-router; the compiled-in default " \
     "(/var/lib/agent-mcp/router.db) is unwritable by user-mode units." >&2
   fail=1
 else
-  value=$(grep -oP '"AGENT_MCP_ROUTER_DB=\K[^"]+' <<<"$ENV_BLOCK" | head -1)
+  value=$(grep -oP '"CONEXUS_ROUTER_DB=\K[^"]+' <<<"$ENV_BLOCK" | head -1)
   if [ -z "$value" ]; then
-    echo "FAIL: AGENT_MCP_ROUTER_DB must be set via a quoted " \
-      '"AGENT_MCP_ROUTER_DB=<path>" entry in the Environment list.' >&2
+    echo "FAIL: CONEXUS_ROUTER_DB must be set via a quoted " \
+      '"CONEXUS_ROUTER_DB=<path>" entry in the Environment list.' >&2
     fail=1
   else
     if grep -qF '/var/lib' <<<"$value"; then
-      echo "FAIL: AGENT_MCP_ROUTER_DB must not point under /var/lib (got '$value'); " \
+      echo "FAIL: CONEXUS_ROUTER_DB must not point under /var/lib (got '$value'); " \
         "user-mode units cannot write there." >&2
       fail=1
     fi
@@ -140,7 +140,7 @@ else
     # is `${config.xdg.dataHome}/...`. Accept that, or an explicit
     # ~/.local/share interpolation via %h.
     if ! grep -qF 'xdg.dataHome' <<<"$value" && ! grep -qF '%h/.local/share' <<<"$value"; then
-      echo "FAIL: AGENT_MCP_ROUTER_DB='$value' should resolve under " \
+      echo "FAIL: CONEXUS_ROUTER_DB='$value' should resolve under " \
         'XDG_DATA_HOME (use ${config.xdg.dataHome}/agent-mcp/router.db ' \
         'or %h/.local/share/agent-mcp/router.db).' >&2
       fail=1
@@ -151,7 +151,7 @@ fi
 # test_router_environment_has_no_var_lib_defaults:
 # Defense in depth: no env var in the user-mode router unit may
 # point under /var/lib/*. User-mode systemd cannot write there.
-var_lib_matches=$(grep -oP '"AGENT_MCP_[A-Z_]+=/var/lib[^"]*"' <<<"$ENV_BLOCK" || true)
+var_lib_matches=$(grep -oP '"CONEXUS_[A-Z_]+=/var/lib[^"]*"' <<<"$ENV_BLOCK" || true)
 if [ -n "$var_lib_matches" ]; then
   echo "FAIL: User-mode router unit env vars must not point under /var/lib: " >&2
   echo "$var_lib_matches" >&2
@@ -159,14 +159,14 @@ if [ -n "$var_lib_matches" ]; then
 fi
 
 # test_router_environment_declares_required_var, parametrized over:
-#   AGENT_MCP_ROUTER_DB, AGENT_MCP_DEFAULT_WORKSPACE
+#   CONEXUS_ROUTER_DB, CONEXUS_DEFAULT_WORKSPACE
 # Env vars `conexus-router` reads at startup that have NO CLI-flag
 # equivalent (env-var-only, per its own `Cli` struct doc in
 # rust/conexus-router/src/main.rs). Each MUST be set in the
 # home-manager router unit so the user-mode service has the values it
 # needs without falling back to a root-only path or the wrong
 # default.
-for var_name in "AGENT_MCP_ROUTER_DB" "AGENT_MCP_DEFAULT_WORKSPACE"; do
+for var_name in "CONEXUS_ROUTER_DB" "CONEXUS_DEFAULT_WORKSPACE"; do
   if ! grep -qF -- "$var_name" <<<"$ENV_BLOCK"; then
     echo "FAIL: home-manager-module.nix: conexus-router Environment must set " \
       "$var_name (the router reads it at startup, with no CLI-flag " \

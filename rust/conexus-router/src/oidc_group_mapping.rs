@@ -1,4 +1,4 @@
-//! OIDC group-claim -> agent-mcp group mapping + de-provisioning
+//! OIDC group-claim -> conexus group mapping + de-provisioning
 //! reconciliation. Port target: `agent_mcp/router/sso.py`'s
 //! `apply_group_mapping`/`reconcile_oidc_group_membership` (Phase E2
 //! PR22 step 4/8, `conexus-router-oidc-group-mapping`).
@@ -59,7 +59,7 @@ fn sanitise_group_name(raw: &str) -> String {
     sanitise_username(raw)
 }
 
-/// The agent-mcp group name a single claim maps to, or `None` if the
+/// The conexus group name a single claim maps to, or `None` if the
 /// claim is unmapped and there's no wildcard entry. Shared by
 /// [`apply_group_mapping`] and [`mapped_group_names`] so the two
 /// can't drift apart on what "maps to" means.
@@ -77,7 +77,7 @@ fn mapped_name(
     wildcard.map(|_| format!("{WILDCARD_GROUP_PREFIX}{}", sanitise_group_name(claim)))
 }
 
-/// Port of `_mapped_group_names`: the FULL set of agent-mcp group
+/// Port of `_mapped_group_names`: the FULL set of conexus group
 /// names the current claims map to, regardless of whether the user is
 /// already a member. Used by the de-provisioning reconciler to
 /// compute which IdP-managed memberships the current claim still
@@ -93,7 +93,7 @@ fn mapped_group_names(
         .collect()
 }
 
-/// Port of `apply_group_mapping`. Maps OIDC group claims to agent-mcp
+/// Port of `apply_group_mapping`. Maps OIDC group claims to conexus
 /// groups; returns the group names the user was newly added to.
 ///
 /// Idempotent: re-running with the same claims is a no-op for

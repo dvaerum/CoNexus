@@ -197,7 +197,7 @@ pub static SETTINGS_SCHEMA: &[SettingSpec] = &[
         tier: SettingTier::Operator,
         group: SettingGroup::EventLoop,
         title: "Event-loop debug logging",
-        description: "When on, the backend logs a detailed trace of the wait_for_events wake loop (which hold strategy each client gets, whether a connection parks vs re-polls, heartbeats sent, the adaptive hold-ladder phase, and events in/out) at a level the systemd journal captures — grep for \"EVENTLOOP\". Off by default; when unset it falls back to the AGENT_MCP_EVENTLOOP_DEBUG environment variable (the deploy default). Diagnostic only — leave off in normal operation.",
+        description: "When on, the backend logs a detailed trace of the wait_for_events wake loop (which hold strategy each client gets, whether a connection parks vs re-polls, heartbeats sent, the adaptive hold-ladder phase, and events in/out) at a level the systemd journal captures — grep for \"EVENTLOOP\". Off by default; when unset it falls back to the CONEXUS_EVENTLOOP_DEBUG environment variable (the deploy default). Diagnostic only — leave off in normal operation.",
         widget: Some(SettingWidget::Switch),
     },
     SettingSpec {
@@ -317,7 +317,7 @@ pub static SETTINGS_SCHEMA: &[SettingSpec] = &[
         widget: Some(SettingWidget::IntDuration),
     },
     // -- Delivery transport / fallback push (ADR-0021) -----------------
-    // The tunable per-project policy for when agent-mcp pushes a skinny
+    // The tunable per-project policy for when conexus pushes a skinny
     // notification down a worker's registered delivery transport (the
     // fallback for sessions that don't poll wait_for_events). All
     // operator-tier.
@@ -328,7 +328,7 @@ pub static SETTINGS_SCHEMA: &[SettingSpec] = &[
         tier: SettingTier::Operator,
         group: SettingGroup::Delivery,
         title: "Fallback delivery channel",
-        description: "When on, agent-mcp pushes skinny notifications (message/task id, title, status — never the body) to a worker's registered delivery transport when the agent falls behind (see the triggers below), so a session that isn't polling still gets poked. Off by default; a runtime (e.g. the AoE bridge) must also register the transport for a worker.",
+        description: "When on, conexus pushes skinny notifications (message/task id, title, status — never the body) to a worker's registered delivery transport when the agent falls behind (see the triggers below), so a session that isn't polling still gets poked. Off by default; a runtime (e.g. the AoE bridge) must also register the transport for a worker.",
         widget: Some(SettingWidget::Switch),
     },
     SettingSpec {

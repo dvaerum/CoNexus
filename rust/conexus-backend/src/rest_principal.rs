@@ -4,7 +4,7 @@
 //! two doors the operator kept for this port (2026-09-05 decision,
 //! `prancy-napping-pie.md` Phase E1): **forwarding-header only** —
 //! the per-project backend stays router-DB-blind, exactly like `/mcp`
-//! auth. Python's THIRD door (`kind="session"`, an `agent_mcp_session`
+//! auth. Python's THIRD door (`kind="session"`, an `conexus_session`
 //! cookie) is deliberately NOT ported: `deps.py`'s own docstring
 //! documents that path performing a LIVE `router.db` lookup
 //! (`identity.get_session`/`group_resolver.resolve_user_*`) on every
@@ -51,7 +51,7 @@ pub use crate::principal_resolve::PrincipalRejected;
 /// why the cookie door is dropped here).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RestPrincipal {
-    /// A verified, HMAC-signed `X-Agent-MCP-Forwarded-Operator` header.
+    /// A verified, HMAC-signed `X-Conexus-Forwarded-Operator` header.
     /// `sysadmin` is deliberately absent: the wire format never carries
     /// it (matches `principal_resolve::resolve_principal`'s own
     /// hardcoded `sysadmin: false` for this door).

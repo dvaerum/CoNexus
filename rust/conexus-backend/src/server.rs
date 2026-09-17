@@ -356,7 +356,7 @@ fn publish_dashboard_change(shared: &Arc<SharedState>, tool_name: &str, result: 
     shared.operator_events.publish(serde_json::json!({
         "jsonrpc": "2.0",
         "method": "notifications/resources/updated",
-        "params": {"uri": format!("agent-mcp://{scope}"), "action_type": tool_name},
+        "params": {"uri": format!("conexus://{scope}"), "action_type": tool_name},
     }));
 }
 

@@ -7,7 +7,7 @@
 //! not here). Two per-agent "ambient state" resources, both scoped to
 //! the calling bearer's own agent_id:
 //!
-//! * `agent-mcp://inbox/<agent_id>` -- the same JSON envelope
+//! * `conexus://inbox/<agent_id>` -- the same JSON envelope
 //!   `wait_for_events`/`fetch_events_since` return, routed through
 //!   the identical `conexus_wakeloop::event_feed::assemble_event_feed`
 //!   pipeline (Phase D3) so this can never silently diverge the way
@@ -18,7 +18,7 @@
 //!   `drain_queue=[]` -- a passive poll, deliberately NOT the same as
 //!   `fetch_events_since`'s `fire_scheduled=true`: this resource never
 //!   fires scheduled directives/pokes as a side effect of being read.
-//! * `agent-mcp://status/<agent_id>` -- ambient counters
+//! * `conexus://status/<agent_id>` -- ambient counters
 //!   (`unread_messages`, `unfinished_tasks`).
 //!
 //! **Deliberately NOT ported**: the generic `core.registry.
@@ -46,8 +46,8 @@ use rusqlite::Connection;
 use serde_json::json;
 use tokio::sync::Mutex as AsyncMutex;
 
-pub const INBOX_URI_PREFIX: &str = "agent-mcp://inbox/";
-pub const STATUS_URI_PREFIX: &str = "agent-mcp://status/";
+pub const INBOX_URI_PREFIX: &str = "conexus://inbox/";
+pub const STATUS_URI_PREFIX: &str = "conexus://status/";
 
 /// One `resources/list` catalog entry.
 pub struct ResourceListing {
@@ -381,8 +381,8 @@ mod tests {
     fn list_for_a_real_agent_returns_both_resources_scoped_to_it() {
         let listing = list_for(Some("worker-1"));
         assert_eq!(listing.len(), 2);
-        assert_eq!(listing[0].uri, "agent-mcp://inbox/worker-1");
-        assert_eq!(listing[1].uri, "agent-mcp://status/worker-1");
+        assert_eq!(listing[0].uri, "conexus://inbox/worker-1");
+        assert_eq!(listing[1].uri, "conexus://status/worker-1");
     }
 
     // -- match_uri (indirectly via read) -------------------------------
@@ -393,7 +393,7 @@ mod tests {
         let (_dir, sea_orm_db) = test_sea_orm_db().await;
         let outcome = read(
             &conn,
-            "agent-mcp://bogus/x",
+            "conexus://bogus/x",
             None,
             "2026-01-01T00:00:00Z",
             &sea_orm_db,
@@ -556,7 +556,7 @@ mod tests {
         let p = worker("worker-2");
         let outcome = read(
             &conn,
-            "agent-mcp://status/worker-1",
+            "conexus://status/worker-1",
             Some(&p),
             "2026-01-01T00:00:00Z",
             &sea_orm_db,
@@ -576,7 +576,7 @@ mod tests {
         let p = worker("worker-1");
         let outcome = read(
             &conn,
-            "agent-mcp://status/worker-1",
+            "conexus://status/worker-1",
             Some(&p),
             "2026-01-01T00:00:00Z",
             &sea_orm_db,
@@ -599,7 +599,7 @@ mod tests {
         let p = admin();
         let outcome = read(
             &conn,
-            "agent-mcp://inbox/worker-1",
+            "conexus://inbox/worker-1",
             Some(&p),
             "2026-01-01T00:00:00Z",
             &sea_orm_db,

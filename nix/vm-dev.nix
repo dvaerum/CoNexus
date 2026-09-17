@@ -113,8 +113,8 @@ in
   # Safe for dev-mode only — the loopback-only port + open SSH +
   # empty-password warnings on this VM already mark it as untrusted.
   systemd.services.agent-mcp-router.environment = {
-    AGENT_MCP_BOOTSTRAP_USERNAME = "dev";
-    AGENT_MCP_BOOTSTRAP_PASSWORD = "dev";
+    CONEXUS_BOOTSTRAP_USERNAME = "dev";
+    CONEXUS_BOOTSTRAP_PASSWORD = "dev";
   };
 
   # Override the host-side port forwarding so the dev sandbox lives at

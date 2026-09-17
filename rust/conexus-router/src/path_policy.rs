@@ -7,8 +7,8 @@
 //! "skip the operator-session gate?", `REDIRECT_EXEMPT_PREFIXES`
 //! answers "skip the fresh-install bounce to /setup?" -- their
 //! differences are load-bearing, not drift, most visibly at
-//! `/agent-mcp/login`/`/agent-mcp/logout`, auth-bypass ONLY, and
-//! `/agent-mcp/api/`, redirect-exempt ONLY).
+//! `/conexus/login`/`/conexus/logout`, auth-bypass ONLY, and
+//! `/conexus/api/`, redirect-exempt ONLY).
 //!
 //! **Re-derivation, not a literal port, for the "is this path
 //! public?" EXACT-match set**: Python's `public_route`/
@@ -39,32 +39,32 @@
 /// Prefixes that bypass operator-session gating entirely. Every entry
 /// here is INTENTIONAL -- adding a new one should come with a written
 /// justification in the PR body. See this module's own doc for why
-/// `/agent-mcp/login`/`/agent-mcp/logout`/`/agent-mcp/setup`/
-/// `/agent-mcp/assets/`/`/agent-mcp/mcp/`/`/agent-mcp/sso/` are each
+/// `/conexus/login`/`/conexus/logout`/`/conexus/setup`/
+/// `/conexus/assets/`/`/conexus/mcp/`/`/conexus/sso/` are each
 /// here.
 pub const UNAUTH_PREFIXES: &[&str] = &[
-    "/agent-mcp/login",
-    "/agent-mcp/logout",
-    "/agent-mcp/setup",
-    "/agent-mcp/assets/",
-    "/agent-mcp/mcp/",
-    "/agent-mcp/sso/",
+    "/conexus/login",
+    "/conexus/logout",
+    "/conexus/setup",
+    "/conexus/assets/",
+    "/conexus/mcp/",
+    "/conexus/sso/",
 ];
 
-/// Exact paths that bypass auth -- the bare `/agent-mcp` landing
-/// redirect (NOT `/agent-mcp/` itself, which must still run the real
+/// Exact paths that bypass auth -- the bare `/conexus` landing
+/// redirect (NOT `/conexus/` itself, which must still run the real
 /// redirect handler).
-pub const UNAUTH_EXACT: &[&str] = &["/agent-mcp"];
+pub const UNAUTH_EXACT: &[&str] = &["/conexus"];
 
 /// Paths that must remain reachable while the `users` table is empty
 /// (the first-boot setup wizard bounce). See the Python module's own
 /// doc for why each entry is exempt.
 pub const REDIRECT_EXEMPT_PREFIXES: &[&str] = &[
-    "/agent-mcp/setup",
-    "/agent-mcp/assets/",
-    "/agent-mcp/api/",
-    "/agent-mcp/mcp/",
-    "/agent-mcp/sso/",
+    "/conexus/setup",
+    "/conexus/assets/",
+    "/conexus/api/",
+    "/conexus/mcp/",
+    "/conexus/sso/",
 ];
 
 /// Shared prefix matcher for the two policy tuples above.
@@ -107,7 +107,7 @@ pub const NON_PROJECT_API_SEGMENTS: &[&str] = &["router"];
 /// resolution) is a later PR's job (the project-registry's own
 /// resolver).
 pub fn project_segment_from_path(path: &str) -> Option<&str> {
-    for base in ["/agent-mcp/api/", "/agent-mcp/app/"] {
+    for base in ["/conexus/api/", "/conexus/app/"] {
         let Some(rest) = path.strip_prefix(base) else {
             continue;
         };
@@ -129,7 +129,7 @@ pub fn project_segment_from_path(path: &str) -> Option<&str> {
 
 /// ADR-0021 delivery transport: the per-agent fallback channel. These
 /// two project-scoped routes are authenticated by the AGENT BEARER at
-/// the backend, exactly like `/agent-mcp/mcp/` -- NOT by an operator
+/// the backend, exactly like `/conexus/mcp/` -- NOT by an operator
 /// session -- so they skip both the operator-session gate and the
 /// Accept-version gate, while every OTHER `/api/<project>/...` route
 /// keeps both. Deliberately tight so it can't reach any other project
@@ -153,13 +153,13 @@ pub fn is_delivery(project_segment: &str, rest: &str) -> bool {
 }
 
 /// True iff the canonical `path` is a delivery route -- matches
-/// `^/agent-mcp/api/(?P<project>[^/]+)/(?P<rest>delivery/[^/]+/?)$`
+/// `^/conexus/api/(?P<project>[^/]+)/(?P<rest>delivery/[^/]+/?)$`
 /// exactly (a project segment, then `delivery/`, then exactly one more
 /// segment, optional trailing slash, end of string) and delegates to
 /// [`is_delivery`] so this path-only check and `is_delivery`'s
 /// split-match-info check can never disagree.
 pub fn is_delivery_path(path: &str) -> bool {
-    let Some(after_api) = path.strip_prefix("/agent-mcp/api/") else {
+    let Some(after_api) = path.strip_prefix("/conexus/api/") else {
         return false;
     };
     let Some((project, tail)) = after_api.split_once('/') else {
@@ -184,21 +184,21 @@ mod tests {
 
     #[test]
     fn unauth_exact_and_prefixes_gate_the_documented_paths() {
-        assert!(is_unauth_path("/agent-mcp", &[]));
-        assert!(is_unauth_path("/agent-mcp/login", &[]));
-        assert!(is_unauth_path("/agent-mcp/assets/app.css", &[]));
-        assert!(!is_unauth_path("/agent-mcp/api/tasks", &[]));
-        // Bare `/agent-mcp/` (trailing slash) is NOT in UNAUTH_EXACT --
+        assert!(is_unauth_path("/conexus", &[]));
+        assert!(is_unauth_path("/conexus/login", &[]));
+        assert!(is_unauth_path("/conexus/assets/app.css", &[]));
+        assert!(!is_unauth_path("/conexus/api/tasks", &[]));
+        // Bare `/conexus/` (trailing slash) is NOT in UNAUTH_EXACT --
         // Python deliberately lets the redirect handler run.
-        assert!(!is_unauth_path("/agent-mcp/", &[]));
+        assert!(!is_unauth_path("/conexus/", &[]));
     }
 
     #[test]
     fn is_unauth_path_honours_the_caller_supplied_derived_set() {
-        assert!(!is_unauth_path("/agent-mcp/api/router/health", &[]));
+        assert!(!is_unauth_path("/conexus/api/router/health", &[]));
         assert!(is_unauth_path(
-            "/agent-mcp/api/router/health",
-            &["/agent-mcp/api/router/health"]
+            "/conexus/api/router/health",
+            &["/conexus/api/router/health"]
         ));
     }
 
@@ -206,26 +206,26 @@ mod tests {
     fn unauth_and_redirect_exempt_deliberately_diverge() {
         // login/logout: auth-bypass ONLY (an operator must be able to
         // log back in), never redirect-exempt.
-        assert!(is_unauth_path("/agent-mcp/login", &[]));
-        assert!(!is_redirect_exempt("/agent-mcp/login"));
+        assert!(is_unauth_path("/conexus/login", &[]));
+        assert!(!is_redirect_exempt("/conexus/login"));
         // /api/: redirect-exempt ONLY (machine-to-machine, never
         // bounced to the HTML wizard), never blanket auth-bypass.
-        assert!(is_redirect_exempt("/agent-mcp/api/tasks"));
-        assert!(!is_unauth_path("/agent-mcp/api/tasks", &[]));
+        assert!(is_redirect_exempt("/conexus/api/tasks"));
+        assert!(!is_unauth_path("/conexus/api/tasks", &[]));
     }
 
     #[test]
     fn project_segment_from_path_extracts_from_both_prefixes() {
         assert_eq!(
-            project_segment_from_path("/agent-mcp/api/myproject/tasks"),
+            project_segment_from_path("/conexus/api/myproject/tasks"),
             Some("myproject")
         );
         assert_eq!(
-            project_segment_from_path("/agent-mcp/app/myproject/"),
+            project_segment_from_path("/conexus/app/myproject/"),
             Some("myproject")
         );
         assert_eq!(
-            project_segment_from_path("/agent-mcp/api/myproject"),
+            project_segment_from_path("/conexus/api/myproject"),
             Some("myproject")
         );
     }
@@ -233,15 +233,15 @@ mod tests {
     #[test]
     fn project_segment_from_path_excludes_the_reserved_router_segment() {
         assert_eq!(
-            project_segment_from_path("/agent-mcp/api/router/health"),
+            project_segment_from_path("/conexus/api/router/health"),
             None
         );
     }
 
     #[test]
     fn project_segment_from_path_is_none_outside_project_scoped_prefixes() {
-        assert_eq!(project_segment_from_path("/agent-mcp/login"), None);
-        assert_eq!(project_segment_from_path("/agent-mcp/api/"), None);
+        assert_eq!(project_segment_from_path("/conexus/login"), None);
+        assert_eq!(project_segment_from_path("/conexus/api/"), None);
     }
 
     #[test]
@@ -260,14 +260,12 @@ mod tests {
 
     #[test]
     fn is_delivery_path_matches_the_real_url_shape() {
-        assert!(is_delivery_path("/agent-mcp/api/myproject/delivery/stream"));
-        assert!(is_delivery_path(
-            "/agent-mcp/api/myproject/delivery/status/"
-        ));
+        assert!(is_delivery_path("/conexus/api/myproject/delivery/stream"));
+        assert!(is_delivery_path("/conexus/api/myproject/delivery/status/"));
         assert!(!is_delivery_path(
-            "/agent-mcp/api/myproject/delivery/stream/extra"
+            "/conexus/api/myproject/delivery/stream/extra"
         ));
-        assert!(!is_delivery_path("/agent-mcp/api/router/delivery/stream"));
-        assert!(!is_delivery_path("/agent-mcp/api/myproject/tasks"));
+        assert!(!is_delivery_path("/conexus/api/router/delivery/stream"));
+        assert!(!is_delivery_path("/conexus/api/myproject/tasks"));
     }
 }

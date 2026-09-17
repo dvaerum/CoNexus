@@ -292,7 +292,7 @@ fn within_title_hold(msg_ts: &str, now_iso: &str) -> bool {
 /// after `since`, plus the message-truncation boundary. Port of
 /// `_collect_events_with_cap`.
 ///
-/// `get_env` resolves `AGENT_MCP_SUBJECT_MODEL` (the AI subject-gen
+/// `get_env` resolves `CONEXUS_SUBJECT_MODEL` (the AI subject-gen
 /// on/off flag) -- an explicit lookup, not a direct `std::env::var`
 /// read, matching this workspace's established convention for sidestepping
 /// `cargo test`'s parallel-thread env-var-race hazard (see
@@ -347,7 +347,7 @@ pub async fn collect_events_with_cap(
         let mut messages_truncated = (msg_rows.len() as i64) >= MESSAGE_EVENT_QUERY_CAP;
         let mut msg_cap_ts: Option<String> = msg_rows.last().map(|r| r.timestamp.clone());
 
-        let gen_on = get_env("AGENT_MCP_SUBJECT_MODEL").is_some_and(|v| !v.trim().is_empty());
+        let gen_on = get_env("CONEXUS_SUBJECT_MODEL").is_some_and(|v| !v.trim().is_empty());
         let mut last_emitted_ts: Option<String> = None;
 
         for row in &msg_rows {
@@ -1343,8 +1343,7 @@ mod tests {
         assert_eq!(off.events.len(), 1);
 
         // subject-gen ON, still within the 120s hold window: held.
-        let get_env_on =
-            |k: &str| (k == "AGENT_MCP_SUBJECT_MODEL").then(|| "some-model".to_string());
+        let get_env_on = |k: &str| (k == "CONEXUS_SUBJECT_MODEL").then(|| "some-model".to_string());
         let held = collect_events_with_cap(
             &conn,
             &sea_orm_db,

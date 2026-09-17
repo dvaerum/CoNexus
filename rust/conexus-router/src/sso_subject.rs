@@ -542,7 +542,7 @@ mod tests {
     fn fuzz_pairs(seed: u64, count: usize) -> Vec<(String, SsoSubjectValue)> {
         let issuers = [
             "https://idp.example.test",
-            "https://keycloak.corp.example/realms/agent-mcp",
+            "https://keycloak.corp.example/realms/conexus",
             "https://accounts.google.com",
             "http-less-issuer",
             "https://idp.example.test:8443/oidc",

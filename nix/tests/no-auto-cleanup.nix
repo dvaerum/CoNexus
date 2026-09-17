@@ -86,20 +86,20 @@ pkgs.testers.nixosTest {
           "HOME=/home/testuser"
           "XDG_RUNTIME_DIR=/run/user/1500"
           # The launcher and router must agree on the backend socket
-          # path. Without AGENT_MCP_SOCK_DIR the launcher falls back to
+          # path. Without CONEXUS_SOCK_DIR the launcher falls back to
           # ``$XDG_RUNTIME_DIR/agent-mcp`` (= /run/user/1500/...), which
           # this session-less system user can't create (mkdir EACCES) —
           # and even if it could, the backend would bind a socket the
-          # router (AGENT_MCP_SOCK_DIR=/run/agent-mcp) never looks at.
+          # router (CONEXUS_SOCK_DIR=/run/agent-mcp) never looks at.
           # Pin both to the router's dir. Mirrors production
           # `nix/module.nix` (multi mode), which sets these on the
           # template too.
-          "AGENT_MCP_SOCK_DIR=/run/agent-mcp"
-          "AGENT_MCP_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
+          "CONEXUS_SOCK_DIR=/run/agent-mcp"
+          "CONEXUS_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
           "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
           "OPENAI_API_KEY=fake"
-          "AGENT_MCP_EMBEDDING_MODEL=fake-zero-vector"
-          "AGENT_MCP_EMBEDDING_DIMENSION=1024"
+          "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
+          "CONEXUS_EMBEDDING_DIMENSION=1024"
         ];
         RuntimeDirectory = "agent-mcp/%i";
         RuntimeDirectoryMode = "0700";
@@ -135,23 +135,23 @@ pkgs.testers.nixosTest {
       after = [ "fake-openai.service" "network.target" ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
-        AGENT_MCP_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
+        CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
         # Phase 1 PR C: see single-tenant.nix.
-        AGENT_MCP_BOOTSTRAP_USERNAME = "ci-sentinel";
-        AGENT_MCP_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
+        CONEXUS_BOOTSTRAP_USERNAME = "ci-sentinel";
+        CONEXUS_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
         # The template unit is a SYSTEM service and the router runs as
         # an unprivileged user, so lazy-spawn must drive the system bus
         # (`systemctl start`, authorised by the polkit rule below) —
         # NOT `systemctl --user`, which would target testuser's own
         # systemd instance where no conexus@ unit exists. Mirrors
         # production `nix/module.nix`.
-        AGENT_MCP_SYSTEMCTL_MODE = "system";
-        AGENT_MCP_ROUTER_HOST = "0.0.0.0";
+        CONEXUS_SYSTEMCTL_MODE = "system";
+        CONEXUS_ROUTER_HOST = "0.0.0.0";
         # `--default-workspace` has no CLI-flag equivalent on
         # `conexus-router` (env-var-only); without it, projects created
         # via __create/api/router/projects would land under the wrong
         # fallback path (see home-manager-module.nix's own comment).
-        AGENT_MCP_DEFAULT_WORKSPACE = "/home/testuser/projects";
+        CONEXUS_DEFAULT_WORKSPACE = "/home/testuser/projects";
       };
       serviceConfig = {
         Type = "simple";
@@ -211,21 +211,21 @@ pkgs.testers.nixosTest {
     machine.succeed(
         "curl -fsS -c /tmp/agent-mcp-cookies.txt "
         "--data 'username=ci-sentinel&password=ci-sentinel-pw' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/login"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/login"
     )
 
     # 1. Register a project so a backend gets lazy-spawned (ADR 0014:
     # POST /api/router/projects with a JSON body).
     machine.succeed(
         "curl -fsSL -b /tmp/agent-mcp-cookies.txt -o /dev/null "
-        "-H 'Accept: application/vnd.agent-mcp.v1+json' "
+        "-H 'Accept: application/vnd.conexus.v1+json' "
         "-H 'Content-Type: application/json' "
         "-X POST --data '{\"name\": \"idle-test\"}' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/router/projects"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
 
     # 2. Force backend startup by hitting the dashboard endpoint —
-    # this routes to /agent-mcp/app/idle-test/ which spawns the
+    # this routes to /conexus/app/idle-test/ which spawns the
     # per-project backend on first contact.
     #
     # SC-R6-1 (round 6): the /app/ warm-start side-effect is now
@@ -241,7 +241,7 @@ pkgs.testers.nixosTest {
     # this test's premise — do not remove it.
     machine.succeed(
         "curl -fsS -b /tmp/agent-mcp-cookies.txt -o /dev/null "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/app/idle-test/"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/app/idle-test/"
     )
 
     # Wait for the per-project backend to come up AND finish schema
@@ -301,9 +301,9 @@ pkgs.testers.nixosTest {
     for _ in range(9):
         machine.succeed(
             "curl -fsS -o /dev/null "
-            "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/idle-test/all-data"
+            "http://127.0.0.1:${toString ports.routerPort}/conexus/api/idle-test/all-data"
             " || curl -fsS -o /dev/null "
-            "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/__api/idle-test/all-data"
+            "http://127.0.0.1:${toString ports.routerPort}/conexus/__api/idle-test/all-data"
             " || true"
         )
         machine.succeed("sleep 20")

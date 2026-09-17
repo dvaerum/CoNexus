@@ -43,9 +43,9 @@ pub const DEFAULT_PERMISSIONS_POLICY: &str =
 pub const HSTS_VALUE: &str = "max-age=63072000; includeSubDomains";
 
 /// Neutral, version-free `Server` banner.
-pub const SERVER_BANNER: &str = "agent-mcp";
+pub const SERVER_BANNER: &str = "conexus";
 
-/// Port of `_csp`: `AGENT_MCP_CSP` overrides the default when set to
+/// Port of `_csp`: `CONEXUS_CSP` overrides the default when set to
 /// a non-empty value (an empty override is treated as unset, matching
 /// Python's `if override else _DEFAULT_CSP` falsy check).
 pub fn csp(env_override: Option<&str>) -> String {

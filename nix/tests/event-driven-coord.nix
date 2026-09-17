@@ -70,25 +70,25 @@ pkgs.testers.nixosTest {
           "XDG_RUNTIME_DIR=/run/user/1500"
           "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
           "OPENAI_API_KEY=fake"
-          "AGENT_MCP_EMBEDDING_MODEL=fake-zero-vector"
-          "AGENT_MCP_EMBEDDING_DIMENSION=1024"
+          "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
+          "CONEXUS_EMBEDDING_DIMENSION=1024"
           # Keep the wake-loop default snappy so the
           # `wait_for_events(timeout=10)` calls in the test don't
           # blow past the polkit-managed unit's grace period. Left in
           # place for `conexus-backend` too even though it is currently
           # unread there (harmless no-op env var, not yet verified
           # whether the Rust wake-loop has an equivalent knob).
-          "AGENT_MCP_EVENT_WAIT_TIMEOUT=60"
+          "CONEXUS_EVENT_WAIT_TIMEOUT=60"
           # Launcher / router share this for socket path discovery.
           # In the VM test we use the systemd RuntimeDirectory at
           # /run/agent-mcp (created with 0700 perms below) instead
           # of XDG_RUNTIME_DIR which testuser can't write to.
-          "AGENT_MCP_SOCK_DIR=/run/agent-mcp"
+          "CONEXUS_SOCK_DIR=/run/agent-mcp"
           # The launcher resolves the project workspace from this file.
           # The HOME-based fallback ($HOME/.config/agent-mcp/…) already
           # matches, but pin it explicitly for parity with the other VM
           # templates (no-auto-cleanup / production module.nix).
-          "AGENT_MCP_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
+          "CONEXUS_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
         ];
         RuntimeDirectory = "agent-mcp/%i";
         RuntimeDirectoryMode = "0700";
@@ -123,21 +123,21 @@ pkgs.testers.nixosTest {
       after = [ "fake-openai.service" "network.target" ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
-        AGENT_MCP_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
+        CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
         # Phase 1 PR C: see single-tenant.nix.
-        AGENT_MCP_BOOTSTRAP_USERNAME = "ci-sentinel";
-        AGENT_MCP_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
-        AGENT_MCP_ROUTER_HOST = "0.0.0.0";
+        CONEXUS_BOOTSTRAP_USERNAME = "ci-sentinel";
+        CONEXUS_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
+        CONEXUS_ROUTER_HOST = "0.0.0.0";
         # `--default-workspace` has no CLI-flag equivalent on
         # `conexus-router` (env-var-only); without it, projects created
         # via __create/api/router/projects would land under the wrong
         # fallback path (see home-manager-module.nix's own comment).
-        AGENT_MCP_DEFAULT_WORKSPACE = "/home/testuser/projects";
+        CONEXUS_DEFAULT_WORKSPACE = "/home/testuser/projects";
         # The router defaults to `systemctl --user`, which matches
         # the nixos-developer-system home-manager deployment. In the
         # VM test the conexus@%i template is system-level, so flip
         # the mode (mirrors nix/module.nix's setting).
-        AGENT_MCP_SYSTEMCTL_MODE = "system";
+        CONEXUS_SYSTEMCTL_MODE = "system";
       };
       serviceConfig = {
         Type = "simple";
@@ -200,14 +200,14 @@ pkgs.testers.nixosTest {
     machine.succeed(
         "curl -fsS -c /tmp/agent-mcp-cookies.txt "
         "--data 'username=ci-sentinel&password=ci-sentinel-pw' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/login"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/login"
     )
     machine.succeed(
         "curl -fsSL -b /tmp/agent-mcp-cookies.txt -o /dev/null "
-        "-H 'Accept: application/vnd.agent-mcp.v1+json' "
+        "-H 'Accept: application/vnd.conexus.v1+json' "
         "-H 'Content-Type: application/json' "
         "-X POST --data '{\"name\": \"coord-test\"}' "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/api/router/projects"
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/api/router/projects"
     )
 
     # Start the per-project backend explicitly. The router would
@@ -228,7 +228,7 @@ pkgs.testers.nixosTest {
     # completes -- the same socket-readiness idiom
     # `orchestrator::ensure::socket_ready()` already uses on the
     # router side. The workspace path is what the create handler
-    # wrote to projects.local.json, which is AGENT_MCP_DEFAULT_WORKSPACE
+    # wrote to projects.local.json, which is CONEXUS_DEFAULT_WORKSPACE
     # / <name> = /home/testuser/projects/coord-test.
     sock_path = "/run/agent-mcp/coord-test/backend.sock"
     machine.wait_until_succeeds(f"test -S {sock_path}", timeout=60)
@@ -322,13 +322,13 @@ pkgs.testers.nixosTest {
         " -H 'Content-Type: application/json' "
         " -H 'Accept: application/json, text/event-stream' "
         " --data @/tmp/init.json "
-        "http://127.0.0.1:${toString ports.routerPort}/agent-mcp/mcp/coord-test",
+        "http://127.0.0.1:${toString ports.routerPort}/conexus/mcp/coord-test",
         timeout=60,
     )
 
     MCP_URL = (
         "http://127.0.0.1:${toString ports.routerPort}"
-        "/agent-mcp/mcp/coord-test"
+        "/conexus/mcp/coord-test"
     )
 
     # `conexus-backend`'s rmcp transport is STATEFUL (a real

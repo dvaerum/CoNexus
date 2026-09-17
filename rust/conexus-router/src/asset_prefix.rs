@@ -26,7 +26,7 @@ use regex::bytes::Regex;
 
 /// The literal sentinel the dashboard build emits at every spot
 /// Next.js would normally bake in `assetPrefix`.
-pub const SENTINEL: &str = "__AGENT_MCP_ASSET_PREFIX__";
+pub const SENTINEL: &str = "__CONEXUS_ASSET_PREFIX__";
 
 /// Next.js's flight-streaming serializer can flush its output buffer
 /// mid-string, splitting the sentinel across a
@@ -37,7 +37,7 @@ pub const SENTINEL: &str = "__AGENT_MCP_ASSET_PREFIX__";
 /// splits the sentinel, every optional group matches zero characters
 /// and the pattern degenerates to the sentinel's literal bytes (no
 /// separate non-split code path to keep in sync). Confirmed against a
-/// real captured split (`__AGENT_MCP_ASSET_PREFIX_` + boundary + `_`)
+/// real captured split (`__CONEXUS_ASSET_PREFIX_` + boundary + `_`)
 /// during this migration's own Firefox-MCP verification.
 static SENTINEL_WITH_OPTIONAL_SPLIT: LazyLock<Regex> = LazyLock::new(|| {
     const BOUNDARY: &str = r#""\]\)</script><script>self\.__next_f\.push\(\[\d+,""#;
@@ -156,9 +156,9 @@ mod tests {
     #[test]
     fn substitutes_a_plain_contiguous_occurrence() {
         let body = format!("<script>var p = \"{SENTINEL}\";</script>").into_bytes();
-        let out = substitute_asset_prefix(&body, "/agent-mcp/__dashboard");
+        let out = substitute_asset_prefix(&body, "/conexus/__dashboard");
         let out_str = String::from_utf8(out).unwrap();
-        assert!(out_str.contains("/agent-mcp/__dashboard"));
+        assert!(out_str.contains("/conexus/__dashboard"));
         assert!(!out_str.contains(SENTINEL));
     }
 
@@ -195,12 +195,12 @@ mod tests {
         payload.extend_from_slice(tail.as_bytes());
         payload.extend_from_slice(b"/_next/static/css/c916fe8822084f8b.css\"])");
 
-        let out = substitute_asset_prefix(&payload, "/agent-mcp/assets");
+        let out = substitute_asset_prefix(&payload, "/conexus/assets");
         assert!(!contains_subslice(&out, SENTINEL.as_bytes()));
         assert!(!contains_subslice(&out, head.as_bytes()));
         assert!(contains_subslice(
             &out,
-            b"/agent-mcp/assets/_next/static/css/c916fe8822084f8b.css"
+            b"/conexus/assets/_next/static/css/c916fe8822084f8b.css"
         ));
     }
 
@@ -267,10 +267,10 @@ mod tests {
 
         let cache = AssetPrefixCache::new();
         let out = cache
-            .substitute_file_bytes(&path, "/agent-mcp/__dashboard")
+            .substitute_file_bytes(&path, "/conexus/__dashboard")
             .unwrap();
         let out_str = String::from_utf8(out).unwrap();
-        assert_eq!(out_str, "<html>/agent-mcp/__dashboard</html>");
+        assert_eq!(out_str, "<html>/conexus/__dashboard</html>");
     }
 
     #[test]

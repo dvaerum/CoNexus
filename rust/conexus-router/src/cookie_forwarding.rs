@@ -1,9 +1,9 @@
 //! Cookie -> forwarding-header role resolution for `mcp_handler::
-//! backend_api_handler`'s REST proxy path (`/agent-mcp/api/<project>/*`
+//! backend_api_handler`'s REST proxy path (`/conexus/api/<project>/*`
 //! -- the dashboard's `all-data`/`events` calls). Closes the gap
 //! `mcp_handler.rs`'s own module doc and `proxy_core.rs`'s own module
 //! doc both flag: `backend_api_handler` forwarded a browser's
-//! `agent_mcp_session` cookie to `conexus-backend` with no forwarding-
+//! `conexus_session` cookie to `conexus-backend` with no forwarding-
 //! header bridge at all, and the Rust backend's `rest_gate`/
 //! `rest_principal` (2026-09-05, Phase E1) deliberately dropped the
 //! raw-cookie admission door Python's old `require_operator_session`
@@ -173,13 +173,13 @@ mod tests {
     fn an_empty_or_garbage_cookie_resolves_to_none() {
         let c = conn();
         assert!(
-            resolve_cookie_project_role(&c, Some("agent_mcp_session="), "proj-a", now_dt())
+            resolve_cookie_project_role(&c, Some("conexus_session="), "proj-a", now_dt())
                 .unwrap()
                 .is_none()
         );
         assert!(resolve_cookie_project_role(
             &c,
-            Some("agent_mcp_session=not-a-real-session"),
+            Some("conexus_session=not-a-real-session"),
             "proj-a",
             now_dt()
         )

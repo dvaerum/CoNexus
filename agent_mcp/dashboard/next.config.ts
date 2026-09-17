@@ -61,12 +61,12 @@ const nextConfig: NextConfig = {
   // Asset prefix for deployments behind a path-prefixed reverse proxy.
   //
   // Phase 4 (prancy-napping-pie): the default is now a literal
-  // *sentinel* string (`__AGENT_MCP_ASSET_PREFIX__`) instead of an
+  // *sentinel* string (`__CONEXUS_ASSET_PREFIX__`) instead of an
   // empty string or a baked-in path. Next.js embeds whatever this
   // resolves to in HTML, JS chunks, and CSS files at build time; the
   // sentinel is then substituted at *serve* time by
-  // `agent_mcp/router/asset_prefix.py` with the operator's configured
-  // runtime prefix.
+  // `rust/conexus-router/src/asset_prefix.rs` with the operator's
+  // configured runtime prefix.
   //
   // This inversion (prefix-agnostic build + runtime substitution)
   // means one build artifact serves every deployment URL — operators
@@ -78,7 +78,7 @@ const nextConfig: NextConfig = {
   // before `npm run build`). Nix / CI / production builds MUST NOT
   // set the env var — let the sentinel default fire so the router
   // can do its job.
-  assetPrefix: process.env.ASSET_PREFIX || '__AGENT_MCP_ASSET_PREFIX__',
+  assetPrefix: process.env.ASSET_PREFIX || '__CONEXUS_ASSET_PREFIX__',
 
   // Inline the resolved product version so client components (the sidebar
   // footer) read it via process.env at build time. See resolveVersion().

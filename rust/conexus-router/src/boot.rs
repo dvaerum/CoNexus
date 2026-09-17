@@ -23,14 +23,14 @@ use rusqlite::Connection;
 use crate::rate_limit;
 
 /// Production default -- port of `_DEFAULT_ROUTER_DB`.
-const DEFAULT_ROUTER_DB: &str = "/var/lib/agent-mcp/router.db";
+const DEFAULT_ROUTER_DB: &str = "/var/lib/conexus/router.db";
 
 /// Port of `migrations_runner.get_router_db_path`. `get_env` matches
 /// this crate's own established convention (`rate_limit::
 /// RateLimitConfig::resolve`) -- resolves fresh, no process-wide
 /// cache.
 pub fn router_db_path(get_env: impl Fn(&str) -> Option<String>) -> PathBuf {
-    get_env("AGENT_MCP_ROUTER_DB")
+    get_env("CONEXUS_ROUTER_DB")
         .filter(|s| !s.is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(DEFAULT_ROUTER_DB))
@@ -63,8 +63,8 @@ pub async fn apply_baseline_migration(sea_orm_db: &sea_orm::DatabaseConnection) 
 /// implement it -- was retired and a VM test's env-var-seeded
 /// `ci-sentinel` login started failing for real).
 ///
-/// Bootstrap fires only when both `AGENT_MCP_BOOTSTRAP_USERNAME` and
-/// `AGENT_MCP_BOOTSTRAP_PASSWORD` are set (one alone is a typo, not a
+/// Bootstrap fires only when both `CONEXUS_BOOTSTRAP_USERNAME` and
+/// `CONEXUS_BOOTSTRAP_PASSWORD` are set (one alone is a typo, not a
 /// half-bootstrap) AND the `users` table is empty. Both env vars are
 /// stripped from the process environment afterwards regardless of
 /// outcome (mirrors Python's own `try/finally` -- a leaked bootstrap
@@ -92,8 +92,8 @@ pub async fn bootstrap_operator_from_env(
     get_env: impl Fn(&str) -> Option<String>,
     unset_env: impl Fn(&str),
 ) -> Result<()> {
-    let username = get_env("AGENT_MCP_BOOTSTRAP_USERNAME");
-    let password = get_env("AGENT_MCP_BOOTSTRAP_PASSWORD");
+    let username = get_env("CONEXUS_BOOTSTRAP_USERNAME");
+    let password = get_env("CONEXUS_BOOTSTRAP_PASSWORD");
 
     let result = if let (Some(username), Some(password)) = (&username, &password) {
         bootstrap_operator(db, username, password, registered_projects).await
@@ -104,8 +104,8 @@ pub async fn bootstrap_operator_from_env(
     // Strip even on error/never-attempted-but-one-var-set -- a
     // present bootstrap password must never survive into this
     // process's later lifetime regardless of what happened.
-    unset_env("AGENT_MCP_BOOTSTRAP_USERNAME");
-    unset_env("AGENT_MCP_BOOTSTRAP_PASSWORD");
+    unset_env("CONEXUS_BOOTSTRAP_USERNAME");
+    unset_env("CONEXUS_BOOTSTRAP_PASSWORD");
 
     result
 }
@@ -152,14 +152,14 @@ async fn bootstrap_operator(
 
     eprintln!(
         "conexus-router: bootstrapped first operator {username:?} from \
-         AGENT_MCP_BOOTSTRAP_USERNAME/PASSWORD env vars."
+         CONEXUS_BOOTSTRAP_USERNAME/PASSWORD env vars."
     );
     Ok(())
 }
 
 /// A resolved bind host -- port of `_resolve_bind_host`'s own
 /// single-string-or-list return shape. A comma-separated
-/// `AGENT_MCP_ROUTER_HOST` binds MULTIPLE explicit hosts (tighter than
+/// `CONEXUS_ROUTER_HOST` binds MULTIPLE explicit hosts (tighter than
 /// `0.0.0.0`); a single value stays a bare string; present-but-empty
 /// (or unset, matching Python's own `default="127.0.0.1"`) resolves
 /// to the documented default.
@@ -179,7 +179,7 @@ pub enum BindHost {
 /// matching Python's own `click` default) is distinguished from a
 /// present-but-empty value.
 pub fn resolve_bind_host(get_env: impl Fn(&str) -> Option<String>) -> BindHost {
-    let raw = get_env("AGENT_MCP_ROUTER_HOST").unwrap_or_else(|| "127.0.0.1".to_string());
+    let raw = get_env("CONEXUS_ROUTER_HOST").unwrap_or_else(|| "127.0.0.1".to_string());
     let parts: Vec<String> = raw
         .split(',')
         .map(str::trim)
@@ -235,26 +235,25 @@ pub fn assert_startup_safe(
     get_env: impl Fn(&str) -> Option<String>,
 ) -> Result<(), String> {
     let loopback = host_is_loopback(host);
-    let allow_insecure =
-        rate_limit::env_truthy(get_env("AGENT_MCP_ALLOW_INSECURE_BIND").as_deref());
+    let allow_insecure = rate_limit::env_truthy(get_env("CONEXUS_ALLOW_INSECURE_BIND").as_deref());
     if single_tenant_name.is_some() && !loopback && !allow_insecure {
         return Err(format!(
             "Refusing to start: single-tenant mode disables operator authentication, but the \
              router is binding a non-loopback host ({host:?}). This would publish an \
              unauthenticated admin dashboard to the network. Fix one of:\n  * bind loopback \
-             (unset AGENT_MCP_ROUTER_HOST or set it to 127.0.0.1) and front the router with a \
+             (unset CONEXUS_ROUTER_HOST or set it to 127.0.0.1) and front the router with a \
              trusted reverse proxy, OR\n  * run in multi-tenant mode (drop --single-tenant) so \
              the operator-session gate is enforced, OR\n  * if this bind is genuinely isolated \
              (e.g. a qemu guest reachable only via host port-forwarding), set \
-             AGENT_MCP_ALLOW_INSECURE_BIND=1 to acknowledge the risk."
+             CONEXUS_ALLOW_INSECURE_BIND=1 to acknowledge the risk."
         ));
     }
     Ok(())
 }
 
 /// `Some(warning message)` iff the bind is non-loopback with no TLS
-/// signal (neither `AGENT_MCP_REQUIRE_SECURE_COOKIES` nor an
-/// `https://` `AGENT_MCP_EXTERNAL_URL`) -- port of
+/// signal (neither `CONEXUS_REQUIRE_SECURE_COOKIES` nor an
+/// `https://` `CONEXUS_EXTERNAL_URL`) -- port of
 /// `_assert_startup_safe`'s own non-fatal warning half. Split into
 /// its own function (rather than a side-effecting `log::warn!` inside
 /// `assert_startup_safe`) so the decision stays pure and testable;
@@ -267,8 +266,8 @@ pub fn secure_cookie_warning(
         return None;
     }
     let require_secure =
-        rate_limit::env_truthy(get_env("AGENT_MCP_REQUIRE_SECURE_COOKIES").as_deref());
-    let https_signal = get_env("AGENT_MCP_EXTERNAL_URL")
+        rate_limit::env_truthy(get_env("CONEXUS_REQUIRE_SECURE_COOKIES").as_deref());
+    let https_signal = get_env("CONEXUS_EXTERNAL_URL")
         .map(|u| u.to_lowercase().starts_with("https://"))
         .unwrap_or(false);
     if require_secure || https_signal {
@@ -276,9 +275,9 @@ pub fn secure_cookie_warning(
     }
     Some(format!(
         "Router is binding a non-loopback host ({host:?}) with no TLS signal: \
-         AGENT_MCP_REQUIRE_SECURE_COOKIES is unset and AGENT_MCP_EXTERNAL_URL is not https. \
+         CONEXUS_REQUIRE_SECURE_COOKIES is unset and CONEXUS_EXTERNAL_URL is not https. \
          Session cookies will be set WITHOUT the Secure flag. If this deploy is \
-         internet-facing, terminate TLS upstream and set AGENT_MCP_REQUIRE_SECURE_COOKIES=1."
+         internet-facing, terminate TLS upstream and set CONEXUS_REQUIRE_SECURE_COOKIES=1."
     ))
 }
 
@@ -352,14 +351,14 @@ mod tests {
     fn router_db_path_defaults_to_the_production_path() {
         assert_eq!(
             router_db_path(env_map(&[])),
-            PathBuf::from("/var/lib/agent-mcp/router.db")
+            PathBuf::from("/var/lib/conexus/router.db")
         );
     }
 
     #[test]
     fn router_db_path_honours_the_override() {
         assert_eq!(
-            router_db_path(env_map(&[("AGENT_MCP_ROUTER_DB", "/tmp/test-router.db")])),
+            router_db_path(env_map(&[("CONEXUS_ROUTER_DB", "/tmp/test-router.db")])),
             PathBuf::from("/tmp/test-router.db")
         );
     }
@@ -375,21 +374,21 @@ mod tests {
 
     #[test]
     fn resolve_bind_host_empty_value_binds_all_interfaces() {
-        let host = resolve_bind_host(env_map(&[("AGENT_MCP_ROUTER_HOST", "")]));
+        let host = resolve_bind_host(env_map(&[("CONEXUS_ROUTER_HOST", "")]));
         assert_eq!(host, BindHost::AllInterfaces);
         assert!(!host_is_loopback(&host));
     }
 
     #[test]
     fn resolve_bind_host_whitespace_only_binds_all_interfaces() {
-        let host = resolve_bind_host(env_map(&[("AGENT_MCP_ROUTER_HOST", "   ")]));
+        let host = resolve_bind_host(env_map(&[("CONEXUS_ROUTER_HOST", "   ")]));
         assert_eq!(host, BindHost::AllInterfaces);
     }
 
     #[test]
     fn resolve_bind_host_splits_a_comma_separated_multi_host_value() {
         let host = resolve_bind_host(env_map(&[(
-            "AGENT_MCP_ROUTER_HOST",
+            "CONEXUS_ROUTER_HOST",
             "127.0.0.1, 10.14.255.10",
         )]));
         assert_eq!(
@@ -403,7 +402,7 @@ mod tests {
 
     #[test]
     fn host_is_loopback_true_for_a_uds_path() {
-        let host = BindHost::Hosts(vec!["/run/agent-mcp/router.sock".to_string()]);
+        let host = BindHost::Hosts(vec!["/run/conexus/router.sock".to_string()]);
         assert!(host_is_loopback(&host));
     }
 
@@ -460,7 +459,7 @@ mod tests {
         assert!(assert_startup_safe(
             Some("demo"),
             &host,
-            env_map(&[("AGENT_MCP_ALLOW_INSECURE_BIND", "true")])
+            env_map(&[("CONEXUS_ALLOW_INSECURE_BIND", "true")])
         )
         .is_ok());
     }
@@ -484,7 +483,7 @@ mod tests {
         let host = BindHost::AllInterfaces;
         assert!(secure_cookie_warning(
             &host,
-            env_map(&[("AGENT_MCP_REQUIRE_SECURE_COOKIES", "true")])
+            env_map(&[("CONEXUS_REQUIRE_SECURE_COOKIES", "true")])
         )
         .is_none());
     }
@@ -494,7 +493,7 @@ mod tests {
         let host = BindHost::AllInterfaces;
         assert!(secure_cookie_warning(
             &host,
-            env_map(&[("AGENT_MCP_EXTERNAL_URL", "https://agent-mcp.example.test")])
+            env_map(&[("CONEXUS_EXTERNAL_URL", "https://conexus.example.test")])
         )
         .is_none());
     }
@@ -539,11 +538,8 @@ mod tests {
             &db,
             &["proj-a".to_string()],
             env_map(&[
-                ("AGENT_MCP_BOOTSTRAP_USERNAME", "ci-sentinel"),
-                (
-                    "AGENT_MCP_BOOTSTRAP_PASSWORD",
-                    "correct horse battery staple",
-                ),
+                ("CONEXUS_BOOTSTRAP_USERNAME", "ci-sentinel"),
+                ("CONEXUS_BOOTSTRAP_PASSWORD", "correct horse battery staple"),
             ]),
             unset,
         )
@@ -562,8 +558,8 @@ mod tests {
         assert_eq!(
             *calls.lock().unwrap(),
             vec![
-                "AGENT_MCP_BOOTSTRAP_USERNAME".to_string(),
-                "AGENT_MCP_BOOTSTRAP_PASSWORD".to_string()
+                "CONEXUS_BOOTSTRAP_USERNAME".to_string(),
+                "CONEXUS_BOOTSTRAP_PASSWORD".to_string()
             ],
             "both bootstrap env vars must be unset after a successful bootstrap"
         );
@@ -590,11 +586,8 @@ mod tests {
             &db,
             &[],
             env_map(&[
-                ("AGENT_MCP_BOOTSTRAP_USERNAME", "ci-sentinel"),
-                (
-                    "AGENT_MCP_BOOTSTRAP_PASSWORD",
-                    "correct horse battery staple",
-                ),
+                ("CONEXUS_BOOTSTRAP_USERNAME", "ci-sentinel"),
+                ("CONEXUS_BOOTSTRAP_PASSWORD", "correct horse battery staple"),
             ]),
             unset,
         )
@@ -613,8 +606,8 @@ mod tests {
         assert_eq!(
             *calls.lock().unwrap(),
             vec![
-                "AGENT_MCP_BOOTSTRAP_USERNAME".to_string(),
-                "AGENT_MCP_BOOTSTRAP_PASSWORD".to_string()
+                "CONEXUS_BOOTSTRAP_USERNAME".to_string(),
+                "CONEXUS_BOOTSTRAP_PASSWORD".to_string()
             ]
         );
     }
@@ -627,7 +620,7 @@ mod tests {
         bootstrap_operator_from_env(
             &db,
             &[],
-            env_map(&[("AGENT_MCP_BOOTSTRAP_USERNAME", "ci-sentinel")]),
+            env_map(&[("CONEXUS_BOOTSTRAP_USERNAME", "ci-sentinel")]),
             unset,
         )
         .await
@@ -642,8 +635,8 @@ mod tests {
         assert_eq!(
             *calls.lock().unwrap(),
             vec![
-                "AGENT_MCP_BOOTSTRAP_USERNAME".to_string(),
-                "AGENT_MCP_BOOTSTRAP_PASSWORD".to_string()
+                "CONEXUS_BOOTSTRAP_USERNAME".to_string(),
+                "CONEXUS_BOOTSTRAP_PASSWORD".to_string()
             ]
         );
     }
@@ -669,8 +662,8 @@ mod tests {
             &db,
             &[],
             env_map(&[
-                ("AGENT_MCP_BOOTSTRAP_USERNAME", "ci-sentinel"),
-                ("AGENT_MCP_BOOTSTRAP_PASSWORD", "short"),
+                ("CONEXUS_BOOTSTRAP_USERNAME", "ci-sentinel"),
+                ("CONEXUS_BOOTSTRAP_PASSWORD", "short"),
             ]),
             unset,
         )
@@ -685,8 +678,8 @@ mod tests {
         assert_eq!(
             *calls.lock().unwrap(),
             vec![
-                "AGENT_MCP_BOOTSTRAP_USERNAME".to_string(),
-                "AGENT_MCP_BOOTSTRAP_PASSWORD".to_string()
+                "CONEXUS_BOOTSTRAP_USERNAME".to_string(),
+                "CONEXUS_BOOTSTRAP_PASSWORD".to_string()
             ],
             "the vars must still be stripped even when bootstrap fails (matches Python's own try/finally)"
         );

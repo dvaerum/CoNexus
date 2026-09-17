@@ -64,7 +64,15 @@ pub struct AliasInfo {
 /// The header name the router alone is authoritative for signing --
 /// stripped from every inbound request unconditionally (see
 /// [`filter_headers`]).
-pub const FORWARDING_HEADER_NAME: &str = "x-agent-mcp-forwarded-operator";
+///
+/// Lowercase twin of [`conexus_auth::forwarding_header::HEADER_NAME`]
+/// (this crate needs the lowercase wire form for `HeaderName::
+/// from_static`/header-map comparison; that crate needs the
+/// mixed-case display form for `sign`/`verify`'s wire format) -- a
+/// `#[cfg(test)]` assertion below keeps the two from silently
+/// re-diverging the way `X-Agent-MCP-Forwarded-Operator` vs.
+/// `x-agent-mcp-forwarded-operator` once did.
+pub const FORWARDING_HEADER_NAME: &str = "x-conexus-forwarded-operator";
 
 const HOP_BY_HOP_HEADERS: [&str; 6] = [
     "connection",
@@ -357,7 +365,7 @@ pub async fn proxy_to_backend(
     );
     if let Some(alias) = alias_info {
         headers.insert(
-            HeaderName::from_static("x-agent-mcp-alias"),
+            HeaderName::from_static("x-conexus-alias"),
             HeaderValue::from_str(&format!("{},{}", alias.name, alias.expires_at))
                 .expect("alias name/expires_at are always valid header-value bytes"),
         );
@@ -499,6 +507,14 @@ mod tests {
     use hyper_util::rt::TokioIo;
     use std::time::Duration;
 
+    #[test]
+    fn forwarding_header_name_stays_in_sync_with_conexus_auth() {
+        assert_eq!(
+            FORWARDING_HEADER_NAME,
+            conexus_auth::forwarding_header::HEADER_NAME.to_ascii_lowercase()
+        );
+    }
+
     fn registry_with(dir: &Path, name: &str) -> ProjectRegistry {
         let registry = ProjectRegistry::new(dir.join("projects.local.json"));
         let now: DateTime<Utc> = "2026-01-01T00:00:00Z".parse().unwrap();
@@ -536,7 +552,7 @@ mod tests {
         headers.insert("host", HeaderValue::from_static("example.test"));
         headers.insert("content-length", HeaderValue::from_static("5"));
         headers.insert(
-            "X-Agent-MCP-Forwarded-Operator",
+            "X-Conexus-Forwarded-Operator",
             HeaderValue::from_static("stale"),
         );
         headers.insert("authorization", HeaderValue::from_static("Bearer abc"));
@@ -544,7 +560,7 @@ mod tests {
         let out = filter_headers(&headers);
         assert!(!out.contains_key("host"));
         assert!(!out.contains_key("content-length"));
-        assert!(!out.contains_key("x-agent-mcp-forwarded-operator"));
+        assert!(!out.contains_key("x-conexus-forwarded-operator"));
         assert!(out.contains_key("authorization"));
     }
 
@@ -754,7 +770,7 @@ mod tests {
         spawn_backend(sock_dir.join("proj-a").join("backend.sock"), |req| {
             let alias_header = req
                 .headers()
-                .get("x-agent-mcp-alias")
+                .get("x-conexus-alias")
                 .map(|v| v.to_str().unwrap().to_string())
                 .unwrap_or_default();
             Response::builder()
@@ -806,7 +822,7 @@ mod tests {
         spawn_backend(sock_dir.join("proj-a").join("backend.sock"), |req| {
             let header = req
                 .headers()
-                .get("x-agent-mcp-forwarded-operator")
+                .get("x-conexus-forwarded-operator")
                 .map(|v| v.to_str().unwrap().to_string())
                 .unwrap_or_default();
             Response::builder()
@@ -859,7 +875,7 @@ mod tests {
         spawn_backend(sock_dir.join("proj-a").join("backend.sock"), |req| {
             let header = req
                 .headers()
-                .get("x-agent-mcp-forwarded-operator")
+                .get("x-conexus-forwarded-operator")
                 .map(|v| v.to_str().unwrap().to_string())
                 .unwrap_or_default();
             Response::builder()
@@ -874,7 +890,7 @@ mod tests {
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
         let mut headers = HeaderMap::new();
         headers.insert(
-            "x-agent-mcp-forwarded-operator",
+            "x-conexus-forwarded-operator",
             HeaderValue::from_static("mallory.operator.9999999999.forged"),
         );
 

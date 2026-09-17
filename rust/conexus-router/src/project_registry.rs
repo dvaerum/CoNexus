@@ -1,7 +1,7 @@
 //! Port of `agent_mcp/router/project_registry.py` (892 LOC, Phase E2
 //! PR 5, `conexus-router-project-registry`) -- the locking JSON store
 //! backing `projects.local.json`, the file both the router and
-//! `agent-mcp-launcher` read on every request/boot.
+//! `conexus-launcher` read on every request/boot.
 //!
 //! **Locking strategy**: `flock` (via the `fd-lock` crate) on a
 //! SIDECAR lockfile (`<path>.lock`), never the registry file itself
@@ -187,8 +187,8 @@ fn validate_slug(name: &str, field_label: &str) -> Result<(), RegistryError> {
     }
 }
 
-/// `AGENT_MCP_PROJECTS_FILE` env var if set, else
-/// `<HOME>/.config/agent-mcp/projects.local.json`. `get_env` is an
+/// `CONEXUS_PROJECTS_FILE` env var if set, else
+/// `<HOME>/.config/conexus/projects.local.json`. `get_env` is an
 /// explicit lookup (not a direct `std::env::var` read) matching the
 /// Phase D2 RAG-clients convention -- sidesteps `cargo test`'s
 /// parallel-thread env-var-race hazard, the same bug class already
@@ -200,13 +200,13 @@ fn validate_slug(name: &str, field_label: &str) -> Result<(), RegistryError> {
 /// `#![allow(dead_code)]` during a docs audit; see git blame.
 #[allow(dead_code)]
 pub fn default_registry_path(get_env: impl Fn(&str) -> Option<String>) -> PathBuf {
-    if let Some(p) = get_env("AGENT_MCP_PROJECTS_FILE") {
+    if let Some(p) = get_env("CONEXUS_PROJECTS_FILE") {
         return PathBuf::from(p);
     }
     let home = get_env("HOME").unwrap_or_else(|| "/".to_string());
     Path::new(&home)
         .join(".config")
-        .join("agent-mcp")
+        .join("conexus")
         .join("projects.local.json")
 }
 
@@ -756,7 +756,7 @@ impl ProjectRegistry {
     /// Same as [`Self::resolve_alias`], but also returns the alias
     /// entry's `expires_at` -- `proxy_core.rs` (Phase E2 PR 8) needs
     /// both halves to reconstruct Python's `alias_info` tuple
-    /// (`"<alias_name>,<expires_at>"`, the `X-Agent-MCP-Alias` header
+    /// (`"<alias_name>,<expires_at>"`, the `X-Conexus-Alias` header
     /// value), which `resolve_alias` alone can't provide.
     pub fn resolve_alias_entry(
         &self,
@@ -1316,7 +1316,7 @@ mod tests {
     #[test]
     fn default_registry_path_honours_the_env_override() {
         let path = default_registry_path(|k| {
-            if k == "AGENT_MCP_PROJECTS_FILE" {
+            if k == "CONEXUS_PROJECTS_FILE" {
                 Some("/custom/projects.json".to_string())
             } else {
                 None
@@ -1336,7 +1336,7 @@ mod tests {
         });
         assert_eq!(
             path,
-            PathBuf::from("/home/op/.config/agent-mcp/projects.local.json")
+            PathBuf::from("/home/op/.config/conexus/projects.local.json")
         );
     }
 

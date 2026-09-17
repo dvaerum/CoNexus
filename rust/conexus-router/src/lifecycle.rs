@@ -28,8 +28,8 @@ pub static SLUG_RE: LazyLock<Regex> =
 pub const NAME_MAX: usize = 64;
 
 /// Segments that collide with the router's own top-level path
-/// namespace (`/agent-mcp/api/`, `/agent-mcp/app/`, `/agent-mcp/assets/`,
-/// `/agent-mcp/mcp/`) -- ADR-0014 adds `router`, the single admin-
+/// namespace (`/conexus/api/`, `/conexus/app/`, `/conexus/assets/`,
+/// `/conexus/mcp/`) -- ADR-0014 adds `router`, the single admin-
 /// namespace segment under `/api/router/...`. Rejected at create/
 /// rename time so the registry never holds a name that would collide.
 pub const RESERVED_NAMES: &[&str] = &["api", "app", "assets", "mcp", "router"];
@@ -63,7 +63,7 @@ pub fn validate_name(name: &str, existing: &HashSet<String>) -> Option<String> {
             .join(", ");
         return Some(format!(
             "name {name:?} is reserved — it conflicts with the top-level router \
-             path /agent-mcp/{name}/. Reserved names: {joined}."
+             path /conexus/{name}/. Reserved names: {joined}."
         ));
     }
     if existing.contains(name) {

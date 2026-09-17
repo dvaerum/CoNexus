@@ -144,8 +144,8 @@ let
   conexusLauncher = pkgs.writeShellScriptBin "conexus-launcher" ''
     set -euo pipefail
     name="''${1:?usage: conexus-launcher <instance>}"
-    if [[ -n "''${AGENT_MCP_PROJECTS_FILE:-}" ]]; then
-      loc_file="$AGENT_MCP_PROJECTS_FILE"
+    if [[ -n "''${CONEXUS_PROJECTS_FILE:-}" ]]; then
+      loc_file="$CONEXUS_PROJECTS_FILE"
     else
       cfg_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/agent-mcp"
       loc_file="$cfg_dir/projects.local.json"
@@ -168,7 +168,7 @@ let
       exit 1
     fi
 
-    sock_root="''${AGENT_MCP_SOCK_DIR:-''${XDG_RUNTIME_DIR}/agent-mcp}"
+    sock_root="''${CONEXUS_SOCK_DIR:-''${XDG_RUNTIME_DIR}/agent-mcp}"
     sock="$sock_root/$name/backend.sock"
     forwarding_hmac_in="$sock_root/$name/forwarding_hmac"
     mkdir -p "$(dirname "$sock")"

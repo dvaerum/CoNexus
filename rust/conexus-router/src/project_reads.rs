@@ -40,7 +40,7 @@ pub fn health_response(single_tenant_name: Option<&str>) -> HandlerResponse {
         headers: vec![("Cache-Control".to_string(), "no-store".to_string())],
         body: HandlerBody::Json(serde_json::json!({
             "ok": true,
-            "service": "agent-mcp-router",
+            "service": "conexus-router",
             "mode": if single_tenant_name.is_some() { "single-tenant" } else { "multi-tenant" },
         })),
     }
@@ -454,7 +454,7 @@ mod tests {
             panic!("expected JSON");
         };
         assert_eq!(body["ok"], true);
-        assert_eq!(body["service"], "agent-mcp-router");
+        assert_eq!(body["service"], "conexus-router");
         assert_eq!(body["mode"], "multi-tenant");
     }
 

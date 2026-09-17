@@ -11,7 +11,7 @@
 //! Python's own module doc explains why: this module always wants a
 //! LOCAL Ollama endpoint regardless of whatever provider RAG
 //! embeddings/completions are configured with for this deploy, so the
-//! two config surfaces (`AGENT_MCP_SUBJECT_MODEL`/`AGENT_MCP_LLM_BASE_URL`
+//! two config surfaces (`CONEXUS_SUBJECT_MODEL`/`CONEXUS_LLM_BASE_URL`
 //! here vs. `OPENAI_API_KEY`/`OLLAMA_MODEL` there) are kept genuinely
 //! separate. [`crate::completion_client::CompletionClient`] itself
 //! (the struct + its `chat()` method) IS reused directly -- only the
@@ -39,10 +39,10 @@ fn env_nonempty(get_env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<
         .filter(|v| !v.is_empty())
 }
 
-/// True when `AGENT_MCP_SUBJECT_MODEL` is set (non-empty) -- no model
+/// True when `CONEXUS_SUBJECT_MODEL` is set (non-empty) -- no model
 /// configured means nothing to generate with.
 pub fn subject_model_configured(get_env: &impl Fn(&str) -> Option<String>) -> bool {
-    env_nonempty(get_env, "AGENT_MCP_SUBJECT_MODEL").is_some()
+    env_nonempty(get_env, "CONEXUS_SUBJECT_MODEL").is_some()
 }
 
 /// Trim whitespace, strip enclosing quotes, collapse internal
@@ -69,7 +69,7 @@ fn truncate(subject: &str) -> String {
 
 /// Ask the configured Ollama model for a one-line subject.
 ///
-/// Returns `None` when: `AGENT_MCP_SUBJECT_MODEL` is unset; the HTTP
+/// Returns `None` when: `CONEXUS_SUBJECT_MODEL` is unset; the HTTP
 /// call fails for any reason; or the model returns an empty /
 /// whitespace-only completion. Returns the (trimmed, length-capped)
 /// subject string otherwise.
@@ -77,8 +77,8 @@ pub async fn suggest_subject(
     get_env: impl Fn(&str) -> Option<String>,
     content: &str,
 ) -> Option<String> {
-    let model = env_nonempty(&get_env, "AGENT_MCP_SUBJECT_MODEL")?;
-    let base_url = env_nonempty(&get_env, "AGENT_MCP_LLM_BASE_URL")
+    let model = env_nonempty(&get_env, "CONEXUS_SUBJECT_MODEL")?;
+    let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
         .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
 
     // Head-truncate so the input can never overflow the model's
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn model_configured_when_set_nonempty() {
         assert!(subject_model_configured(&env(&[(
-            "AGENT_MCP_SUBJECT_MODEL",
+            "CONEXUS_SUBJECT_MODEL",
             "qwen2.5:3b-instruct"
         )])));
     }
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn whitespace_only_model_env_counts_as_unconfigured() {
         assert!(!subject_model_configured(&env(&[(
-            "AGENT_MCP_SUBJECT_MODEL",
+            "CONEXUS_SUBJECT_MODEL",
             "   "
         )])));
     }
@@ -183,8 +183,8 @@ mod tests {
         // degrade to None rather than propagate an error.
         let out = suggest_subject(
             env(&[
-                ("AGENT_MCP_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
-                ("AGENT_MCP_LLM_BASE_URL", "http://127.0.0.1:1/v1"),
+                ("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
+                ("CONEXUS_LLM_BASE_URL", "http://127.0.0.1:1/v1"),
             ]),
             "hello world",
         )
@@ -216,15 +216,15 @@ mod tests {
         let base_url = format!("http://{addr}/v1");
         let out = suggest_subject(
             env(&[
-                ("AGENT_MCP_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
-                ("AGENT_MCP_LLM_BASE_URL", &base_url),
+                ("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
+                ("CONEXUS_LLM_BASE_URL", &base_url),
                 // Pins the context window so resolve_subject_input_chars
                 // skips its own `/props` HTTP probe entirely -- this
                 // fake server only ever accepts ONE connection (for
                 // the real /chat/completions call this test is
                 // actually exercising), and an unguarded probe would
                 // consume that single connection first.
-                ("AGENT_MCP_MODEL_CONTEXT_WINDOW", "4096"),
+                ("CONEXUS_MODEL_CONTEXT_WINDOW", "4096"),
             ]),
             "the deploy to staging just failed with a timeout",
         )
@@ -256,10 +256,10 @@ mod tests {
         let base_url = format!("http://{addr}/v1");
         let out = suggest_subject(
             env(&[
-                ("AGENT_MCP_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
-                ("AGENT_MCP_LLM_BASE_URL", &base_url),
+                ("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
+                ("CONEXUS_LLM_BASE_URL", &base_url),
                 // See the sibling test above for why this is pinned.
-                ("AGENT_MCP_MODEL_CONTEXT_WINDOW", "4096"),
+                ("CONEXUS_MODEL_CONTEXT_WINDOW", "4096"),
             ]),
             "hello",
         )

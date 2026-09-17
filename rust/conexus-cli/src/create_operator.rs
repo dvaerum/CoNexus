@@ -18,14 +18,14 @@ use std::path::PathBuf;
 
 use rusqlite::Connection;
 
-/// Resolution order: `AGENT_MCP_ROUTER_DB` env var (test isolation /
+/// Resolution order: `CONEXUS_ROUTER_DB` env var (test isolation /
 /// ops override), else the production default -- port of Python's
 /// `get_router_db_path()`.
 pub fn router_db_path(get_env: impl Fn(&str) -> Option<String>) -> PathBuf {
-    if let Some(p) = get_env("AGENT_MCP_ROUTER_DB") {
+    if let Some(p) = get_env("CONEXUS_ROUTER_DB") {
         return PathBuf::from(p);
     }
-    PathBuf::from("/var/lib/agent-mcp/router.db")
+    PathBuf::from("/var/lib/conexus/router.db")
 }
 
 fn read_password(password_stdin: bool) -> anyhow::Result<String> {
@@ -126,13 +126,13 @@ mod tests {
 
     #[test]
     fn router_db_path_honours_the_env_override() {
-        let path = router_db_path(env(&[("AGENT_MCP_ROUTER_DB", "/tmp/custom-router.db")]));
+        let path = router_db_path(env(&[("CONEXUS_ROUTER_DB", "/tmp/custom-router.db")]));
         assert_eq!(path, PathBuf::from("/tmp/custom-router.db"));
     }
 
     #[test]
     fn router_db_path_falls_back_to_the_production_default() {
         let path = router_db_path(env(&[]));
-        assert_eq!(path, PathBuf::from("/var/lib/agent-mcp/router.db"));
+        assert_eq!(path, PathBuf::from("/var/lib/conexus/router.db"));
     }
 }

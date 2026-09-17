@@ -1,4 +1,4 @@
-//! `X-Agent-MCP-Forwarded-Operator` — the signed header the router
+//! `X-Conexus-Forwarded-Operator` — the signed header the router
 //! attaches when proxying a cookie-authenticated dashboard request to
 //! the per-project backend.
 //!
@@ -19,7 +19,7 @@ use sha2::Sha256;
 use subtle::ConstantTimeEq;
 
 /// The header name the router signs and the backend reads.
-pub const HEADER_NAME: &str = "X-Agent-MCP-Forwarded-Operator";
+pub const HEADER_NAME: &str = "X-Conexus-Forwarded-Operator";
 
 /// Default signature lifetime (`sign`'s default TTL in the Python
 /// source).

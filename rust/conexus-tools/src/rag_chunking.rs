@@ -4,7 +4,7 @@
 //! once the operator confirmed nothing else needed doing first).
 //! Port of `agent_mcp/features/rag/chunking.py`'s `simple_chunker`/
 //! `markdown_aware_chunker` -- the only two chunkers real production
-//! ever uses: `AGENT_MCP_EMBEDDING_DIMENSION`/`--advanced` are never
+//! ever uses: `CONEXUS_EMBEDDING_DIMENSION`/`--advanced` are never
 //! set in the real deploy repo, so `code_chunking.py`'s code-aware
 //! chunker (entity extraction, per-language summaries, ~584 LOC) has
 //! zero real production call site today. Deliberately NOT ported here

@@ -1,5 +1,5 @@
-//! The two real OIDC authorization-code-flow routes: `GET /agent-mcp/
-//! sso/login` (redirect to the IdP) and `GET /agent-mcp/sso/callback`
+//! The two real OIDC authorization-code-flow routes: `GET /conexus/
+//! sso/login` (redirect to the IdP) and `GET /conexus/sso/callback`
 //! (mint the session). Port target: `agent_mcp/router/sso.py`'s
 //! `init_oidc_login_handler`/`handle_oidc_callback`/
 //! `_default_redirect_url`/`_resolve_redirect_url` (Phase E2 PR22
@@ -110,7 +110,7 @@ fn oidc_error_log_line(context: &str, err: &impl std::fmt::Display) -> String {
 }
 
 /// Port of `_default_redirect_url`/`_resolve_redirect_url`. Explicit
-/// config wins, then `AGENT_MCP_EXTERNAL_URL`, then `derived_origin`
+/// config wins, then `CONEXUS_EXTERNAL_URL`, then `derived_origin`
 /// -- the mount-aware origin `RequestMount::external_origin()`
 /// already resolves (the same trusted-proxy-gated host/scheme
 /// composition `login.rs::_external_origin`'s Rust port already
@@ -128,9 +128,9 @@ fn resolve_oidc_redirect_url(
         return configured.clone();
     }
     if let Some(external) = external_url_env.map(str::trim).filter(|s| !s.is_empty()) {
-        return format!("{}/agent-mcp/sso/callback", external.trim_end_matches('/'));
+        return format!("{}/conexus/sso/callback", external.trim_end_matches('/'));
     }
-    format!("{derived_origin}/agent-mcp/sso/callback")
+    format!("{derived_origin}/conexus/sso/callback")
 }
 
 /// The one non-standard claim `CoreIdTokenClaims` never models -- see
@@ -193,7 +193,7 @@ fn resolve_active_oidc_config() -> OidcConfigOutcome {
     }
 }
 
-// ── GET /agent-mcp/sso/login ─────────────────────────────────────────
+// ── GET /conexus/sso/login ─────────────────────────────────────────
 
 pub async fn init_oidc_login_handler(
     OriginalUri(uri): OriginalUri,
@@ -232,7 +232,7 @@ pub async fn init_oidc_login_handler(
 
     let redirect_uri = resolve_oidc_redirect_url(
         &cfg,
-        std::env::var("AGENT_MCP_EXTERNAL_URL").ok().as_deref(),
+        std::env::var("CONEXUS_EXTERNAL_URL").ok().as_deref(),
         &mount_ctx.external_origin(),
     );
     let client =
@@ -282,7 +282,7 @@ pub async fn init_oidc_login_handler(
         .into_response()
 }
 
-// ── GET /agent-mcp/sso/callback ──────────────────────────────────────
+// ── GET /conexus/sso/callback ──────────────────────────────────────
 
 pub async fn handle_oidc_callback(
     OriginalUri(uri): OriginalUri,
@@ -347,7 +347,7 @@ pub async fn handle_oidc_callback(
 
     let redirect_uri = resolve_oidc_redirect_url(
         &cfg,
-        std::env::var("AGENT_MCP_EXTERNAL_URL").ok().as_deref(),
+        std::env::var("CONEXUS_EXTERNAL_URL").ok().as_deref(),
         &mount_ctx.external_origin(),
     );
     let client =
@@ -540,7 +540,7 @@ pub async fn handle_oidc_callback(
 /// wiring passed `cfg.default_is_sysadmin` to BOTH fields, which
 /// silently promoted EVERY subsequent OIDC-JIT-created user to
 /// sysadmin whenever an operator opted into
-/// `AGENT_MCP_SSO_OIDC_DEFAULT_SYSADMIN` -- not just the first, as the
+/// `CONEXUS_SSO_OIDC_DEFAULT_SYSADMIN` -- not just the first, as the
 /// finding's whole premise requires. Extracted as its own pure
 /// function (this crate's own `resolve_oidc_redirect_url` precedent)
 /// so the wiring contract is directly unit-testable without a live
@@ -603,7 +603,7 @@ mod tests {
                 Some("https://env.example.test/"),
                 "https://derived.example.test"
             ),
-            "https://env.example.test/agent-mcp/sso/callback"
+            "https://env.example.test/conexus/sso/callback"
         );
     }
 
@@ -612,7 +612,7 @@ mod tests {
         let cfg = oidc_settings(None);
         assert_eq!(
             resolve_oidc_redirect_url(&cfg, Some("   "), "https://derived.example.test"),
-            "https://derived.example.test/agent-mcp/sso/callback"
+            "https://derived.example.test/conexus/sso/callback"
         );
     }
 
@@ -621,7 +621,7 @@ mod tests {
         let cfg = oidc_settings(None);
         assert_eq!(
             resolve_oidc_redirect_url(&cfg, None, "https://derived.example.test"),
-            "https://derived.example.test/agent-mcp/sso/callback"
+            "https://derived.example.test/conexus/sso/callback"
         );
     }
 
@@ -636,7 +636,7 @@ mod tests {
     // that function honours `default_is_sysadmin` UNCONDITIONALLY,
     // regardless of table emptiness) silently promoted EVERY
     // subsequently JIT-created OIDC user to sysadmin whenever an
-    // operator opted into `AGENT_MCP_SSO_OIDC_DEFAULT_SYSADMIN` -- not
+    // operator opted into `CONEXUS_SSO_OIDC_DEFAULT_SYSADMIN` -- not
     // just the very first bootstrap user the finding's whole premise
     // requires. `sso.py`'s own `find_or_create_sso_user` docstring is
     // the ground truth: "only the proxy-header path passes

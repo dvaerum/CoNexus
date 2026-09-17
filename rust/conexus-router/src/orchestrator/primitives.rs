@@ -155,13 +155,13 @@ pub enum SystemctlMode {
 }
 
 impl SystemctlMode {
-    /// Port of the `AGENT_MCP_SYSTEMCTL_MODE` env-var contract
+    /// Port of the `CONEXUS_SYSTEMCTL_MODE` env-var contract
     /// (case-insensitive, trimmed; anything other than exactly
     /// `"user"` means system mode) -- `get_env` is an explicit lookup,
     /// not a direct `std::env::var` read, matching the Phase D2
     /// RAG-clients / `project_registry.rs` convention.
     pub fn from_env(get_env: impl Fn(&str) -> Option<String>) -> Self {
-        let raw = get_env("AGENT_MCP_SYSTEMCTL_MODE").unwrap_or_else(|| "user".to_string());
+        let raw = get_env("CONEXUS_SYSTEMCTL_MODE").unwrap_or_else(|| "user".to_string());
         if raw.trim().to_lowercase() == "user" {
             SystemctlMode::User
         } else {
@@ -398,7 +398,7 @@ mod tests {
     fn systemctl_mode_from_env_matrix() {
         let case = |v: Option<&str>| {
             SystemctlMode::from_env(|k| {
-                if k == "AGENT_MCP_SYSTEMCTL_MODE" {
+                if k == "CONEXUS_SYSTEMCTL_MODE" {
                     v.map(str::to_string)
                 } else {
                     None
