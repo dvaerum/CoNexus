@@ -34,7 +34,7 @@
 # Project membership is *not* declared in nix. Every project is
 # registered at runtime via POST /conexus/api/router/projects
 # (dashboard form or `curl`, JSON body), recorded in
-# ~/.config/agent-mcp/projects.local.json. The module materialises the
+# ~/.config/conexus/projects.local.json. The module materialises the
 # router + systemd template + the daemon-agent wiring; project list
 # lives outside source control.
 #
@@ -127,7 +127,7 @@ let
 
   # ── Single-tenant ExecStartPre seed ───────────────────────────────
   # When the module is configured for N=1 (`multiTenant = false` +
-  # `singleProject = {…}`), we seed ~/.config/agent-mcp/projects.local.json
+  # `singleProject = {…}`), we seed ~/.config/conexus/projects.local.json
   # with the single declared entry before the router starts. The
   # router's registry reads this file on every request, so without the
   # seed the launcher couldn't resolve <name> → workspace path and the
@@ -141,9 +141,9 @@ let
   # explicit declaration that the file should contain exactly one
   # entry.
   singleProjectSeedScript = lib.mkIf (!cfg.multiTenant) (
-    pkgs.writeShellScript "agent-mcp-single-tenant-seed" ''
+    pkgs.writeShellScript "conexus-single-tenant-seed" ''
       set -euo pipefail
-      cfg_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/agent-mcp"
+      cfg_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/conexus"
       mkdir -p "$cfg_dir"
       file="$cfg_dir/projects.local.json"
       desired='{"${cfg.singleProject.name}":"${cfg.singleProject.workspace}"}'
@@ -386,7 +386,7 @@ in {
 
       defaultWorkspaceParent = lib.mkOption {
         type = lib.types.str;
-        example = "/home/alice/.local/share/agent-mcp/projects";
+        example = "/home/alice/.local/share/conexus/projects";
         description = ''
           Where POST /conexus/api/router/projects puts a project's
           workspace when the user leaves the "Workspace" form field
@@ -638,7 +638,7 @@ in {
           };
           tokenPath = lib.mkOption {
             type = lib.types.str;
-            example = "/home/alice/.config/agent-mcp/tokens/washing-brothers--backend-dev.token";
+            example = "/home/alice/.config/conexus/tokens/washing-brothers--backend-dev.token";
             description = ''
               Absolute path to the file containing the agent's bearer
               token. The file is operator-provisioned; for production
@@ -821,17 +821,17 @@ in {
           Type = "simple";
           Environment = [
             # Router DB lives under XDG_DATA_HOME (default
-            # ~/.local/share/agent-mcp/router.db) -- user-mode units
+            # ~/.local/share/conexus/router.db) -- user-mode units
             # cannot write to conexus-router's own compiled-in
-            # `/var/lib/agent-mcp/router.db` default (that path is the
+            # `/var/lib/conexus/router.db` default (that path is the
             # NixOS system-mode module's user, not this one's).
-            "CONEXUS_ROUTER_DB=${config.xdg.dataHome}/agent-mcp/router.db"
+            "CONEXUS_ROUTER_DB=${config.xdg.dataHome}/conexus/router.db"
             # `--default-workspace` has no CLI-flag equivalent on
             # `conexus-router` (env-var-only, mirroring the retired
             # Python router's own `AGENT_MCP_DEFAULT_WORKSPACE` --
             # see rust/conexus-router/src/main.rs's own
             # `default_workspace_parent()` doc). Without this,
-            # `conexus-router` falls back to `$HOME/.local/share/agent-mcp/projects`,
+            # `conexus-router` falls back to `$HOME/.local/share/conexus/projects`,
             # NOT `cfg.router.defaultWorkspaceParent` -- a real gap this
             # unit had from the day `conexus-router` was first wired in
             # here, masked while `router.impl` still defaulted to
@@ -895,7 +895,7 @@ in {
             let
               commonFlags =
                 "--port ${toString cfg.router.port} "
-                + "--projects-file %h/.config/agent-mcp/projects.local.json "
+                + "--projects-file %h/.config/conexus/projects.local.json "
                 + "--sock-dir %t/conexus "
                 + "--dashboard-dir ${cfg.dashboard.package}/share/agent-mcp-dashboard "
                 + "--external-url ${lib.escapeShellArg cfg.router.externalUrl} "
