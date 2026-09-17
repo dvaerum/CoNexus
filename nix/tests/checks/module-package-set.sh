@@ -37,7 +37,7 @@
 # `conexusLauncherPackage`/`conexusRouterPackage`/
 # `conexusDaemonAgentPackage`) replaced it. Those three options are
 # externally-supplied packages (`nullOr package`) this module never
-# builds itself — they do NOT move with `services.agent-mcp.pkgs` from
+# builds itself — they do NOT move with `services.conexus.pkgs` from
 # THIS module's own point of view (the flake's own `homeModules.default`
 # wrapper is what threads `cfg.pkgs` into building them, one layer up —
 # see `nix/tests/checks/single-source-of-truth.sh`-adjacent coverage for
@@ -110,7 +110,7 @@ braced_block() {
 # test_packages_nix_is_imported_once_from_the_option:
 # The module's single `packages.nix` import is fed from `cfg.pkgs`.
 #
-# This is what makes `services.agent-mcp.pkgs` mean anything: the
+# This is what makes `services.conexus.pkgs` mean anything: the
 # package set goes *in*, before any derivation is built, rather than
 # being patched onto the results.
 import_count=$(grep -o 'import \./packages\.nix' <<<"$MODULE_CODE" | wc -l)
@@ -125,7 +125,7 @@ else
 
   if ! grep -qF 'pkgs = cfg.pkgs;' <<<"$import_block"; then
     echo "FAIL: the packages.nix import must take its package set from " \
-      "\`cfg.pkgs\` (the services.agent-mcp.pkgs option), not from the " \
+      "\`cfg.pkgs\` (the services.conexus.pkgs option), not from the " \
       "module argument — otherwise the option is inert. Import args were:" >&2
     echo "$import_block" >&2
     fail=1
@@ -141,7 +141,7 @@ else
 
   if grep -qF 'inherit pkgs' <<<"$import_block"; then
     echo "FAIL: \`inherit pkgs\` in the packages.nix import pins the build to the " \
-      "consumer's channel and makes services.agent-mcp.pkgs a no-op." >&2
+      "consumer's channel and makes services.conexus.pkgs a no-op." >&2
     fail=1
   fi
 fi
@@ -257,20 +257,20 @@ module_eval=$(NIX_CONFIG="experimental-features = nix-command flakes" \
   || { echo "FAIL: nix eval failed:" >&2; cat "$stderr_file" >&2; exit 1; }
 
 # test_unset_option_is_exactly_todays_behaviour:
-# Leaving `services.agent-mcp.pkgs` unset changes nothing.
+# Leaving `services.conexus.pkgs` unset changes nothing.
 #
 # The option is additive: its default is the module's own `pkgs`, so
 # an unset config and an explicitly-passed consumer set must produce
 # identical store paths.
 if ! jq -e '.unset == .explicit' <<<"$module_eval" >/dev/null; then
-  echo "FAIL: leaving services.agent-mcp.pkgs unset must be byte-identical to " \
+  echo "FAIL: leaving services.conexus.pkgs unset must be byte-identical to " \
     "explicitly passing the module's own pkgs; got a difference:" >&2
   jq '{unset, explicit}' <<<"$module_eval" >&2
   exit 1
 fi
 
 # test_override_reaches_the_dashboard:
-# The dashboard's store path follows `services.agent-mcp.pkgs`.
+# The dashboard's store path follows `services.conexus.pkgs`.
 #
 # This is the assertion the old `package` option would have failed
 # for the Python application it used to build; the dashboard is the
@@ -280,7 +280,7 @@ unset_dashboard=$(jq -r '.unset.dashboardOut' <<<"$module_eval")
 swapped_dashboard=$(jq -r '.swapped.dashboardOut' <<<"$module_eval")
 if [ "$unset_dashboard" = "$swapped_dashboard" ]; then
   echo "FAIL: swapping nodejs in the configured package set did not change " \
-    "the dashboard's store path — services.agent-mcp.pkgs stopped " \
+    "the dashboard's store path — services.conexus.pkgs stopped " \
     "reaching agentMcpDashboard's buildNpmPackage call" >&2
   exit 1
 fi
@@ -309,7 +309,7 @@ fi
 unset_backend_exec=$(jq -r '.unset.backendExecStart' <<<"$module_eval")
 swapped_backend_exec=$(jq -r '.swapped.backendExecStart' <<<"$module_eval")
 if [ "$unset_backend_exec" != "$swapped_backend_exec" ]; then
-  echo "FAIL: backendExecStart changed when only \`services.agent-mcp.pkgs\` " \
+  echo "FAIL: backendExecStart changed when only \`services.conexus.pkgs\` " \
     "moved — conexus@ should be entirely determined by " \
     "conexusLauncherPackage (stubbed identically in both harness " \
     "runs), not by \`cfg.pkgs\`." >&2
@@ -328,7 +328,7 @@ swapped_router_binary="${swapped_router_exec%% *}"
 
 if [ "$unset_router_binary" != "$swapped_router_binary" ]; then
   echo "FAIL: the conexus-router BINARY path changed when only " \
-    "\`services.agent-mcp.pkgs\` moved — it should be entirely " \
+    "\`services.conexus.pkgs\` moved — it should be entirely " \
     "determined by conexusRouterPackage, not by \`cfg.pkgs\`." >&2
   exit 1
 fi

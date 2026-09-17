@@ -29,7 +29,7 @@
 #
 # This check parses the home-manager module's router-service
 # `Environment` block for the env-var-only knobs and its `ExecStart`
-# for the flag-shaped ones, anchoring on the `services.agent-mcp.router.*`
+# for the flag-shaped ones, anchoring on the `services.conexus.router.*`
 # config -> unit mapping so the same class of regression (a new
 # router-startup input added upstream, and nobody remembering to wire it
 # into the user-scope unit) can't sneak back in.

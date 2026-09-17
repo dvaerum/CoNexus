@@ -87,21 +87,21 @@ pkgs.testers.nixosTest {
           "XDG_RUNTIME_DIR=/run/user/1500"
           # The launcher and router must agree on the backend socket
           # path. Without CONEXUS_SOCK_DIR the launcher falls back to
-          # ``$XDG_RUNTIME_DIR/agent-mcp`` (= /run/user/1500/...), which
+          # ``$XDG_RUNTIME_DIR/conexus`` (= /run/user/1500/...), which
           # this session-less system user can't create (mkdir EACCES) —
           # and even if it could, the backend would bind a socket the
-          # router (CONEXUS_SOCK_DIR=/run/agent-mcp) never looks at.
+          # router (CONEXUS_SOCK_DIR=/run/conexus) never looks at.
           # Pin both to the router's dir. Mirrors production
           # `nix/module.nix` (multi mode), which sets these on the
           # template too.
-          "CONEXUS_SOCK_DIR=/run/agent-mcp"
+          "CONEXUS_SOCK_DIR=/run/conexus"
           "CONEXUS_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
           "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
           "OPENAI_API_KEY=fake"
           "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
           "CONEXUS_EMBEDDING_DIMENSION=1024"
         ];
-        RuntimeDirectory = "agent-mcp/%i";
+        RuntimeDirectory = "conexus/%i";
         RuntimeDirectoryMode = "0700";
         # See conexus-router's own RuntimeDirectoryPreserve comment
         # below -- same bare-parent-vs-%i-child sharing, same fix.
@@ -115,7 +115,7 @@ pkgs.testers.nixosTest {
         # backend exited 2/INVALIDARGUMENT on every start.
         ExecStartPre = [
           "${pkgs.runtimeShell} -c 'test -f \"$RUNTIME_DIRECTORY/forwarding_hmac\" || { ${pkgs.coreutils}/bin/head -c 32 /dev/urandom > \"$RUNTIME_DIRECTORY/forwarding_hmac\" && ${pkgs.coreutils}/bin/chmod 600 \"$RUNTIME_DIRECTORY/forwarding_hmac\"; }'"
-          "${pkgs.coreutils}/bin/rm -f /run/agent-mcp/%i/backend.sock"
+          "${pkgs.coreutils}/bin/rm -f /run/conexus/%i/backend.sock"
         ];
         ExecStart = ''
           ${conexusPkgs.conexusLauncher}/bin/conexus-launcher %i
@@ -160,13 +160,13 @@ pkgs.testers.nixosTest {
         # RuntimeDirectoryPreserve=yes (live incident 2026-09-07, see
         # nix/home-manager-module.nix's conexus-router unit for the
         # full writeup): this bare, single-component RuntimeDirectory
-        # is a strict parent of conexus@'s own "agent-mcp/%i" above --
+        # is a strict parent of conexus@'s own "conexus/%i" above --
         # per systemd.exec(5), that makes it THIS unit's own innermost
         # subdirectory, so without `=yes` every stop of this router
         # (crash-loop, redeploy) recursively deletes the whole
-        # /run/agent-mcp tree, including any live per-project backend's
+        # /run/conexus tree, including any live per-project backend's
         # own subdirectory and socket.
-        RuntimeDirectory = "agent-mcp";
+        RuntimeDirectory = "conexus";
         RuntimeDirectoryMode = "0700";
         RuntimeDirectoryPreserve = "yes";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/agent-mcp /home/testuser/projects";
@@ -174,7 +174,7 @@ pkgs.testers.nixosTest {
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/agent-mcp/projects.local.json "
-          + "--sock-dir /run/agent-mcp "
+          + "--sock-dir /run/conexus "
           + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400";
@@ -209,7 +209,7 @@ pkgs.testers.nixosTest {
     # Log in the sentinel operator (ADR 0014: admin REST surface is
     # session-gated).
     machine.succeed(
-        "curl -fsS -c /tmp/agent-mcp-cookies.txt "
+        "curl -fsS -c /tmp/conexus-cookies.txt "
         "--data 'username=ci-sentinel&password=ci-sentinel-pw' "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/login"
     )
@@ -217,7 +217,7 @@ pkgs.testers.nixosTest {
     # 1. Register a project so a backend gets lazy-spawned (ADR 0014:
     # POST /api/router/projects with a JSON body).
     machine.succeed(
-        "curl -fsSL -b /tmp/agent-mcp-cookies.txt -o /dev/null "
+        "curl -fsSL -b /tmp/conexus-cookies.txt -o /dev/null "
         "-H 'Accept: application/vnd.conexus.v1+json' "
         "-H 'Content-Type: application/json' "
         "-X POST --data '{\"name\": \"idle-test\"}' "
@@ -240,7 +240,7 @@ pkgs.testers.nixosTest {
     # shell, no oracle) but would NO LONGER start the backend, breaking
     # this test's premise — do not remove it.
     machine.succeed(
-        "curl -fsS -b /tmp/agent-mcp-cookies.txt -o /dev/null "
+        "curl -fsS -b /tmp/conexus-cookies.txt -o /dev/null "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/app/idle-test/"
     )
 
@@ -257,7 +257,7 @@ pkgs.testers.nixosTest {
     # `orchestrator::ensure::socket_ready()` already uses router-side.
     machine.wait_for_unit("conexus@idle-test.service")
     machine.wait_until_succeeds(
-        "test -S /run/agent-mcp/idle-test/backend.sock",
+        "test -S /run/conexus/idle-test/backend.sock",
         timeout=60,
     )
 

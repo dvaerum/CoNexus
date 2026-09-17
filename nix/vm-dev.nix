@@ -6,7 +6,7 @@
 #   1. forwardPorts maps host:18080 → guest:1337 (the router port)
 #      by default. 18080 is also the literal sentinel that
 #      nix/run-vm-dev.sh rewrites at launch time when
-#      AGENT_MCP_VM_DEV_HOST_PORT is set, so a developer whose host
+#      CONEXUS_VM_DEV_HOST_PORT is set, so a developer whose host
 #      already binds :18080 (e.g. SeaweedFS) can pick another port
 #      without rebuilding the VM derivation. The standard vm.nix
 #      uses host:5454 — this VM exists in parallel so a dev can
@@ -29,7 +29,7 @@
 #   3. **DEV-MODE SSH IS WIDE OPEN.** OpenSSH is enabled with root
 #      login, empty passwords, and password auth all permitted, plus
 #      a host:18222 → guest:22 forward (sentinel rewritten at launch
-#      via AGENT_MCP_VM_DEV_SSH_PORT, same pattern as the dashboard
+#      via CONEXUS_VM_DEV_SSH_PORT, same pattern as the dashboard
 #      port). This exists so we can read `systemctl status`,
 #      `journalctl -u …`, /run/agent-mcp/, /var/lib/agent-mcp/, and
 #      /var/log/journal/ inside the VM when a per-project backend
@@ -60,11 +60,11 @@
 let
   # ── Preload fixtures (dev-only test-data seeding) ─────────────────
   # Auto-discover every nix/vm-dev/fixtures/<name>.tar.zst and bake it
-  # into the image at /etc/agent-mcp-vm-dev/fixtures/. Each is a raw tar
+  # into the image at /etc/conexus-vm-dev/fixtures/. Each is a raw tar
   # of the agent-mcp state-dir subtree captured from a seeded VM
   # (`nix run .#capture-vm-dev-fixture`); the in-guest
   # agent-mcp-vm-dev-preload.service restores the one(s) named by
-  # AGENT_MCP_VM_DEV_PRELOAD (via the kernel cmdline) on a fresh disk.
+  # CONEXUS_VM_DEV_PRELOAD (via the kernel cmdline) on a fresh disk.
   # readDir-based so an empty/absent fixtures dir is a clean no-op — the
   # feature adds nothing to the image until a fixture is captured.
   fixturesDir = ./vm-dev/fixtures;
@@ -112,7 +112,7 @@ in
   # and the bootstrap no-ops when the users table is already populated.
   # Safe for dev-mode only — the loopback-only port + open SSH +
   # empty-password warnings on this VM already mark it as untrusted.
-  systemd.services.agent-mcp-router.environment = {
+  systemd.services.conexus-router.environment = {
     CONEXUS_BOOTSTRAP_USERNAME = "dev";
     CONEXUS_BOOTSTRAP_PASSWORD = "dev";
   };
@@ -122,7 +122,7 @@ in
   # the default multi-tenant VM. The dev can run both simultaneously.
   # nix/run-vm-dev.sh rewrites the literals "18080" and "18222" in the
   # generated qemu hostfwd rules at launch time when
-  # AGENT_MCP_VM_DEV_HOST_PORT / AGENT_MCP_VM_DEV_SSH_PORT are set, so
+  # CONEXUS_VM_DEV_HOST_PORT / CONEXUS_VM_DEV_SSH_PORT are set, so
   # callers can pick different host ports without rebuilding the VM
   # derivation. Keep these values in sync with the sentinel sed
   # patterns in run-vm-dev.sh if you ever change them.
@@ -253,20 +253,20 @@ in
   # the SQLite state dir, which needs no session cookie (the reason the
   # legacy HTTP seed couldn't work) and no LLM endpoint (unlike a
   # boot-time API seeder). Off by default; enabled per-launch via
-  # AGENT_MCP_VM_DEV_PRELOAD.
+  # CONEXUS_VM_DEV_PRELOAD.
 
   # Bake every captured fixture into the image (no-op when none exist).
   environment.etc = etcFixtures;
 
   # ── Preload restore unit ──────────────────────────────────────────
   # Runs ONLY when the kernel cmdline carries `agent_mcp_preload=…`
-  # (set by nix/run-vm-dev.sh from $AGENT_MCP_VM_DEV_PRELOAD), AFTER
+  # (set by nix/run-vm-dev.sh from $CONEXUS_VM_DEV_PRELOAD), AFTER
   # systemd-tmpfiles created ${stateDir}, and BEFORE the router (and
   # therefore before any lazily-spawned agent-mcp@ backend reads a
   # project DB). Not a `requires=` of the router: a missing-bundle
   # failure should be loud (red unit + console) without bricking the
   # VM — the dev still gets an empty-state sandbox to work in.
-  systemd.services.agent-mcp-vm-dev-preload = {
+  systemd.services.conexus-vm-dev-preload = {
     description = "Restore a preload DB fixture into the agent-mcp state dir (vm-dev, fresh disk only)";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-tmpfiles-setup.service" "local-fs.target" ];
@@ -275,8 +275,8 @@ in
     # bare word and `word=value` forms of the cmdline option.
     unitConfig.ConditionKernelCommandLine = "agent_mcp_preload";
     environment = {
-      AGENT_MCP_STATE_DIR = config.services.agent-mcp.stateDir;
-      AGENT_MCP_FIXTURES_DIR = "/etc/agent-mcp-vm-dev/fixtures";
+      CONEXUS_STATE_DIR = config.services.conexus.stateDir;
+      CONEXUS_FIXTURES_DIR = "/etc/conexus-vm-dev/fixtures";
     };
     serviceConfig = {
       Type = "oneshot";

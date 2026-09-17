@@ -83,14 +83,14 @@ pkgs.testers.nixosTest {
           # In the VM test we use the systemd RuntimeDirectory at
           # /run/agent-mcp (created with 0700 perms below) instead
           # of XDG_RUNTIME_DIR which testuser can't write to.
-          "CONEXUS_SOCK_DIR=/run/agent-mcp"
+          "CONEXUS_SOCK_DIR=/run/conexus"
           # The launcher resolves the project workspace from this file.
           # The HOME-based fallback ($HOME/.config/agent-mcp/…) already
           # matches, but pin it explicitly for parity with the other VM
           # templates (no-auto-cleanup / production module.nix).
           "CONEXUS_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
         ];
-        RuntimeDirectory = "agent-mcp/%i";
+        RuntimeDirectory = "conexus/%i";
         RuntimeDirectoryMode = "0700";
         # See conexus-router's own RuntimeDirectoryPreserve comment
         # below -- same bare-parent-vs-%i-child sharing, same fix.
@@ -103,7 +103,7 @@ pkgs.testers.nixosTest {
         # no-auto-cleanup.nix and the production template do.
         ExecStartPre = [
           "${pkgs.runtimeShell} -c 'test -f \"$RUNTIME_DIRECTORY/forwarding_hmac\" || { ${pkgs.coreutils}/bin/head -c 32 /dev/urandom > \"$RUNTIME_DIRECTORY/forwarding_hmac\" && ${pkgs.coreutils}/bin/chmod 600 \"$RUNTIME_DIRECTORY/forwarding_hmac\"; }'"
-          "${pkgs.coreutils}/bin/rm -f /run/agent-mcp/%i/backend.sock"
+          "${pkgs.coreutils}/bin/rm -f /run/conexus/%i/backend.sock"
         ];
         ExecStart = ''
           ${conexusPkgs.conexusLauncher}/bin/conexus-launcher %i
@@ -146,13 +146,13 @@ pkgs.testers.nixosTest {
         # RuntimeDirectoryPreserve=yes (live incident 2026-09-07, see
         # nix/home-manager-module.nix's conexus-router unit for the
         # full writeup): this bare, single-component RuntimeDirectory
-        # is a strict parent of conexus@'s own "agent-mcp/%i" above --
+        # is a strict parent of conexus@'s own "conexus/%i" above --
         # per systemd.exec(5), that makes it THIS unit's own innermost
         # subdirectory, so without `=yes` every stop of this router
         # (crash-loop, redeploy) recursively deletes the whole
-        # /run/agent-mcp tree, including any live per-project backend's
+        # /run/conexus tree, including any live per-project backend's
         # own subdirectory and socket.
-        RuntimeDirectory = "agent-mcp";
+        RuntimeDirectory = "conexus";
         RuntimeDirectoryMode = "0700";
         RuntimeDirectoryPreserve = "yes";
         ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/agent-mcp /home/testuser/projects";
@@ -160,7 +160,7 @@ pkgs.testers.nixosTest {
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/agent-mcp/projects.local.json "
-          + "--sock-dir /run/agent-mcp "
+          + "--sock-dir /run/conexus "
           + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400";
@@ -198,12 +198,12 @@ pkgs.testers.nixosTest {
     # Log in the sentinel operator (ADR 0014: admin REST surface is
     # session-gated) and create the project via the REST resource.
     machine.succeed(
-        "curl -fsS -c /tmp/agent-mcp-cookies.txt "
+        "curl -fsS -c /tmp/conexus-cookies.txt "
         "--data 'username=ci-sentinel&password=ci-sentinel-pw' "
         "http://127.0.0.1:${toString ports.routerPort}/conexus/login"
     )
     machine.succeed(
-        "curl -fsSL -b /tmp/agent-mcp-cookies.txt -o /dev/null "
+        "curl -fsSL -b /tmp/conexus-cookies.txt -o /dev/null "
         "-H 'Accept: application/vnd.conexus.v1+json' "
         "-H 'Content-Type: application/json' "
         "-X POST --data '{\"name\": \"coord-test\"}' "
@@ -230,7 +230,7 @@ pkgs.testers.nixosTest {
     # router side. The workspace path is what the create handler
     # wrote to projects.local.json, which is CONEXUS_DEFAULT_WORKSPACE
     # / <name> = /home/testuser/projects/coord-test.
-    sock_path = "/run/agent-mcp/coord-test/backend.sock"
+    sock_path = "/run/conexus/coord-test/backend.sock"
     machine.wait_until_succeeds(f"test -S {sock_path}", timeout=60)
 
     db_path = "/home/testuser/projects/coord-test/.agent/mcp_state.db"

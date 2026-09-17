@@ -42,7 +42,7 @@
 #   `.strip()`, the bytes are binary and any whitespace at the
 #   boundary is data).
 # - The file mode must be 0600.
-# - The unit must declare `RuntimeDirectory=agent-mcp/%i` so the
+# - The unit must declare `RuntimeDirectory=conexus/%i` so the
 #   parent dir exists with the right owner/mode.
 # - The existing socket-removal ExecStartPre must still be present (the
 #   pre-existing defensive cleanup).
@@ -95,12 +95,12 @@ fail=0
 
 # test_backend_template_declares_runtime_directory:
 # The per-project backend unit must declare
-# `RuntimeDirectory=agent-mcp/%i` so systemd creates
-# `$XDG_RUNTIME_DIR/agent-mcp/<name>/` with the right owner/mode
+# `RuntimeDirectory=conexus/%i` so systemd creates
+# `$XDG_RUNTIME_DIR/conexus/<name>/` with the right owner/mode
 # before any ExecStartPre runs.
-if ! grep -qP 'RuntimeDirectory\s*=\s*"agent-mcp/%i"' <<<"$BLOCK"; then
+if ! grep -qP 'RuntimeDirectory\s*=\s*"conexus/%i"' <<<"$BLOCK"; then
   echo 'FAIL: home-manager-module.nix: "conexus@" service must set' \
-    'RuntimeDirectory = "agent-mcp/%i" so the parent dir exists' \
+    'RuntimeDirectory = "conexus/%i" so the parent dir exists' \
     'before ExecStartPre tries to write forwarding_hmac into it.' >&2
   fail=1
 fi

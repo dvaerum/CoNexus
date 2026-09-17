@@ -1,8 +1,8 @@
 { config, lib, pkgs, ... }:
 
-# NixOS module exposing the agent-mcp deployment as system services.
+# NixOS module exposing the conexus deployment as system services.
 #
-#   services.agent-mcp.enable = true
+#   services.conexus.enable = true
 #     → router (conexus-router) on :1337 + per-project conexus@<name>.service
 #       template (mirrors the production nixos-developer-system deployment).
 #
@@ -28,7 +28,7 @@
 # this module.
 
 let
-  cfg = config.services.agent-mcp;
+  cfg = config.services.conexus;
   pkgs' = import ./packages.nix {
     inherit pkgs lib;
     src = cfg.src;
@@ -54,37 +54,37 @@ let
     ReadWritePaths = [ cfg.stateDir cfg.runtimeDir ];
   };
 in {
-  options.services.agent-mcp = {
-    enable = lib.mkEnableOption "agent-mcp (multi-tenant router + per-project backends)";
+  options.services.conexus = {
+    enable = lib.mkEnableOption "conexus (multi-tenant router + per-project backends)";
 
     src = lib.mkOption {
       type = lib.types.path;
       description = ''
-        Path to the agent-mcp source tree. The flake wires this to
+        Path to the conexus source tree. The flake wires this to
         the repo root via `_module.args`.
       '';
     };
 
     user = lib.mkOption {
       type = lib.types.str;
-      default = "agent-mcp";
+      default = "conexus";
       description = "System user that owns the deployment.";
     };
 
     group = lib.mkOption {
       type = lib.types.str;
-      default = "agent-mcp";
+      default = "conexus";
     };
 
     stateDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/agent-mcp";
+      default = "/var/lib/conexus";
       description = "Persistent state root (projects.local.json, workspaces).";
     };
 
     runtimeDir = lib.mkOption {
       type = lib.types.str;
-      default = "/run/agent-mcp";
+      default = "/run/conexus";
       description = "Volatile UDS root (cleared on reboot).";
     };
 
@@ -99,7 +99,7 @@ in {
       default = "127.0.0.1";
       description = ''
         Interface the router binds, passed through as
-        `--host`/`AGENT_MCP_ROUTER_HOST`-equivalent config. Defaults to
+        `--host`/`CONEXUS_ROUTER_HOST`-equivalent config. Defaults to
         loopback — matching the application's deliberately-safe
         default — so a bare import of this module keeps the router
         behind a reverse proxy (nginx on loopback handles
@@ -163,7 +163,7 @@ in {
   # without creating anything. Retired entirely — operators create
   # projects via the dashboard UI after first login. The first-boot
   # operator can still be auto-seeded by setting
-  # `AGENT_MCP_BOOTSTRAP_USERNAME` / `_PASSWORD` on the router
+  # `CONEXUS_BOOTSTRAP_USERNAME` / `_PASSWORD` on the router
   # service environment.
 
   config = lib.mkIf cfg.enable {
@@ -205,7 +205,7 @@ in {
         # `conexus-router` (env-var-only -- see rust/conexus-router/src/
         # main.rs's own `default_workspace_parent()` doc). Without this,
         # `conexus-router` falls back to `$HOME/.local/share/agent-mcp/projects`
-        # under the `agent-mcp` system user's HOME (`cfg.stateDir`),
+        # under the `conexus` system user's HOME (`cfg.stateDir`),
         # NOT `${cfg.stateDir}/projects` where the tmpfiles rule above
         # actually creates the workspace parent.
         CONEXUS_DEFAULT_WORKSPACE = "${cfg.stateDir}/projects";
@@ -275,10 +275,10 @@ in {
         Type = "simple";
         User = cfg.user;
         Group = cfg.group;
-        RuntimeDirectory = "agent-mcp/%i";
+        RuntimeDirectory = "conexus/%i";
         RuntimeDirectoryMode = "0750";
         # F015 v3 (defence-in-depth): without this, systemd's default
-        # ``RuntimeDirectoryPreserve=no`` wipes ``/run/agent-mcp/%i/``
+        # ``RuntimeDirectoryPreserve=no`` wipes ``/run/conexus/%i/``
         # on every ``systemctl stop`` — including the
         # ``forwarding_hmac`` key file the backend's
         # ``--forwarding-hmac-in`` flag points at. Preserving the
@@ -286,7 +286,7 @@ in {
         # stop/start cycles.
         #
         # SC-3: the flip side of preservation is that systemd will NOT
-        # wipe ``/run/agent-mcp/%i/`` when a project is deleted (only on
+        # wipe ``/run/conexus/%i/`` when a project is deleted (only on
         # reboot, since it's tmpfs). The router's own project-deletion
         # handler owns that cleanup — it rmtree's
         # ``$CONEXUS_SOCK_DIR/<name>/`` after stopping the unit so the

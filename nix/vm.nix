@@ -11,7 +11,7 @@
 #   - agent-mcp state    → /var/lib/agent-mcp on the qcow2 scratch
 #     disk (real ext4; SQLite WAL needs fcntl locks 9p can't fake).
 #   - Ollama model blobs → /var/lib/ollama bind-mounted via 9p from
-#     `$AGENT_MCP_OLLAMA_DIR` on the host. Plain files, no SQLite,
+#     `$CONEXUS_OLLAMA_DIR` on the host. Plain files, no SQLite,
 #     so 9p works fine and the user can wipe disk.qcow2 without
 #     redownloading the ~620 MB embedding model.
 #     (`llm = "internal"` only — see below.)
@@ -58,7 +58,7 @@
 # agent_mcp/external/{completion,embedding}_service.py — the seams
 # resolve INDEPENDENTLY, no Python change is needed here):
 #
-#   AGENT_MCP_LLM_BASE_URL → chat / completion  (llmChatPort)
+#   CONEXUS_LLM_BASE_URL → chat / completion  (llmChatPort)
 #   OPENAI_BASE_URL        → embeddings         (llmEmbeddingPort)
 #
 # `OPENAI_API_KEY` must be non-empty in external mode. It is the
@@ -68,7 +68,7 @@
 # everything at the in-guest 127.0.0.1:11434 that external mode
 # does not run. Because setting it also SKIPS that block's
 # embedding defaults, external mode must state
-# AGENT_MCP_EMBEDDING_MODEL / _DIMENSION explicitly, or the
+# CONEXUS_EMBEDDING_MODEL / _DIMENSION explicitly, or the
 # constants freeze to the OpenAI cloud fallbacks
 # (text-embedding-3-large / 1536) that ollama does not serve.
 # `OPENAI_MODEL` is likewise mandatory: `completion_client()`
@@ -182,7 +182,7 @@ in
   networking.firewall.enable = false;
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = true;
-  networking.hostName = "agent-mcp";
+  networking.hostName = "conexus";
 
   # ── Ollama (local embedding + chat endpoint) ───────────────────
   # `llm = "internal"` only. qwen3-embedding:0.6b ~620 MB — embeddings
@@ -344,7 +344,7 @@ in
     })
   ];
 
-  services.agent-mcp = {
+  services.conexus = {
     enable = true;
     src = src;
     conexusLauncherPackage = conexusLauncher;
@@ -389,7 +389,7 @@ in
         guest.port = inVmHostPort; }
     ];
     # 9p source path is a shell var the wrapper sets just before
-    # exec'ing this VM's run-script; "$AGENT_MCP_OLLAMA_DIR" is the
+    # exec'ing this VM's run-script; "$CONEXUS_OLLAMA_DIR" is the
     # host-side directory (typically ./vm-persistent-data/ollama/).
     # security_model=none avoids the xattr-based UID translation that
     # made mapped-xattr break ollama's downloads — we don't actually
@@ -401,7 +401,7 @@ in
     # env var the wrapper may not have set would fail the boot.
     sharedDirectories = lib.optionalAttrs internalLlm {
       ollama-models = {
-        source = "\"$AGENT_MCP_OLLAMA_DIR\"";
+        source = "\"$CONEXUS_OLLAMA_DIR\"";
         target = "/var/lib/ollama";
         securityModel = "none";
       };
