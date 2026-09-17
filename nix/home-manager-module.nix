@@ -825,7 +825,7 @@ in {
             # cannot write to conexus-router's own compiled-in
             # `/var/lib/agent-mcp/router.db` default (that path is the
             # NixOS system-mode module's user, not this one's).
-            "AGENT_MCP_ROUTER_DB=${config.xdg.dataHome}/agent-mcp/router.db"
+            "CONEXUS_ROUTER_DB=${config.xdg.dataHome}/agent-mcp/router.db"
             # `--default-workspace` has no CLI-flag equivalent on
             # `conexus-router` (env-var-only, mirroring the retired
             # Python router's own `AGENT_MCP_DEFAULT_WORKSPACE` --
@@ -836,33 +836,33 @@ in {
             # unit had from the day `conexus-router` was first wired in
             # here, masked while `router.impl` still defaulted to
             # "python" (whose own unit DID set this).
-            "AGENT_MCP_DEFAULT_WORKSPACE=${cfg.router.defaultWorkspaceParent}"
+            "CONEXUS_DEFAULT_WORKSPACE=${cfg.router.defaultWorkspaceParent}"
           ]
           ++ lib.optionals (cfg.sso.oidc != null) [
-            "AGENT_MCP_SSO_OIDC_ISSUER=${cfg.sso.oidc.issuer}"
-            "AGENT_MCP_SSO_OIDC_CLIENT_ID=${cfg.sso.oidc.clientId}"
-            "AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE=${
+            "CONEXUS_SSO_OIDC_ISSUER=${cfg.sso.oidc.issuer}"
+            "CONEXUS_SSO_OIDC_CLIENT_ID=${cfg.sso.oidc.clientId}"
+            "CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE=${
               toString cfg.sso.oidc.clientSecretFile
             }"
-            "AGENT_MCP_SSO_OIDC_PROVIDER_NAME=${cfg.sso.oidc.providerName}"
-            "AGENT_MCP_SSO_OIDC_GROUP_MAPPING=${
+            "CONEXUS_SSO_OIDC_PROVIDER_NAME=${cfg.sso.oidc.providerName}"
+            "CONEXUS_SSO_OIDC_GROUP_MAPPING=${
               builtins.toJSON cfg.sso.oidc.groupMapping
             }"
-            "AGENT_MCP_SSO_OIDC_SCOPES=${
+            "CONEXUS_SSO_OIDC_SCOPES=${
               lib.concatStringsSep " " cfg.sso.oidc.scopes
             }"
           ]
           ++ lib.optionals (
             cfg.sso.oidc != null && cfg.sso.oidc.redirectUrl != null
           ) [
-            "AGENT_MCP_SSO_OIDC_REDIRECT_URL=${cfg.sso.oidc.redirectUrl}"
+            "CONEXUS_SSO_OIDC_REDIRECT_URL=${cfg.sso.oidc.redirectUrl}"
           ]
           ++ lib.optionals (cfg.sso.proxyHeader != null) [
-            "AGENT_MCP_SSO_PROXY_HEADER=${cfg.sso.proxyHeader.trustHeader}"
-            "AGENT_MCP_SSO_PROXY_TRUSTED_IPS=${
+            "CONEXUS_SSO_PROXY_HEADER=${cfg.sso.proxyHeader.trustHeader}"
+            "CONEXUS_SSO_PROXY_TRUSTED_IPS=${
               lib.concatStringsSep "," cfg.sso.proxyHeader.trustedIps
             }"
-            "AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN=${
+            "CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN=${
               if cfg.sso.proxyHeader.defaultIsSysadmin then "true" else "false"
             }"
           ];

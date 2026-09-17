@@ -42,7 +42,7 @@
 # forwarding-HMAC signature the router signs into its proxied requests is
 # the ONLY remaining router->backend auth channel). So the invariant this
 # check now pins is the opposite of its original one: `conexus@` must NOT
-# carry an `AGENT_MCP_ROUTER_DB` entry that would be dead weight
+# carry an `CONEXUS_ROUTER_DB` entry that would be dead weight
 # suggesting a code path that doesn't exist in this implementation.
 set -euo pipefail
 
@@ -118,8 +118,8 @@ if [ "$BLOCK" = "___MARKER_NOT_FOUND___" ]; then
 fi
 ENV_BLOCK="$(extract_backend_environment_block "$BLOCK")"
 
-# test_backend_does_not_set_AGENT_MCP_ROUTER_DB:
-# `conexus@` must NOT set `AGENT_MCP_ROUTER_DB`.
+# test_backend_does_not_set_CONEXUS_ROUTER_DB:
+# `conexus@` must NOT set `CONEXUS_ROUTER_DB`.
 #
 # Unlike the retired Python backend, `conexus-backend` never opens
 # router.db directly (see header comment) — the forwarding-HMAC
@@ -127,8 +127,8 @@ ENV_BLOCK="$(extract_backend_environment_block "$BLOCK")"
 # would be dead weight at best, and at worst a signal that someone
 # is trying to re-add a router.db-opening code path to the backend
 # without updating the auth architecture doc alongside it.
-if grep -qF 'AGENT_MCP_ROUTER_DB' <<<"$ENV_BLOCK"; then
-  echo 'FAIL: conexus@ backend template sets AGENT_MCP_ROUTER_DB, but' \
+if grep -qF 'CONEXUS_ROUTER_DB' <<<"$ENV_BLOCK"; then
+  echo 'FAIL: conexus@ backend template sets CONEXUS_ROUTER_DB, but' \
     'conexus-backend does not open router.db (forwarding-HMAC is' \
     'its only router-trust channel) — either this is dead' \
     'configuration, or the backend gained a new router.db-opening' \
@@ -142,7 +142,7 @@ fi
 # point under /var/lib/*. User-mode systemd cannot read or write
 # there (the per-user systemd manager runs as the operator, not
 # root).
-var_lib_matches=$(grep -oP '"AGENT_MCP_[A-Z_]+=/var/lib[^"]*"' <<<"$ENV_BLOCK" || true)
+var_lib_matches=$(grep -oP '"CONEXUS_[A-Z_]+=/var/lib[^"]*"' <<<"$ENV_BLOCK" || true)
 if [ -n "$var_lib_matches" ]; then
   echo "FAIL: User-mode backend template env vars must not point under /var/lib:" >&2
   echo "$var_lib_matches" >&2

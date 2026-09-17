@@ -121,10 +121,10 @@ let
     # Neither endpoint checks it.
     OPENAI_API_KEY = "external";
     OPENAI_BASE_URL = embeddingBaseUrl;
-    AGENT_MCP_LLM_BASE_URL = chatBaseUrl;
+    CONEXUS_LLM_BASE_URL = chatBaseUrl;
     OPENAI_MODEL = llmChatModel;
-    AGENT_MCP_EMBEDDING_MODEL = llmEmbeddingModel;
-    AGENT_MCP_EMBEDDING_DIMENSION = toString llmEmbeddingDimension;
+    CONEXUS_EMBEDDING_MODEL = llmEmbeddingModel;
+    CONEXUS_EMBEDDING_DIMENSION = toString llmEmbeddingDimension;
   };
 
   llmEndpointCheckUnit = "agent-mcp-llm-endpoint-check.service";

@@ -200,7 +200,7 @@ in {
         # because qemu user-mode hostfwd delivers packets to the guest's
         # primary IP (not loopback), so the VM must bind the wildcard to
         # be reachable on the host-forwarded port. See nix/vm.nix.
-        AGENT_MCP_ROUTER_HOST = cfg.routerHost;
+        CONEXUS_ROUTER_HOST = cfg.routerHost;
         # `--default-workspace` has no CLI-flag equivalent on
         # `conexus-router` (env-var-only -- see rust/conexus-router/src/
         # main.rs's own `default_workspace_parent()` doc). Without this,
@@ -208,10 +208,10 @@ in {
         # under the `agent-mcp` system user's HOME (`cfg.stateDir`),
         # NOT `${cfg.stateDir}/projects` where the tmpfiles rule above
         # actually creates the workspace parent.
-        AGENT_MCP_DEFAULT_WORKSPACE = "${cfg.stateDir}/projects";
+        CONEXUS_DEFAULT_WORKSPACE = "${cfg.stateDir}/projects";
         # Crucial: VM has no per-user systemd instance — router
         # has to drive the system bus directly.
-        AGENT_MCP_SYSTEMCTL_MODE = "system";
+        CONEXUS_SYSTEMCTL_MODE = "system";
       };
       serviceConfig = {
         Type = "simple";
@@ -289,12 +289,12 @@ in {
         # wipe ``/run/agent-mcp/%i/`` when a project is deleted (only on
         # reboot, since it's tmpfs). The router's own project-deletion
         # handler owns that cleanup — it rmtree's
-        # ``$AGENT_MCP_SOCK_DIR/<name>/`` after stopping the unit so the
+        # ``$CONEXUS_SOCK_DIR/<name>/`` after stopping the unit so the
         # ``forwarding_hmac`` key doesn't linger for a now-gone project.
         RuntimeDirectoryPreserve = "yes";
         Environment = [
-          "AGENT_MCP_PROJECTS_FILE=${cfg.stateDir}/projects.local.json"
-          "AGENT_MCP_SOCK_DIR=${cfg.runtimeDir}"
+          "CONEXUS_PROJECTS_FILE=${cfg.stateDir}/projects.local.json"
+          "CONEXUS_SOCK_DIR=${cfg.runtimeDir}"
         ];
         # F015 v4: generate the per-project HMAC key in the unit
         # ExecStartPre (not the router) so EVERY path that starts
