@@ -85,10 +85,10 @@ pkgs.testers.nixosTest {
           # of XDG_RUNTIME_DIR which testuser can't write to.
           "CONEXUS_SOCK_DIR=/run/conexus"
           # The launcher resolves the project workspace from this file.
-          # The HOME-based fallback ($HOME/.config/agent-mcp/…) already
+          # The HOME-based fallback ($HOME/.config/conexus/…) already
           # matches, but pin it explicitly for parity with the other VM
           # templates (no-auto-cleanup / production module.nix).
-          "CONEXUS_PROJECTS_FILE=/home/testuser/.config/agent-mcp/projects.local.json"
+          "CONEXUS_PROJECTS_FILE=/home/testuser/.config/conexus/projects.local.json"
         ];
         RuntimeDirectory = "conexus/%i";
         RuntimeDirectoryMode = "0700";
@@ -123,7 +123,7 @@ pkgs.testers.nixosTest {
       after = [ "fake-openai.service" "network.target" ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
-        CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
+        CONEXUS_ROUTER_DB = "/home/testuser/.config/conexus/router.db";
         # Phase 1 PR C: see single-tenant.nix.
         CONEXUS_BOOTSTRAP_USERNAME = "ci-sentinel";
         CONEXUS_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
@@ -155,11 +155,11 @@ pkgs.testers.nixosTest {
         RuntimeDirectory = "conexus";
         RuntimeDirectoryMode = "0700";
         RuntimeDirectoryPreserve = "yes";
-        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/agent-mcp /home/testuser/projects";
+        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/conexus /home/testuser/projects";
         ExecStart =
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "
-          + "--projects-file /home/testuser/.config/agent-mcp/projects.local.json "
+          + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
           + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "

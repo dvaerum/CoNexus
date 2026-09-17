@@ -137,7 +137,7 @@ pkgs.testers.nixosTest {
         # migrations against this DB at startup. Default
         # /var/lib/conexus is not writable by testuser; point at
         # testuser's home so the ExecStartPre mkdir below covers both.
-        CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
+        CONEXUS_ROUTER_DB = "/home/testuser/.config/conexus/router.db";
         # Phase 1 PR C: seed a sentinel operator via env-var bootstrap
         # so the empty-users redirect middleware is dormant — this
         # test asserts routing behaviour (e.g. /api/router/projects,
@@ -179,11 +179,11 @@ pkgs.testers.nixosTest {
         RuntimeDirectory = "conexus";
         RuntimeDirectoryMode = "0700";
         RuntimeDirectoryPreserve = "yes";
-        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/agent-mcp /home/testuser/projects";
+        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/conexus /home/testuser/projects";
         ExecStart =
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "
-          + "--projects-file /home/testuser/.config/agent-mcp/projects.local.json "
+          + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
           + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "

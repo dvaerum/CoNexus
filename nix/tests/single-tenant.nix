@@ -107,7 +107,7 @@ pkgs.testers.nixosTest {
           # treating as anonymous", and 401s. No prior assertion in
           # this test suite drove a cookie-authenticated call through
           # to the backend, so this gap was dormant too.
-          "CONEXUS_ROUTER_DB=/home/testuser/.config/agent-mcp/router.db"
+          "CONEXUS_ROUTER_DB=/home/testuser/.config/conexus/router.db"
           # XDG_RUNTIME_DIR above points at a login-
           # session dir nothing in this VM ever creates (testuser never
           # logs in, so pam_systemd never provisions /run/user/1500).
@@ -156,7 +156,7 @@ pkgs.testers.nixosTest {
       after = [ "fake-openai.service" "network.target" ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
-        CONEXUS_ROUTER_DB = "/home/testuser/.config/agent-mcp/router.db";
+        CONEXUS_ROUTER_DB = "/home/testuser/.config/conexus/router.db";
         # Phase 1 PR C: seed a sentinel operator via the env-var
         # bootstrap so the empty-users redirect middleware is dormant
         # — this VM test asserts routing/URL behaviour that predates
@@ -199,7 +199,7 @@ pkgs.testers.nixosTest {
         RuntimeDirectoryMode = "0700";
         RuntimeDirectoryPreserve = "yes";
         ExecStartPre = [
-          "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/agent-mcp /home/testuser/projects ${singleWorkspace}"
+          "${pkgs.coreutils}/bin/mkdir -p /home/testuser/.config/conexus /home/testuser/projects ${singleWorkspace}"
           # Seed projects.local.json with the single-tenant entry —
           # mirrors what the home-manager module's
           # singleProjectSeedScript does on production hosts. Copied
@@ -208,12 +208,12 @@ pkgs.testers.nixosTest {
           # file exactly like the home-manager module's version — see
           # the R8-F2 comment on ``projectsSeedFile`` above for why this
           # isn't an inline ``echo`` one-liner.
-          "${pkgs.coreutils}/bin/install -m 0644 ${projectsSeedFile} /home/testuser/.config/agent-mcp/projects.local.json"
+          "${pkgs.coreutils}/bin/install -m 0644 ${projectsSeedFile} /home/testuser/.config/conexus/projects.local.json"
         ];
         ExecStart =
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "
-          + "--projects-file /home/testuser/.config/agent-mcp/projects.local.json "
+          + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
           + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
