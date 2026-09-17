@@ -147,7 +147,7 @@ let
     if [[ -n "''${CONEXUS_PROJECTS_FILE:-}" ]]; then
       loc_file="$CONEXUS_PROJECTS_FILE"
     else
-      cfg_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/agent-mcp"
+      cfg_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/conexus"
       loc_file="$cfg_dir/projects.local.json"
     fi
 
@@ -168,7 +168,7 @@ let
       exit 1
     fi
 
-    sock_root="''${CONEXUS_SOCK_DIR:-''${XDG_RUNTIME_DIR}/agent-mcp}"
+    sock_root="''${CONEXUS_SOCK_DIR:-''${XDG_RUNTIME_DIR}/conexus}"
     sock="$sock_root/$name/backend.sock"
     forwarding_hmac_in="$sock_root/$name/forwarding_hmac"
     mkdir -p "$(dirname "$sock")"
