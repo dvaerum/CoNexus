@@ -219,7 +219,7 @@
       };
 
       # ── home-manager module (Phase 2) ───────────────────────────
-      # User-scope module exposing `services.agent-mcp.*` options.
+      # User-scope module exposing `services.conexus.*` options.
       # See nix/README.md for the worked example.
       #
       # `homeModules`, not the legacy `homeManagerModules` -- home-manager's
@@ -237,33 +237,33 @@
       # repo path themselves.
       # `config` is needed (not just `{ ... }:`) so `conexusLauncherPackage`
       # below can build against WHATEVER package set the consumer's
-      # home-manager config resolves for `services.agent-mcp.pkgs`
+      # home-manager config resolves for `services.conexus.pkgs`
       # (defaults to their own `pkgs`, but is itself overridable) --
       # never this flake's own fixed x86_64-linux `pkgs`, which would
       # silently be wrong for a consumer on a different system.
       homeModules.default = { config, ... }: let
         conexusPkgsFor = import ./nix/conexus.nix {
-          pkgs = config.services.agent-mcp.pkgs;
+          pkgs = config.services.conexus.pkgs;
           inherit lib;
           src = self;
-          craneLib = crane.mkLib config.services.agent-mcp.pkgs;
+          craneLib = crane.mkLib config.services.conexus.pkgs;
         };
       in {
         imports = [ ./nix/home-manager-module.nix ];
-        services.agent-mcp.source = lib.mkDefault self;
-        services.agent-mcp.conexusLauncherPackage =
+        services.conexus.source = lib.mkDefault self;
+        services.conexus.conexusLauncherPackage =
           lib.mkDefault conexusPkgsFor.conexusLauncher;
         # Auto-wired -- see this option's own doc in
         # home-manager-module.nix for why a daemon-agent instance
         # carries none of the router's former port-collision risk.
-        services.agent-mcp.conexusDaemonAgentPackage =
+        services.conexus.conexusDaemonAgentPackage =
           lib.mkDefault conexusPkgsFor.conexusDaemonAgentWrapper;
         # Auto-wired too, now that conexus-router is the ONLY router
         # implementation (the Python router it used to risk racing for
         # the port was retired together with `router.impl` -- see
         # `conexusRouterPackage`'s own doc in home-manager-module.nix
         # for the before/after reasoning).
-        services.agent-mcp.conexusRouterPackage =
+        services.conexus.conexusRouterPackage =
           lib.mkDefault conexusPkgsFor.conexusRouterWrapper;
       };
       homeModules.agent-mcp = self.homeModules.default;
