@@ -16,7 +16,7 @@ claim → existing `users.email`, else JIT-create*. That rule is no longer
 what the code does, and hasn't been since the first pentest round that
 touched it. Email is mutable and IdP-asserted, so matching on it
 re-minted a user (and, under
-`CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN`, a fresh sysadmin) on every
+`AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN`, a fresh sysadmin) on every
 request, and let an IdP with unverified emails seize a local operator
 account. The reconciliation key became a stable `(iss, sub)` pair
 persisted in `users.sso_subject`, matched before email, with the email

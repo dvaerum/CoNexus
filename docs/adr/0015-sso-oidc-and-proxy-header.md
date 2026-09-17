@@ -58,8 +58,8 @@ Three modes:
 | Mode | Activator | Auth source |
 |---|---|---|
 | `builtin` (default) | none | Local `users.password_hash` |
-| `oidc` | `CONEXUS_SSO_OIDC_ISSUER` set | External OIDC IdP |
-| `proxy_header` | `CONEXUS_SSO_PROXY_HEADER` set | Trusted upstream proxy |
+| `oidc` | `AGENT_MCP_SSO_OIDC_ISSUER` set | External OIDC IdP |
+| `proxy_header` | `AGENT_MCP_SSO_PROXY_HEADER` set | Trusted upstream proxy |
 
 ### OIDC
 
@@ -68,9 +68,9 @@ Three modes:
   Discovery via `/.well-known/openid-configuration`. PKCE is mandatory
   (`code_challenge_method=S256`). id_token decode + signature
   validation via Authlib's JWS surface against the IdP's JWKS.
-* **Routes**: `GET /conexus/sso/login` initiates the flow with a
+* **Routes**: `GET /agent-mcp/sso/login` initiates the flow with a
   per-flow cookie binding the state + PKCE verifier to the browser;
-  `GET /conexus/sso/callback` validates the cookie matches the
+  `GET /agent-mcp/sso/callback` validates the cookie matches the
   `state` query param, exchanges the code, decodes claims, finds-or-
   creates the local user, and mints the standard session cookie.
 * **User matching algorithm** (superseded — see ADR-0024): match by
@@ -93,7 +93,7 @@ Three modes:
 
 ### Proxy-header trust
 
-* **Activator**: `CONEXUS_SSO_PROXY_HEADER=<header-name>` (the
+* **Activator**: `AGENT_MCP_SSO_PROXY_HEADER=<header-name>` (the
   header to consult; nix submodule defaults to `Remote-User`).
 * **Trusted source enforcement**: the router only honours the
   trusted header when `request.remote` (the transport peer IP) is in
@@ -105,7 +105,7 @@ Three modes:
 * **JIT user creation**: same algorithm as OIDC's (superseded — see
   ADR-0024; the proxy path's stable subject is the raw trusted header
   value in its own `proxy:` namespace), with one extra
-  knob: `CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN` (default `false`).
+  knob: `AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN` (default `false`).
   When set true, every JIT-created user via the proxy-header path
   gets `is_sysadmin = TRUE`. Only safe when the upstream proxy is
   the sole, well-trusted auth boundary.
@@ -114,7 +114,7 @@ Three modes:
 
 The System overview gains a new **SSO** tab next to Users / Groups
 (matching the placement of the Wave 1b CRUD UIs). The tab fetches
-`GET /conexus/api/router/sso/config` and renders the active mode
+`GET /agent-mcp/api/router/sso/config` and renders the active mode
 plus the operator-visible knobs (the OIDC client secret is reported
 only as a presence boolean — the value never crosses the wire).
 Non-sysadmin operators see a "Sysadmin only" explanatory card
@@ -142,8 +142,8 @@ every existing row's hash verbatim.
   PKCE flow is wired correctly and the id_token signature is
   validated against the IdP's JWKS — defaults are safe.
 * Operators who already run a forward-auth proxy can drop agent-mcp
-  in behind it with two env vars (`CONEXUS_SSO_PROXY_HEADER` +
-  `CONEXUS_SSO_PROXY_TRUSTED_IPS`).
+  in behind it with two env vars (`AGENT_MCP_SSO_PROXY_HEADER` +
+  `AGENT_MCP_SSO_PROXY_TRUSTED_IPS`).
 * Group-claim mapping lets a sysadmin pre-create groups in agent-mcp
   and bind IdP roles to them without writing custom sync code.
 * The wildcard JIT escape gives a one-line "mirror every IdP group"

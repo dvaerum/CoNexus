@@ -9,7 +9,7 @@ without changing the underlying `config_allow_*`-toggle shape decided
 here.
 
 **Provenance**: originally filed in the `home-manager-config` deploy
-repo's `common/user/conexus/docs/adr/` (as
+repo's `common/user/agent-mcp/docs/adr/` (as
 `0004-settings-tab-policy-toggles.md`). Moved here 2026-09-06 — see
 ADR-0003's own provenance note for why.
 
