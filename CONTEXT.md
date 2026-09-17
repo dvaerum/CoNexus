@@ -1,7 +1,7 @@
 # CONTEXT.md — identity & authorization vocabulary
 
 This is the canonical glossary for "who is calling, and what can they
-do" across Agent-MCP. It originally documented the Python
+do" across CoNexus. It originally documented the Python
 implementation's authorization model as it evolved through Waves 6-9
 and several pentest rounds; that Python implementation (and the
 `docs/proposals/security-authz-architecture-hardening.md` findings
@@ -63,7 +63,7 @@ and `OperatorBearer { bearer_token }`.
 
 **Real, deliberate scope narrowing from the Python source**: Python's
 `RestPrincipal` had a THIRD door, `kind="session"` (an
-`agent_mcp_session` cookie resolved via a live `router.db` lookup).
+`conexus_session` cookie resolved via a live `router.db` lookup).
 That door is NOT ported here — the operator's own 2026-09-05 decision
 (`prancy-napping-pie.md`, Phase E1) keeps the per-project backend
 router-DB-blind, exactly like `/mcp` auth. Python's own `deps.py`
@@ -104,7 +104,7 @@ exactly one of them. (Python had a fourth, REST-only mode,
 * **`OperatorSession`** — the dashboard cookie path (ADR-0013),
   resolved by the router's `session_gate.rs`.
 * **`ForwardingHeader`** — the signed
-  `X-Agent-MCP-Forwarded-Operator` header the router attaches when
+  `X-CoNexus-Forwarded-Operator` header the router attaches when
   proxying a cookie-authenticated dashboard request through to a
   per-project backend (ADR-0020: router is mount-agnostic).
 
@@ -342,7 +342,7 @@ cross-reference:
   token on `Authorization: Bearer`, resolved in
   `conexus-backend/src/principal_resolve.rs`.
 * **"forwarding header"** = `PrincipalKind::ForwardingHeader`: the
-  router's signed `X-Agent-MCP-Forwarded-Operator` header
+  router's signed `X-CoNexus-Forwarded-Operator` header
   (`conexus-auth::forwarding_header`), verified in
   `conexus-backend/src/principal_resolve.rs` and (for REST) in
   `conexus-backend/src/rest_principal.rs`.
@@ -351,7 +351,7 @@ cross-reference:
   `GateIdentity` (`conexus-router/src/session_gate.rs:125`, the
   router's own resolved cookie identity, evaluated by
   `evaluate_session_gate`, `conexus-router/src/session_gate.rs:313`):
-  the dashboard's `agent_mcp_session` cookie (ADR-0013).
+  the dashboard's `conexus_session` cookie (ADR-0013).
 * **`RestPrincipal::OperatorBearer`** — the REST-only variant (see
   above) — not a `PrincipalKind` value, a per-agent manager-role
   bearer presented straight to a backend REST endpoint.

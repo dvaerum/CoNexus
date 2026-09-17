@@ -2,9 +2,9 @@
 //
 // Firefox-MCP finding (2026-09-06): `ApiClient.request()`'s 401
 // handling was unconditional — ANY 401 on the per-project REST surface
-// forced an immediate hard redirect to /agent-mcp/login, discarding
+// forced an immediate hard redirect to /conexus/login, discarding
 // the current page/state. That's correct for a genuinely expired
-// session, but the router's `/agent-mcp/api/<project>/*` proxy route
+// session, but the router's `/conexus/api/<project>/*` proxy route
 // is NOT behind the operator session-gate (it forwards straight to
 // the per-project backend's own REST gate), and that backend gate
 // returns the SAME `{"error":"login_required"}` envelope whether the

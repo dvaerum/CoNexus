@@ -4,7 +4,7 @@
  *
  * Today's flow: ApiClientInitializer auto-seeds a synthetic server
  * entry with `(host='proxy', port=0)` when the dashboard URL matches
- * `/agent-mcp/__dashboard/<name>/`, then calls setServer(proxy, 0).
+ * `/conexus/__dashboard/<name>/`, then calls setServer(proxy, 0).
  * The fork's PR #7 setServer produces `http://proxy:0/api` — broken.
  *
  * Two changes here let deployments avoid the broken URL without an
@@ -16,7 +16,7 @@
  *
  * 2. ApiClientInitializer, when the path-prefix matches, calls
  *    apiClient.setBaseUrl with the derived URL
- *    (`/agent-mcp/__api/<name>`) so subsequent fetches resolve through
+ *    (`/conexus/__api/<name>`) so subsequent fetches resolve through
  *    the router's proxy instead of the broken `http://proxy:0/api`.
  */
 
@@ -46,7 +46,7 @@ describe("explicit base URL support (ApiClient + path-prefix singleton)", () => 
     // the old api-client-initializer.tsx useEffect into the
     // module-load body of `lib/project-context.ts`. When the
     // path-prefix matches, the singleton must call
-    // `apiClient.setBaseUrl` with the derived `/agent-mcp/api/<name>`
+    // `apiClient.setBaseUrl` with the derived `/conexus/api/<name>`
     // URL (PR-B renamed from /__api/) so the very first fetch already
     // routes through the proxy.
     const src = read("lib/project-context.ts")
@@ -54,7 +54,7 @@ describe("explicit base URL support (ApiClient + path-prefix singleton)", () => 
       src.includes("setBaseUrl"),
       "expected lib/project-context.ts to call apiClient.setBaseUrl " +
         "with the derived URL when the dashboard URL matches " +
-        "/agent-mcp/app/<name>/",
+        "/conexus/app/<name>/",
     ).toBe(true)
     // PR-B centralised the URL build in lib/urls.ts; project-context
     // now imports `apiUrl()` instead of templating the URL inline.
@@ -65,8 +65,8 @@ describe("explicit base URL support (ApiClient + path-prefix singleton)", () => 
     ).toBe(true)
     const urlsSrc = read("lib/urls.ts")
     expect(
-      urlsSrc.includes("/agent-mcp/api"),
-      "expected the path-derived URL prefix /agent-mcp/api in " +
+      urlsSrc.includes("/conexus/api"),
+      "expected the path-derived URL prefix /conexus/api in " +
         "lib/urls.ts",
     ).toBe(true)
   })

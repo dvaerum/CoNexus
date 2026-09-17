@@ -56,7 +56,7 @@ describe("single /all-data invalidation per mutation (G1)", () => {
     // same operator's SSE stream.
     dispatchNotification({
       method: "notifications/resources/updated",
-      params: { uri: "agent-mcp://memories" },
+      params: { uri: "conexus://memories" },
     })
 
     // Debounced — nothing fires synchronously.

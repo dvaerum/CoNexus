@@ -6,7 +6,7 @@
 // Lists who has access (users + groups) with their role
 // (operator/viewer); supports add/remove/change-role.
 //
-// Backend: /agent-mcp/api/router/projects/<name>/memberships[/<id>]
+// Backend: /conexus/api/router/projects/<name>/memberships[/<id>]
 
 import React, { useCallback, useEffect, useState } from "react"
 import {

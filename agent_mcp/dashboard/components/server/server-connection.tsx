@@ -206,11 +206,11 @@ export function ServerConnection() {
                 URLs. Useful for standalone deployments where the operator
                 runs the MCP backend on an arbitrary local port; meaningless
                 under the multi-tenant router where every probe is
-                cross-origin from `/agent-mcp/...` and Firefox blocks them
+                cross-origin from `/conexus/...` and Firefox blocks them
                 with NS_ERROR_DOM_BAD_URI (50+ failures, ~52 console
                 errors, zero useful discovery). Hide the button in router-
                 served mode; the router already exposes
-                `/agent-mcp/api/router/projects` for discovery and the URL
+                `/conexus/api/router/projects` for discovery and the URL
                 path itself names the active project. */}
             {!projectContext.isRouterServed && (
               <Button

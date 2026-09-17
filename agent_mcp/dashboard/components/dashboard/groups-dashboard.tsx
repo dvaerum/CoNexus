@@ -2,11 +2,11 @@
 
 // Router-level group list / tree view — Phase 3 Wave 1b
 // (prancy-napping-pie). Lives at the cross-project overview
-// (``/agent-mcp/app/``). Groups can contain users OR other groups
+// (``/conexus/app/``). Groups can contain users OR other groups
 // (nested membership); each row expands to show its current members
 // with one-click remove + an add-member dialog.
 //
-// Backend: /agent-mcp/api/router/groups[/<id>][/members][/<member_id>]
+// Backend: /conexus/api/router/groups[/<id>][/members][/<member_id>]
 //
 // Shared-scaffold migration (architecture review, Classes 1/2/3/4):
 // the page shell — header, first-load skeleton, "Sysadmin only" (403)

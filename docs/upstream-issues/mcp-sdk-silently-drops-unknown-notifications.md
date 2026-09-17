@@ -2,7 +2,7 @@
 
 Migrated 2026-09-06 from the deploy repo's (`home-manager-config`,
 formerly `nixos-developer-system`) `docs/UPSTREAM_ISSUES.md` §R -- an
-upstream MCP protocol/SDK tracking item (not an Agent-MCP bug), kept
+upstream MCP protocol/SDK tracking item (not a CoNexus bug), kept
 because it's the direct rationale behind `wait_for_events`'s
 long-polling design (ADR-0011/ADR-0012) still being the primary event
 mechanism rather than a server-push notification.
@@ -14,9 +14,9 @@ The MCP TypeScript SDK's `Client` only invokes handlers registered via
 `method` isn't recognized is silently dropped. Same shape in the
 Python SDK. Verified against Claude Code, which links the TS SDK.
 
-## Impact for Agent-MCP
+## Impact for CoNexus
 
-Any custom server→client notification Agent-MCP might want to push
+Any custom server→client notification CoNexus might want to push
 (e.g. `notifications/agent_message`, `notifications/task_assigned`)
 never reaches the consuming application over the notification channel
 itself. The only working alternative is long-polling: `wait_for_events`

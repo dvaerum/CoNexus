@@ -16,8 +16,8 @@ multi-tenant URL-parity decision itself is unchanged.
 Forks of agent-mcp can run in two modes:
 
 - **Multi-tenant**: router-fronted, many projects per machine, dashboard and
-  backends mounted under `/agent-mcp/__dashboard/<project>/...` and
-  `/agent-mcp/<project>/...`.
+  backends mounted under `/conexus/__dashboard/<project>/...` and
+  `/conexus/<project>/...`.
 - **Single-tenant**: one project per machine.
 
 The original Phase 0 plan was to make single-tenant skip the router entirely:
@@ -32,8 +32,8 @@ of whether the host has one project or many.
 ## Decision
 
 Single-tenant runs the router with N=1. Same absolute URLs as multi-tenant
-(`/agent-mcp/__dashboard/<name>/...` for the dashboard,
-`/agent-mcp/<name>/...` for the backend).
+(`/conexus/__dashboard/<name>/...` for the dashboard,
+`/conexus/<name>/...` for the backend).
 
 The previously-proposed `services.agent-mcp.router.enable` toggle is
 **replaced** by `services.agent-mcp.multiTenant : bool`. That option is

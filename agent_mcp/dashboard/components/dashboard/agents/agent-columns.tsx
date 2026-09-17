@@ -298,7 +298,7 @@ export function useAgentColumns(handlers: AgentRowHandlers): Column<Agent>[] {
                 `core/session_registry.py`) — NOT from the row's `status`
                 column, which used to be a spawn-lifecycle artefact
                 ('created' / 'pending' / 'failed') that's no longer
-                meaningful now agent-mcp doesn't own the process.
+                meaningful now conexus doesn't own the process.
                 `agentPresence()` collapses the inputs into a single
                 4-state enum the UI keys off of. */}
             <Badge

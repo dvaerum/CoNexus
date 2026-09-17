@@ -3,7 +3,7 @@
 // R12-F1 class-sweep miss: PR #691 added a logout control to the
 // shared `<Header>` (components/layout/header.tsx), which covers every
 // per-project dashboard page via `<MainLayout>`. But the cross-project
-// overview at the bare `/agent-mcp/app/` root (no project segment)
+// overview at the bare `/conexus/app/` root (no project segment)
 // renders `<ProjectsOverviewDashboard>` directly — `app/page.tsx`'s
 // `isOverview` branch skips `<MainLayout>`/`<Header>` entirely because
 // this page has its own header block. That left the overview with no
@@ -56,7 +56,7 @@ describe("<ProjectsOverviewDashboard> logout control", () => {
     ).toBeTruthy()
   })
 
-  it("POSTs to /agent-mcp/logout with the session cookie on click", async () => {
+  it("POSTs to /conexus/logout with the session cookie on click", async () => {
     render(<ProjectsOverviewDashboard />)
     fireEvent.click(screen.getByRole("button", { name: /log ?out/i }))
 

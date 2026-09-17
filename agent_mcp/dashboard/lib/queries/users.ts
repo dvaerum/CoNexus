@@ -2,7 +2,7 @@
 
 /**
  * TanStack Query hook for the router-admin users list
- * (`GET /agent-mcp/api/router/users`).
+ * (`GET /conexus/api/router/users`).
  *
  * W6-followup-2 increment G2 (2026-08-11): users-dashboard used to fetch
  * via the hand-rolled `useRouterQuery` hook. This module moves the LIST

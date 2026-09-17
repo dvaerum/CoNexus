@@ -28,7 +28,7 @@ import { useServerStore } from "@/lib/stores/server-store"
 // (`GROUP_ORDER`). Reads come from GET /api/settings-data; writes go
 // through PUT /settings/<key> / POST /settings (lib/api.ts:
 // updateSetting / createSetting), authenticated via the operator
-// session cookie set on /agent-mcp/login.
+// session cookie set on /conexus/login.
 
 const REDACTED = "[redacted]"
 

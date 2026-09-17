@@ -99,7 +99,7 @@ export async function getMessageThread(
     method: 'GET',
     headers: {
       // PR-A: REST endpoints require the strict v1 media type.
-      Accept: 'application/vnd.agent-mcp.v1+json',
+      Accept: 'application/vnd.conexus.v1+json',
     },
     credentials: 'include',
   })

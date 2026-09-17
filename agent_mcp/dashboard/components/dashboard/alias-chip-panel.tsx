@@ -5,10 +5,10 @@
 // chip. Surfaces:
 //
 //   * The list of agent_ids that have used the alias, from
-//     ``GET /agent-mcp/api/router/projects/<name>/aliases?alias=<a>``
+//     ``GET /conexus/api/router/projects/<name>/aliases?alias=<a>``
 //     (backed by mcp_sessions.alias_used).
 //   * A "Remove alias now" button calling
-//     ``DELETE /agent-mcp/api/router/projects/<name>/aliases/<a>``.
+//     ``DELETE /conexus/api/router/projects/<name>/aliases/<a>``.
 //
 // "Extend grace" is intentionally NOT implemented here — extending an
 // alias is equivalent to issuing a new alias via rename (which can
@@ -85,7 +85,7 @@ export function AliasChipPanel({
   // Success toast, deliberately NO Undo.
   //
   // The router registers only GET + DELETE on
-  // `/agent-mcp/api/router/projects/{name}/aliases` (see
+  // `/conexus/api/router/projects/{name}/aliases` (see
   // `register_admin_routes` in agent_mcp/router/admin_api.py) — there is
   // no create-alias endpoint to invert this with. The one path that
   // DOES mint an alias is rename (`ProjectOrchestrator.add_alias`,

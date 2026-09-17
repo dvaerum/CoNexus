@@ -15,7 +15,7 @@
 ## Context
 
 The dashboard router has shipped ~11 operator-facing endpoints under
-`/agent-mcp/__*` since the original deploy
+`/conexus/__*` since the original deploy
 (`__projects`, `__create`, `__rename`, `__unregister`, `__stop`,
 `__overview`, `__client-config/<n>.mcp.json`,
 `__client-installer/<n>.sh`, `__alias-usage`, `__remove-alias`,
@@ -42,7 +42,7 @@ code. Two consequent problems:
 ## Decision
 
 Retire the `__` namespace. Every operator endpoint moves to a REST
-resource under `/agent-mcp/api/router/...`. The single reserved
+resource under `/conexus/api/router/...`. The single reserved
 top-level segment `router` (joining `api`, `app`, `assets`, `mcp` —
 all defended at slug-validate time) carves out the admin namespace
 so the surface can't collide with a project named `projects` /
@@ -50,30 +50,30 @@ so the surface can't collide with a project named `projects` /
 
 | Legacy | New | Method |
 |---|---|---|
-| `GET /agent-mcp/__projects` | `GET /agent-mcp/api/router/projects` | `GET` |
-| `POST /agent-mcp/__create` (form-encoded) | `POST /agent-mcp/api/router/projects` (JSON) | `POST` |
-| `POST /agent-mcp/__rename` | `PATCH /agent-mcp/api/router/projects/<name>` (body: `{name, grace_days?}`) | `PATCH` |
-| `POST /agent-mcp/__unregister` | `DELETE /agent-mcp/api/router/projects/<name>` | `DELETE` |
-| `POST /agent-mcp/__stop` | `POST /agent-mcp/api/router/projects/<name>/stop` | `POST` |
-| `GET /agent-mcp/__overview` | `GET /agent-mcp/api/router/overview` | `GET` |
-| `GET /agent-mcp/__client-config/<n>.mcp.json` | `GET /agent-mcp/api/router/projects/<name>/client-config` | `GET` |
-| `GET /agent-mcp/__client-installer/<n>.sh` | `GET /agent-mcp/api/router/projects/<name>/installer` | `GET` |
-| `GET /agent-mcp/__alias-usage` | `GET /agent-mcp/api/router/projects/<name>/aliases?alias=<a>` | `GET` |
-| `POST /agent-mcp/__remove-alias` | `DELETE /agent-mcp/api/router/projects/<name>/aliases/<alias>` | `DELETE` |
-| `POST /agent-mcp/__create-agent` | `POST /agent-mcp/api/router/projects/<name>/agents` | `POST` |
-| *(new)* | `GET /agent-mcp/api/router/health` | `GET` (public) |
+| `GET /conexus/__projects` | `GET /conexus/api/router/projects` | `GET` |
+| `POST /conexus/__create` (form-encoded) | `POST /conexus/api/router/projects` (JSON) | `POST` |
+| `POST /conexus/__rename` | `PATCH /conexus/api/router/projects/<name>` (body: `{name, grace_days?}`) | `PATCH` |
+| `POST /conexus/__unregister` | `DELETE /conexus/api/router/projects/<name>` | `DELETE` |
+| `POST /conexus/__stop` | `POST /conexus/api/router/projects/<name>/stop` | `POST` |
+| `GET /conexus/__overview` | `GET /conexus/api/router/overview` | `GET` |
+| `GET /conexus/__client-config/<n>.mcp.json` | `GET /conexus/api/router/projects/<name>/client-config` | `GET` |
+| `GET /conexus/__client-installer/<n>.sh` | `GET /conexus/api/router/projects/<name>/installer` | `GET` |
+| `GET /conexus/__alias-usage` | `GET /conexus/api/router/projects/<name>/aliases?alias=<a>` | `GET` |
+| `POST /conexus/__remove-alias` | `DELETE /conexus/api/router/projects/<name>/aliases/<alias>` | `DELETE` |
+| `POST /conexus/__create-agent` | `POST /conexus/api/router/projects/<name>/agents` | `POST` |
+| *(new)* | `GET /conexus/api/router/health` | `GET` (public) |
 
 Notes:
 
   - `client-config` keeps the `.mcp.json` payload but the URL drops
     the file extension. The vendor media type
-    `application/vnd.agent-mcp.client-config+json` advertises the
+    `application/vnd.conexus.client-config+json` advertises the
     shape via `Content-Type`.
   - `installer` similarly drops `.sh`; served as `text/x-shellscript`
     so `curl | bash` is unambiguous.
   - All mutation endpoints take JSON bodies (no form-encoded /
     multipart/form-data).
-  - Versioning stays Accept-header (`application/vnd.agent-mcp.v1+json`)
+  - Versioning stays Accept-header (`application/vnd.conexus.v1+json`)
     — no `/v1/` segment in the path.
 
 ### Auth
@@ -83,7 +83,7 @@ All new routes flow through Phase 1 PR D's
 under `/api/...`. The dashboard sends no `token` field in any request
 body — the session cookie is sent automatically.
 
-The one exception is `GET /agent-mcp/api/router/health`, listed in
+The one exception is `GET /conexus/api/router/health`, listed in
 `_UNAUTH_PREFIXES`. It's the unauthenticated liveness probe / public
 service descriptor.
 
@@ -109,13 +109,13 @@ The retirement is **atomic**:
 
 **Positive**
 
-  - One URL surface to reason about. Inline `/agent-mcp/...` strings
+  - One URL surface to reason about. Inline `/conexus/...` strings
     in dashboard code are forbidden; every URL flows through
     `agent_mcp/dashboard/lib/urls.ts`.
   - REST shape lets non-dashboard clients (CI scripts, monitoring,
     future automation) reason about the surface declaratively.
   - The Accept-header gate applies uniformly. The discoverable
-    service descriptor at `GET /agent-mcp/api/router/health`
+    service descriptor at `GET /conexus/api/router/health`
     advertises the version + mode without bypassing auth.
   - Project-name reservation grows from 4 segments to 5 (added
     `router`) but the surface area for collision shrinks: every admin

@@ -5,7 +5,7 @@ releases 5.77.0 → 5.80.0.
 **Date**: 2026-08-12
 **Builds on**: ADR-0014 (REST admin API — the endpoints the dashboard reads),
 ADR-0020 (router is mount-agnostic — the dashboard is a static export behind
-`/agent-mcp/__dashboard`).
+`/conexus/__dashboard`).
 
 ## Context
 

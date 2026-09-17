@@ -3,7 +3,7 @@
  * `proxy:0 Disconnected` ghost entry.
  *
  * Regression context. PR #23 added `apiClient.setBaseUrl` so dashboard
- * fetches under path-prefixed deployments (`/agent-mcp/__dashboard/<name>/`)
+ * fetches under path-prefixed deployments (`/conexus/__dashboard/<name>/`)
  * go through the router proxy. PR's `ApiClientInitializer` then auto-seeds
  * a `server-store` entry so the upstream sidebar gate is satisfied. The
  * seed uses placeholder `host: 'proxy', port: 0` because the entry needs
@@ -13,7 +13,7 @@
  *
  * 1. **Connection bug.** `serverStore.setActiveServer` calls
  *    `apiClient.setServer(host, port)`, which overwrites baseUrl to
- *    `http://proxy:0/api`. The earlier `setBaseUrl('/agent-mcp/__api/<name>')`
+ *    `http://proxy:0/api`. The earlier `setBaseUrl('/conexus/__api/<name>')`
  *    from the seed is lost. `checkServerHealth` then fails (no `proxy:0`
  *    host) and the entry status flips to `'error'`. The cold-start retry
  *    loop re-triggers setActiveServer → same overwrite → never connects.
@@ -29,7 +29,7 @@
  * `apiClient.setBaseUrl(server.baseUrl)` instead of
  * `apiClient.setServer(host, port)`. Display components hide host:port
  * when `baseUrl` is present. The auto-seed in `ApiClientInitializer`
- * passes `baseUrl: '/agent-mcp/__api/<name>'` when seeding.
+ * passes `baseUrl: '/conexus/__api/<name>'` when seeding.
  *
  * These are regression guards — they parse the .ts/.tsx as text rather
  * than execute it. The fix is verified end-to-end via `npm run build`
@@ -112,8 +112,8 @@ describe("path-prefix explicit baseUrl (server-store)", () => {
     ).toBe(true)
     const urlsSrc = read("lib/urls.ts")
     expect(
-      urlsSrc.includes("/agent-mcp/api"),
-      "expected the path-prefix API root literal /agent-mcp/api in " +
+      urlsSrc.includes("/conexus/api"),
+      "expected the path-prefix API root literal /conexus/api in " +
         "lib/urls.ts — needed so the persisted server entry knows " +
         "where to fetch via the router proxy.",
     ).toBe(true)

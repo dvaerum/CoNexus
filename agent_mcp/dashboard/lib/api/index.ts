@@ -1,4 +1,4 @@
-// API client for Agent-MCP backend — barrel.
+// API client for CoNexus backend — barrel.
 //
 // The `Agent` / `Task` / `Memory` etc interfaces declared in the
 // per-resource modules are the canonical row shapes. They add richer

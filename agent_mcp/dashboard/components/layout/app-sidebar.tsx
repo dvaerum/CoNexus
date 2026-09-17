@@ -125,12 +125,12 @@ export function AppSidebar() {
               {/* CC-10 (audit 2026-06-02): dropped the "Improved
                   Dashboard" tagline — read as leftover beta-marketing
                   copy. Show product + version only. */}
-              <div className="font-medium text-foreground">Agent-MCP</div>
+              <div className="font-medium text-foreground">CoNexus</div>
               {/* Version derived from pyproject.toml via
-                  NEXT_PUBLIC_AGENT_MCP_VERSION (see next.config.ts). Never
+                  NEXT_PUBLIC_CONEXUS_VERSION (see next.config.ts). Never
                   hardcode a version literal here — it drifts silently. */}
               <div className="text-muted-foreground tabular-nums">
-                v{process.env.NEXT_PUBLIC_AGENT_MCP_VERSION ?? "dev"}
+                v{process.env.NEXT_PUBLIC_CONEXUS_VERSION ?? "dev"}
               </div>
             </div>
           )}

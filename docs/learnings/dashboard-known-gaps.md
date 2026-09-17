@@ -2,7 +2,7 @@
 
 Migrated 2026-09-06 from the deploy repo's (`home-manager-config`,
 formerly `nixos-developer-system`) `docs/LEARNINGS.md` §9 and
-`docs/UPSTREAM_ISSUES.md` §F — real, still-open Agent-MCP dashboard
+`docs/UPSTREAM_ISSUES.md` §F — real, still-open CoNexus dashboard
 bugs found while operating the deployment, misfiled as deploy notes
 since this fork had no place to track them at the time. Confirmed
 still relevant (not a duplicate of anything already tracked here)

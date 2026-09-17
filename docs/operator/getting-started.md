@@ -1,6 +1,6 @@
-# Getting Started with Agent-MCP
+# Getting Started with CoNexus
 
-Welcome to Agent-MCP! This guide will take you from installation to your first successful multi-agent collaboration workflow.
+Welcome to CoNexus! This guide will take you from installation to your first successful multi-agent collaboration workflow.
 
 ## 📋 Prerequisites
 
@@ -94,8 +94,8 @@ add to your `mcp.json`:
 ```json
 {
   "mcpServers": {
-    "Agent-MCP": {
-      "url": "http://localhost:5454/agent-mcp/mcp/<project>",
+    "CoNexus": {
+      "url": "http://localhost:5454/conexus/mcp/<project>",
       "headers": {
         "Authorization": "Bearer <per-agent-token>"
       }
@@ -112,7 +112,7 @@ add to your `mcp.json`:
 
 As of v5.0.59 the dashboard requires operator login (Phase 1 of the
 operator-login plan; ADR-0013). The agent-side MCP transport
-(`/agent-mcp/mcp/<project>`) is unchanged — agents authenticate with
+(`/conexus/mcp/<project>`) is unchanged — agents authenticate with
 their per-agent token via the `Authorization: Bearer` header. Only
 the dashboard surface uses cookie sessions.
 
@@ -132,21 +132,21 @@ Pick the bootstrap path that matches your deploy shape:
 ```bash
 # Start the router (multi-tenant), then browse to the dashboard.
 conexus-router --port 5454
-# Open http://localhost:5454/agent-mcp/
+# Open http://localhost:5454/conexus/
 ```
 
-The empty-users state redirects you to `/agent-mcp/setup`. Pick a
+The empty-users state redirects you to `/conexus/setup`. Pick a
 username + password; that account becomes the first operator and
 inherits membership in every existing project.
 
 ### Env vars (NixOS, Docker, declarative deploys)
 
 ```bash
-export AGENT_MCP_BOOTSTRAP_USERNAME="dennis"
+export CONEXUS_BOOTSTRAP_USERNAME="dennis"
 # Pass the password via a sops-decrypted env file or systemd
 # `EnvironmentFile=` — anything that doesn't leak into the
 # command line / `ps`-readable args.
-export AGENT_MCP_BOOTSTRAP_PASSWORD="$(cat /run/secrets/agent-mcp-bootstrap-pw)"
+export CONEXUS_BOOTSTRAP_PASSWORD="$(cat /run/secrets/agent-mcp-bootstrap-pw)"
 conexus-router --port 5454
 ```
 
@@ -165,9 +165,9 @@ echo "$NEW_PW" | conexus-cli router create-operator \
     --username alice --password-stdin
 ```
 
-After first boot, log in at `http://localhost:5454/agent-mcp/login`.
-The session cookie is `agent_mcp_session=<opaque>; HttpOnly; Secure;
-SameSite=Lax; Path=/agent-mcp/`. Sessions live 30 days idle, sliding
+After first boot, log in at `http://localhost:5454/conexus/login`.
+The session cookie is `conexus_session=<opaque>; HttpOnly; Secure;
+SameSite=Lax; Path=/conexus/`. Sessions live 30 days idle, sliding
 on every dashboard request; revoke immediately with a SQL `DELETE
 FROM sessions WHERE user_id = ...` against `router.db` (no
 `conexus-cli` subcommand for this exists yet — `router create-operator`
@@ -179,7 +179,7 @@ used above, which operates on a project's own database, not `router.db`).
 
 ## Environment variables
 
-Agent-MCP defaults are designed to work out of the box — none of the
+CoNexus defaults are designed to work out of the box — none of the
 following are required. The provider switch is presence/absence of a
 non-empty `OPENAI_API_KEY` (see
 [`rust/conexus-tools/src/embedding_client.rs`](../../rust/conexus-tools/src/embedding_client.rs)/
@@ -190,12 +190,12 @@ unset (or empty) means the local-Ollama branch.
 | Variable                          | Default (unset `OPENAI_API_KEY`, i.e. Ollama) | Default (`OPENAI_API_KEY` set, i.e. OpenAI) | Notes |
 | --------------------------------- | ---------------------------------------------- | -------------------------------------------- | ----- |
 | `OPENAI_API_KEY`                  | unset                                          | (required — this is the switch)              | Set to a real OpenAI key to use the cloud; leave unset for local Ollama. |
-| `AGENT_MCP_LLM_BASE_URL`          | `http://localhost:11434/v1`                    | not consulted                                | Chat + embedding endpoint override, Ollama path only. |
+| `CONEXUS_LLM_BASE_URL`          | `http://localhost:11434/v1`                    | not consulted                                | Chat + embedding endpoint override, Ollama path only. |
 | `OLLAMA_MODEL`                    | `qwen3:1.7b`                                   | not consulted                                | Chat-completions model, Ollama path only. |
 | `OPENAI_BASE_URL`                 | not consulted                                  | `https://api.openai.com/v1`                  | Chat + embedding endpoint override, OpenAI path only. |
 | `OPENAI_MODEL`                    | not consulted                                  | **required, no default** — a missing value is a hard config error | Chat-completions model, OpenAI path only. |
-| `AGENT_MCP_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`                         | `text-embedding-3-large`                     | RAG embedding model; an explicit value overrides either branch's default. |
-| `AGENT_MCP_EMBEDDING_DIMENSION`   | `1024`                                         | `1536`                                       | Must match the embedding model; an explicit value overrides either branch's default. |
+| `CONEXUS_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`                         | `text-embedding-3-large`                     | RAG embedding model; an explicit value overrides either branch's default. |
+| `CONEXUS_EMBEDDING_DIMENSION`   | `1024`                                         | `1536`                                       | Must match the embedding model; an explicit value overrides either branch's default. |
 | `MCP_PROJECT_DIR`                 | (set by `--project-dir`)                       | (set by `--project-dir`)                     | **Advanced.** The CLI sets this from `--project-dir`. Schema authority is `sea-orm-migration`, not Alembic — see `rust/conexus-db/src/migration/mod.rs`'s module doc for the migration model. |
 
 Pre-v5.0.53 wirings used a `.env.example` checked into the repo
@@ -219,7 +219,7 @@ via the `MCP_AGENT_TOKEN` env var stamped into the tmux session by
 
 ## 🎯 Your First Multi-Agent Project
 
-Let's build a simple task management system to demonstrate Agent-MCP's capabilities.
+Let's build a simple task management system to demonstrate CoNexus's capabilities.
 
 ### Step 1: Create Your Project Directory
 ```bash
@@ -514,7 +514,7 @@ npm run dev
 ```
 
 ### ❌ "MCP server connection failed"
-**Solution**: Verify the router is running on the correct port and that your AI assistant can reach `http://localhost:5454/agent-mcp/mcp/<project-name>` (the per-project MCP endpoint, proxied through the router — `conexus-backend` has no direct client-facing port of its own).
+**Solution**: Verify the router is running on the correct port and that your AI assistant can reach `http://localhost:5454/conexus/mcp/<project-name>` (the per-project MCP endpoint, proxied through the router — `conexus-backend` has no direct client-facing port of its own).
 
 ---
 
@@ -554,7 +554,7 @@ npm run dev
 2. **Experiment with Agent Specialization** - Create frontend-only, backend-only, or testing-focused agents
 3. **Explore Advanced Patterns** - Use multiple coordinated agents for larger projects
 
-### Contribute to Agent-MCP
+### Contribute to CoNexus
 1. **Share Your MCDs** - Help others learn from your examples
 2. **Report Issues** - Help improve the platform
 3. **Suggest Features** - Shape the future of AI collaboration
@@ -566,6 +566,6 @@ npm run dev
 
 ---
 
-**Congratulations! You've successfully set up Agent-MCP and completed your first multi-agent project. You're now ready to build amazing things with coordinated AI intelligence.**
+**Congratulations! You've successfully set up CoNexus and completed your first multi-agent project. You're now ready to build amazing things with coordinated AI intelligence.**
 
-**[Continue with The Complete MCD Guide →](../mcd-example/mcd-guide.md)**
+**[Continue with The Complete MCD Guide →](../mcd-example/mcd-guide.md)**

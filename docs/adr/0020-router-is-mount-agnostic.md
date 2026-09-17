@@ -19,7 +19,7 @@ operator-SSE 500-on-disconnect is silenced (`security_headers` catches
 `/agent-mcp` URLs in the served page, connected, no console errors.
 **Date**: 2026-07-31
 **Amends / supersedes-in-part**:
-  - **ADR-0008** (single-tenant URL parity) — its `/agent-mcp/...` URL
+  - **ADR-0008** (single-tenant URL parity) — its `/conexus/...` URL
     *examples* and the assumption that the router owns its mount prefix.
     ADR-0008's actual decision (single-tenant reaches URL parity with
     multi-tenant; a build artefact "works at any prefix", lines 52/65)
@@ -36,8 +36,8 @@ operator-SSE 500-on-disconnect is silenced (`security_headers` catches
 ## Context
 
 The always-on router serves every route under a hardcoded `/agent-mcp`
-prefix — `GET /agent-mcp/api/router/health`, `/agent-mcp/app/<project>/`,
-`/agent-mcp/<project>/mcp`, `/agent-mcp/assets`, and so on. The literal
+prefix — `GET /conexus/api/router/health`, `/conexus/app/<project>/`,
+`/conexus/<project>/mcp`, `/conexus/assets`, and so on. The literal
 `/agent-mcp` is baked into ~20 source files (25 occurrences in
 `router/app.py` alone, plus `login.py`, `sso.py`, `identity.py`,
 `admin_api.py`, `asset_prefix.py`, `project_orchestrator.py`,
@@ -54,7 +54,7 @@ style nit — it surfaced concretely when standing up a second front door:
 > WireGuard tunnel to the router) could reach the router at the TCP level
 > (`nc` succeeded) but every request 404'd, because Traefik mounted the
 > service at the **root** of that host while the router only answers under
-> `/agent-mcp/`. The operator's correct mental model — "the `/agent-mcp`
+> `/conexus/`. The operator's correct mental model — "the `/agent-mcp`
 > prefix should live in the proxy, since that's what hosts multiple
 > services on one domain" — is not expressible today.
 
@@ -62,13 +62,13 @@ style nit — it surfaced concretely when standing up a second front door:
 same time, **both**
 
   - `https://mm.best.aau.dk/…` (Traefik, mounted at the host **root**), and
-  - `https://nixos-developer-system.<tailnet>/agent-mcp/…`
+  - `https://nixos-developer-system.<tailnet>/conexus/…`
     (tailscale-serve, mounted under **`/agent-mcp`**).
 
 The absolute URLs the app must emit (dashboard `assetPrefix`, `Location`
 redirects, the pasteable `.mcp.json` snippet) differ between those two
 entry points in both host *and* prefix. A single static config
-(`AGENT_MCP_EXTERNAL_URL` today) can encode only one of them, so it
+(`CONEXUS_EXTERNAL_URL` today) can encode only one of them, so it
 structurally cannot serve both. The external identity must be derived
 **per request**.
 
@@ -102,7 +102,7 @@ mount prefix is owned entirely by the reverse proxy.**
    - *Redirects* (`Location`) → relative where possible (a relative
      redirect resolves correctly under any mount); otherwise prepend the
      derived prefix.
-   - *Dashboard `assetPrefix`* → the existing `__AGENT_MCP_ASSET_PREFIX__`
+   - *Dashboard `assetPrefix`* → the existing `__CONEXUS_ASSET_PREFIX__`
      sentinel substitution (`router/asset_prefix.py`) is driven by the
      **per-request** `X-Forwarded-Prefix` instead of a static env, so the
      HTML served over each host references the right asset base.
@@ -110,18 +110,18 @@ mount prefix is owned entirely by the reverse proxy.**
      → built from the per-request proto + host + prefix, so a snippet
      minted via `mm.best.aau.dk` reads `https://mm.best.aau.dk/mcp/<p>`
      and one minted via the tailnet reads
-     `https://…ts.net/agent-mcp/mcp/<p>`.
+     `https://…ts.net/conexus/mcp/<p>`.
 
-5. **`AGENT_MCP_EXTERNAL_URL` becomes a fallback, not the source of
+5. **`CONEXUS_EXTERNAL_URL` becomes a fallback, not the source of
    truth.** It is used only when there are no forwarded headers to derive
    from — e.g. a snippet generated outside any HTTP request (a daemon /
    CLI path). In-request generation always prefers the forwarded headers.
 
 6. **Trusting the prefix is gated by the trusted-proxy allow-list.**
    `X-Forwarded-Prefix` / `-Host` are honored **only** from
-   `AGENT_MCP_RATELIMIT_TRUSTED_PROXIES` (loopback + the configured proxy
+   `CONEXUS_RATELIMIT_TRUSTED_PROXIES` (loopback + the configured proxy
    source IPs — e.g. Traefik's WireGuard peer). From an untrusted source
-   they are ignored and the app falls back to root + `AGENT_MCP_EXTERNAL_URL`.
+   they are ignored and the app falls back to root + `CONEXUS_EXTERNAL_URL`.
    This closes the spoofing surface a header-derived absolute URL would
    otherwise open (a forged prefix could poison a generated redirect or a
    pasteable snippet). The gate already exists for `X-Forwarded-Proto` /
@@ -166,7 +166,7 @@ CI stays green after each step:
    from route registration; update the two production proxies
    (tailscale-serve TLS config + the nginx module) to **strip
    `/agent-mcp` and send `X-Forwarded-Prefix: /agent-mcp`**. External URLs
-   (`…/agent-mcp/…`), existing bookmarks, and already-distributed
+   (`…/conexus/…`), existing bookmarks, and already-distributed
    `.mcp.json` snippets keep working unchanged — only the internal mount
    moved. Traefik at `mm.best.aau.dk` needs no prefix (root) and works
    the moment step 2 lands.
@@ -175,14 +175,14 @@ CI stays green after each step:
 
 ## Verification
 
-- One backend, two proxies, at once: `…/agent-mcp/api/router/health` via
+- One backend, two proxies, at once: `…/conexus/api/router/health` via
   the tailnet **and** `https://mm.best.aau.dk/api/router/health` via
   Traefik both return `200`; a `.mcp.json` snippet minted through each
   front door carries that front door's host+prefix; the dashboard's
   assets load under each mount.
 - Security: a direct (untrusted) request with a forged
   `X-Forwarded-Prefix` does **not** change any generated URL (falls back
-  to root + `AGENT_MCP_EXTERNAL_URL`); only the configured trusted proxy
+  to root + `CONEXUS_EXTERNAL_URL`); only the configured trusted proxy
   is honored.
 - Regression: the ADR-0014 reserved-segment collision guards and
   single-tenant URL-parity (ADR-0008) tests still pass with the prefix

@@ -21,7 +21,7 @@ export const BROADCAST = "__broadcast"
 
 // Wave 2 (cleanup-wave-2): the ``adminToken()`` helper is gone.
 // Dashboard mutations authenticate via the operator session cookie
-// set on /agent-mcp/login — the browser attaches it to every fetch
+// set on /conexus/login — the browser attaches it to every fetch
 // automatically (the apiClient helper and this ``callMessages`` helper
 // both opt into ``credentials: 'include'``).
 //
@@ -32,7 +32,7 @@ export const BROADCAST = "__broadcast"
 // /api/messages/<id>; delete is DELETE /api/messages/<id>.
 //
 // Wave 2 (cleanup-wave-2): ``credentials: "include"`` ensures the
-// ``agent_mcp_session`` cookie travels with the request even on the
+// ``conexus_session`` cookie travels with the request even on the
 // dashboard's cross-origin-but-same-site dev URLs; the request body
 // no longer carries a bearer token, so missing the cookie would
 // surface as the backend's 401 login_required envelope.
@@ -47,7 +47,7 @@ export async function callMessages(
     headers: {
       "Content-Type": "application/json",
       // PR-A: REST endpoints require the strict v1 media type.
-      "Accept": "application/vnd.agent-mcp.v1+json",
+      "Accept": "application/vnd.conexus.v1+json",
     },
     body: JSON.stringify(body),
     credentials: "include",

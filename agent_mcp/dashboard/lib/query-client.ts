@@ -201,7 +201,7 @@ export const GROUPS_KEY = "groups" as const
  *
  * Deliberately NOT project-namespaced (contrast `tasksQueryKey` /
  * `messagesQueryKey`, which carry a project segment). Groups are a
- * ROUTER-level resource — `GET /agent-mcp/api/router/groups` lives under
+ * ROUTER-level resource — `GET /conexus/api/router/groups` lives under
  * the router-admin root, not under any single project's backend — so a
  * bare `['groups']` is the correct scope. There is exactly one groups
  * list per router, shared across every project the operator can see.

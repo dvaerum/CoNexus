@@ -14,7 +14,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 // "v3.4.0" that drifted far behind the real version).
 //
 // Resolution order:
-//   1. NEXT_PUBLIC_AGENT_MCP_VERSION from the environment — the Nix build
+//   1. NEXT_PUBLIC_CONEXUS_VERSION from the environment — the Nix build
 //      passes it (sourced from this package's own package.json) so the
 //      sandboxed build still gets the right number even if it only has
 //      this directory in scope.
@@ -22,7 +22,7 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 //      `npm run build` from the dashboard dir.
 //   3. "dev" — last-resort fallback if neither is available.
 function resolveVersion(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_AGENT_MCP_VERSION
+  const fromEnv = process.env.NEXT_PUBLIC_CONEXUS_VERSION
   if (fromEnv) return fromEnv
   try {
     const pkg = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf8"))
@@ -34,7 +34,7 @@ function resolveVersion(): string {
   return "dev"
 }
 
-const AGENT_MCP_VERSION = resolveVersion()
+const CONEXUS_VERSION = resolveVersion()
 
 const nextConfig: NextConfig = {
   // Enable static export for serving through the router (only in production)
@@ -70,7 +70,7 @@ const nextConfig: NextConfig = {
   //
   // This inversion (prefix-agnostic build + runtime substitution)
   // means one build artifact serves every deployment URL — operators
-  // wanting `/tools/` instead of `/agent-mcp/__dashboard/` just point
+  // wanting `/tools/` instead of `/conexus/__dashboard/` just point
   // the router at the new prefix; no rebuild.
   //
   // The ASSET_PREFIX env var is still honoured as an escape hatch (a
@@ -83,7 +83,7 @@ const nextConfig: NextConfig = {
   // Inline the resolved product version so client components (the sidebar
   // footer) read it via process.env at build time. See resolveVersion().
   env: {
-    NEXT_PUBLIC_AGENT_MCP_VERSION: AGENT_MCP_VERSION,
+    NEXT_PUBLIC_CONEXUS_VERSION: CONEXUS_VERSION,
   },
 };
 

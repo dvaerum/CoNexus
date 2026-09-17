@@ -3,17 +3,17 @@ import { describe, expect, it } from "vitest"
 import { deriveMount } from "./urls"
 
 // ADR-0020: the dashboard derives its mount prefix from the URL at
-// runtime so ONE build serves both the tailnet (/agent-mcp/…) and a
+// runtime so ONE build serves both the tailnet (/conexus/…) and a
 // Traefik root front door (/…). The critical tailnet-regression guard is
-// that a /agent-mcp/… path still derives exactly "/agent-mcp".
+// that a /conexus/… path still derives exactly "/conexus".
 describe("deriveMount", () => {
-  it("returns /agent-mcp for tailnet app paths (byte-identical)", () => {
-    expect(deriveMount("/agent-mcp/app/foo/")).toBe("/agent-mcp")
-    expect(deriveMount("/agent-mcp/app/")).toBe("/agent-mcp")
-    expect(deriveMount("/agent-mcp/app/foo/?page=tasks")).toBe("/agent-mcp")
-    expect(deriveMount("/agent-mcp/api/foo/all-data")).toBe("/agent-mcp")
-    expect(deriveMount("/agent-mcp/assets/chunk.js")).toBe("/agent-mcp")
-    expect(deriveMount("/agent-mcp/login")).toBe("/agent-mcp")
+  it("returns /conexus for tailnet app paths (byte-identical)", () => {
+    expect(deriveMount("/conexus/app/foo/")).toBe("/conexus")
+    expect(deriveMount("/conexus/app/")).toBe("/conexus")
+    expect(deriveMount("/conexus/app/foo/?page=tasks")).toBe("/conexus")
+    expect(deriveMount("/conexus/api/foo/all-data")).toBe("/conexus")
+    expect(deriveMount("/conexus/assets/chunk.js")).toBe("/conexus")
+    expect(deriveMount("/conexus/login")).toBe("/conexus")
   })
 
   it("returns '' for the root front door (Traefik at host root)", () => {
@@ -24,12 +24,12 @@ describe("deriveMount", () => {
   })
 
   it("supports an arbitrary proxy-chosen prefix", () => {
-    expect(deriveMount("/tools/agent-mcp/app/foo/")).toBe("/tools/agent-mcp")
+    expect(deriveMount("/tools/conexus/app/foo/")).toBe("/tools/conexus")
   })
 
-  it("falls back to /agent-mcp with no window (SSR/prerender)", () => {
+  it("falls back to /conexus with no window (SSR/prerender)", () => {
     // In vitest's node env there is no window; the no-arg call uses the
     // SSR default so build-time prerender is unaffected.
-    expect(deriveMount()).toBe("/agent-mcp")
+    expect(deriveMount()).toBe("/conexus")
   })
 })

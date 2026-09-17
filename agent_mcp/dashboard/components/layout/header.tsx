@@ -27,7 +27,7 @@ const VIEW_TITLES: Record<string, string> = {
 // R12-F1: the dashboard had no logout UI anywhere, leaving an operator
 // on a shared/kiosk browser no way to end their session for up to the
 // cookie's 30-day expiry. The server route
-// (POST /agent-mcp/logout — agent_mcp/router/login.py) was already
+// (POST /conexus/logout — agent_mcp/router/login.py) was already
 // correct (POST-only, CSRF-safe via SameSite cookie, httpOnly). This
 // fires that POST then bounces to the login page — best-effort even if
 // the request itself fails, since the goal is getting the operator off

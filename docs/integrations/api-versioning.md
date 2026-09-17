@@ -1,6 +1,6 @@
-# Agent-MCP REST API versioning
+# CoNexus REST API versioning
 
-The Agent-MCP REST surface under `/agent-mcp/api/<name>/...` (PR-B
+The CoNexus REST surface under `/conexus/api/<name>/...` (PR-B
 renamed from `/__api/`) requires every request to carry an explicit,
 version-pinned `Accept` header. A request without it (or with a
 generic `application/json`, `*/*`, etc.) is rejected with HTTP 406 and
@@ -11,7 +11,7 @@ a structured error body.
 Send this header on every REST request:
 
 ```
-Accept: application/vnd.agent-mcp.v1+json
+Accept: application/vnd.conexus.v1+json
 ```
 
 If you forget, you get a 406 response that tells you exactly what to
@@ -28,7 +28,7 @@ Two reasons:
    sent `Accept: application/json` would have no way to tell which
    version it got — fragile.
 2. **Subsumes the §3.7 audit finding.** Previously, the
-   `/agent-mcp/api/<name>/tokens` endpoint applied its
+   `/conexus/api/<name>/tokens` endpoint applied its
    `Authorization: Bearer` admin-role check only when a header was
    present, leaving the response readable to a request that sent no
    credentials at all. The Accept gate runs first, so an unauthenticated
@@ -40,7 +40,7 @@ Two reasons:
 ```json
 {
   "error": "version_required",
-  "message": "agent-mcp REST endpoints require an Accept header specifying the API version. Resend with: Accept: application/vnd.agent-mcp.v1+json",
+  "message": "agent-mcp REST endpoints require an Accept header specifying the API version. Resend with: Accept: application/vnd.conexus.v1+json",
   "supported_versions": ["v1"],
   "current_default": "v1",
   "docs": "https://github.com/dvaerum/CoNexus/blob/main/docs/integrations/api-versioning.md"
@@ -60,19 +60,19 @@ Two reasons:
 The gate is forgiving about the *shape* of the Accept header, strict
 about the *content*:
 
-- Bare media type: `application/vnd.agent-mcp.v1+json` — accepted.
-- With parameters: `application/vnd.agent-mcp.v1+json;q=0.9` — accepted.
-- Multi-value list: `text/plain, application/vnd.agent-mcp.v1+json` —
+- Bare media type: `application/vnd.conexus.v1+json` — accepted.
+- With parameters: `application/vnd.conexus.v1+json;q=0.9` — accepted.
+- Multi-value list: `text/plain, application/vnd.conexus.v1+json` —
   accepted (the v1 media type must appear somewhere).
 - Wildcards: `*/*`, `application/*`, `application/json` — **rejected**.
 - Missing header: **rejected**.
 
 ## What's NOT gated
 
-- `/agent-mcp/<name>/mcp` — the MCP transport has its own version
+- `/conexus/<name>/mcp` — the MCP transport has its own version
   negotiation inside `initialize.protocolVersion`. Adding our Accept
   gate would break every MCP client.
-- `/agent-mcp/app/...` and `/agent-mcp/assets/...` — dashboard HTML
+- `/conexus/app/...` and `/conexus/assets/...` — dashboard HTML
   and Next.js static assets are loaded by browsers, which don't send
   our private media type.
 - CORS preflights (`OPTIONS`) — exempted so browsers can complete
@@ -81,7 +81,7 @@ about the *content*:
 
 ## Service descriptor
 
-`GET /agent-mcp/` returns a JSON discovery document so a plain HTTP
+`GET /conexus/` returns a JSON discovery document so a plain HTTP
 client can find the endpoint layout without scraping HTML (port of
 `_service_descriptor`, `rust/conexus-router/src/dashboard_static.rs`;
 the internal package version is deliberately NOT echoed — SEC,
@@ -93,23 +93,23 @@ operator consumes):
   "service": "agent-mcp",
   "mode": "multi-tenant",
   "endpoints": {
-    "api": "/agent-mcp/api",
-    "app": "/agent-mcp/app",
-    "assets": "/agent-mcp/assets",
-    "mcp": "/agent-mcp/mcp"
+    "api": "/conexus/api",
+    "app": "/conexus/app",
+    "assets": "/conexus/assets",
+    "mcp": "/conexus/mcp"
   },
-  "projects_url": "/agent-mcp/api/router/projects",
-  "overview_url": "/agent-mcp/api/router/overview",
-  "health_url": "/agent-mcp/api/router/health",
+  "projects_url": "/conexus/api/router/projects",
+  "overview_url": "/conexus/api/router/overview",
+  "health_url": "/conexus/api/router/health",
   "single_tenant_project": null
 }
 ```
 
-(The old `/agent-mcp/__projects`, `/agent-mcp/__overview`,
-`/agent-mcp/__create`, `/agent-mcp/__rename` dunder endpoints named in
+(The old `/conexus/__projects`, `/conexus/__overview`,
+`/conexus/__create`, `/conexus/__rename` dunder endpoints named in
 an earlier draft of this doc were retired by ADR-0014 — the real
 project-lifecycle/admin surface now lives entirely under
-`/agent-mcp/api/router/*`.)
+`/conexus/api/router/*`.)
 
 PR-B (v4.0.0) renamed the top-level prefixes from
 `/__api` / `/__dashboard` / `/__dashboard/_next` to `/api` / `/app` /
@@ -117,7 +117,7 @@ PR-B (v4.0.0) renamed the top-level prefixes from
 grace period for external services and bookmarks.
 
 The descriptor is Accept-negotiated: a browser (`Accept: text/html`)
-sees the existing 302 → `/agent-mcp/app/`; everything else
+sees the existing 302 → `/conexus/app/`; everything else
 sees the JSON above. The descriptor itself does NOT require the v1
 media type — discovery is the entry point, not a v1-specific
 operation.

@@ -86,7 +86,7 @@ function DashboardPage() {
   // simply ignores its value.)
   const { currentSection } = useSectionRoute()
 
-  // Phase 3.5a — when the URL is `/agent-mcp/app/` (no project
+  // Phase 3.5a — when the URL is `/conexus/app/` (no project
   // segment; PR-B renamed from /__dashboard/), render the
   // cross-project overview instead of the
   // per-project dashboard. The MainLayout is skipped because the

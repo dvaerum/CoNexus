@@ -192,7 +192,7 @@ the SSO callback path).
   trusted-proxy set includes loopback (`127.0.0.1,::1`) unconditionally,
   while `sso.is_trusted_proxy_source` was deliberately built with *no*
   implicit trust — only the operator-configured
-  `AGENT_MCP_SSO_PROXY_TRUSTED_IPS` allowlist. Delegating to the
+  `CONEXUS_SSO_PROXY_TRUSTED_IPS` allowlist. Delegating to the
   "canonical" `rate_limit` helper (pass 2's literal recommendation) would
   have widened SSO's proxy-header trust to implicitly include loopback,
   a real regression caught by the existing
@@ -479,7 +479,7 @@ home for the three remaining classification questions, consumed by
   `_add_admin_trailing_slash_aliases` idiom, so every mechanically-
   derived re-registration (trailing-slash alias, ADR-0020 root mirror)
   inherits the marking for free. **Live bug fixed**: the old
-  `/agent-mcp/api/router/health` entry claimed in its own comment to be
+  `/conexus/api/router/health` entry claimed in its own comment to be
   "exact-prefixed" but was matched with `path.startswith`, so a future
   `/api/router/health-details` route would have silently bypassed the
   session gate — the R5-F6 unbounded-prefix class, fixed in the ROUTING

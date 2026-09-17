@@ -3,41 +3,41 @@
  *
  * Every dashboard URL — overview reads, project lifecycle mutations,
  * wiring snippets, MCP transport, static assets — flows through one of
- * the helpers below. Inline ``/agent-mcp/...`` strings are forbidden;
+ * the helpers below. Inline ``/conexus/...`` strings are forbidden;
  * the next URL rename touches this file and the consumers that use
  * the helpers, not every component with a string template.
  *
  * Public surface (locked by ADR 0014):
  *
- *   /agent-mcp/                              service descriptor
+ *   /conexus/                              service descriptor
  *                                            (browsers: 302 → /app/)
- *   /agent-mcp/app/                          React overview (cross-project)
- *   /agent-mcp/app/<name>/                   per-project dashboard pages
- *   /agent-mcp/app/<name>/<sec>              section deep-link
- *   /agent-mcp/api/<name>/<rest>             per-project REST proxy
+ *   /conexus/app/                          React overview (cross-project)
+ *   /conexus/app/<name>/                   per-project dashboard pages
+ *   /conexus/app/<name>/<sec>              section deep-link
+ *   /conexus/api/<name>/<rest>             per-project REST proxy
  *                                            (strict Accept gate)
- *   /agent-mcp/api/router/health             public service descriptor
- *   /agent-mcp/api/router/projects           list / create
- *   /agent-mcp/api/router/projects/<n>       PATCH / DELETE
- *   /agent-mcp/api/router/projects/<n>/stop  stop backend
- *   /agent-mcp/api/router/projects/<n>/client-config
+ *   /conexus/api/router/health             public service descriptor
+ *   /conexus/api/router/projects           list / create
+ *   /conexus/api/router/projects/<n>       PATCH / DELETE
+ *   /conexus/api/router/projects/<n>/stop  stop backend
+ *   /conexus/api/router/projects/<n>/client-config
  *                                            JSON .mcp.json descriptor
- *   /agent-mcp/api/router/projects/<n>/installer
+ *   /conexus/api/router/projects/<n>/installer
  *                                            text/x-shellscript installer
- *   /agent-mcp/api/router/projects/<n>/aliases?alias=<a>
+ *   /conexus/api/router/projects/<n>/aliases?alias=<a>
  *                                            alias usage lookup
- *   /agent-mcp/api/router/projects/<n>/aliases/<a>
+ *   /conexus/api/router/projects/<n>/aliases/<a>
  *                                            DELETE — expire alias now
- *   /agent-mcp/api/router/projects/<n>/agents
+ *   /conexus/api/router/projects/<n>/agents
  *                                            POST — admin create-agent
- *   /agent-mcp/api/router/overview           cross-project envelope
- *   /agent-mcp/assets/<rest>                 Next.js static bundle
- *   /agent-mcp/mcp/<name>                    MCP transport
+ *   /conexus/api/router/overview           cross-project envelope
+ *   /conexus/assets/<rest>                 Next.js static bundle
+ *   /conexus/mcp/<name>                    MCP transport
  */
 
 // ── Mount prefix (ADR-0020) ─────────────────────────────────────────
 // The router serves the dashboard at different external mounts: under
-// `/agent-mcp/…` on the tailnet, and at the host ROOT behind a Traefik
+// `/conexus/…` on the tailnet, and at the host ROOT behind a Traefik
 // reverse proxy (mm.best.aau.dk). The prefix is owned by the proxy, so
 // the dashboard DERIVES it at runtime from window.location — everything
 // below (API base, nav links, login, SSE, path regexes) cascades from it.
@@ -45,9 +45,9 @@
 // Derivation: the prefix is whatever precedes the first reserved segment
 // (app | api | assets | mcp | login — ADR-0014's reserved segments). The
 // dashboard SPA only ever runs under `…/app/…`, so this always resolves:
-//   /agent-mcp/app/foo/  → "/agent-mcp"   (tailnet — byte-identical)
+//   /conexus/app/foo/  → "/conexus"   (tailnet — byte-identical)
 //   /app/foo/            → ""             (Traefik root)
-// SSR/prerender (next build, no window) defaults to "/agent-mcp"; the
+// SSR/prerender (next build, no window) defaults to "/conexus"; the
 // static export re-runs this in the browser at import, so the client
 // value is always correct per-origin.
 export function deriveMount(pathname?: string): string {
@@ -57,7 +57,7 @@ export function deriveMount(pathname?: string): string {
   // No window (SSR/prerender) → the historical default; the static
   // export re-evaluates this in the browser at import, so the client
   // value is always correct per-origin.
-  if (p === null || p === undefined) return "/agent-mcp"
+  if (p === null || p === undefined) return "/conexus"
   const m = p.match(/^(.*?)\/(?:app|api|assets|mcp|login)(?:\/|$)/)
   return m?.[1] ?? ""
 }
@@ -91,7 +91,7 @@ export function overviewAppUrl(): string {
   return `${APP}/`
 }
 
-/** Per-project dashboard root (e.g. /agent-mcp/app/washing-brothers/). */
+/** Per-project dashboard root (e.g. /conexus/app/washing-brothers/). */
 export function appUrl(projectName: string, section?: string): string {
   const base = `${APP}/${encodeURIComponent(projectName)}/`
   if (section === undefined) return base
@@ -117,7 +117,7 @@ export function mcpUrl(projectName: string, origin: string = ""): string {
 
 /** Operator dashboard live-update SSE channel for a project. Distinct
  *  from ``mcpUrl`` (the agent-scoped MCP transport): this is the
- *  cookie-authenticated ``GET /agent-mcp/api/<name>/events`` endpoint the
+ *  cookie-authenticated ``GET /conexus/api/<name>/events`` endpoint the
  *  dashboard's notification client subscribes to, proxied through the
  *  REST ``/api`` root so the operator session cookie carries the auth. */
 export function eventsUrl(projectName: string, origin: string = ""): string {
@@ -148,7 +148,7 @@ export function routerProjectUrl(name: string, query?: string): string {
 }
 
 /** ``GET`` returns the project's ``.mcp.json`` body with the vendor
- *  media type ``application/vnd.agent-mcp.client-config+json``. */
+ *  media type ``application/vnd.conexus.client-config+json``. */
 export function projectClientConfigUrl(name: string): string {
   return `${ROUTER_PROJECTS}/${encodeURIComponent(name)}/client-config`
 }
@@ -247,7 +247,7 @@ export function routerSsoConfigUrl(): string {
 
 /** Regex matching <mount>/app/<name>/<rest?> — extracts the project name
  *  as match[1]. ADR-0020: built from the derived mount so it matches at
- *  both /agent-mcp/app/<name> (tailnet) and /app/<name> (Traefik root).
+ *  both /conexus/app/<name> (tailnet) and /app/<name> (Traefik root).
  *  This is what makes project-context.ts identify the project (and take
  *  the router-served render path) under either front door. */
 export const APP_PROJECT_PATH_RE = new RegExp(`${ROOT}/app/([^/]+)`)
@@ -257,6 +257,6 @@ export const APP_PROJECT_PATH_RE = new RegExp(`${ROOT}/app/([^/]+)`)
 export const APP_OVERVIEW_PATH_RE = new RegExp(`${ROOT}/app/?$`)
 
 // v5.0.0: ``LEGACY_DASHBOARD_PATH_RE`` (the regex for the old
-// /agent-mcp/__dashboard/<name> path shape) was removed alongside the
+// /conexus/__dashboard/<name> path shape) was removed alongside the
 // router's 308 redirects for that surface. No importers existed at
 // the time of removal.

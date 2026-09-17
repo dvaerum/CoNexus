@@ -18,7 +18,7 @@ the actual current behavior of every component the PR will touch so the
 
 | # | Spec requirement | Today | Delta needed |
 |---|---|---|---|
-| 1 | Default timeout 60s, configurable via `AGENT_MCP_EVENT_WAIT_TIMEOUT`, per-call override up to ceiling. | Default 60 (`WAIT_FOR_EVENTS_DEFAULT_TIMEOUT = 60`). Ceiling 900 (`WAIT_FOR_EVENTS_MAX_TIMEOUT = 900`). No env var. | Add env-var read at module load (or per-call). Lower ceiling to 300 per locked decisions table. |
+| 1 | Default timeout 60s, configurable via `CONEXUS_EVENT_WAIT_TIMEOUT`, per-call override up to ceiling. | Default 60 (`WAIT_FOR_EVENTS_DEFAULT_TIMEOUT = 60`). Ceiling 900 (`WAIT_FOR_EVENTS_MAX_TIMEOUT = 900`). No env var. | Add env-var read at module load (or per-call). Lower ceiling to 300 per locked decisions table. |
 | 2 | One-call-per-agent (HTTP-409-equivalent). | NOT enforced. A second concurrent call just clears the same `signal_for(agent_id)` Event and races. | Add `agent_event_locks: dict[str, asyncio.Lock]` in `globals.py`; tool acquires non-blocking; second call returns error envelope. |
 | 3 | On every call, check `project_context.config_auto_event_loop_global` AND `agents.auto_event_loop`. If either OFF, return `stop_listening` immediately. | Not checked. | Add flag-check at top of impl; build `_stop_listening_envelope()` helper. |
 | 4 | Mid-flight stop on flag flip — toggle-write code wakes affected waiters; on wake, rechecks flags. | No mid-flight wake path. Toggle dashboard endpoint doesn't notify. | Wire `signal_for(agent_id).set()` into the toggle-write paths (per-agent + global). After `wait()` returns, recheck flags before returning. |

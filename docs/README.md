@@ -1,11 +1,11 @@
-# Agent-MCP documentation
+# CoNexus documentation
 
 The `docs/` tree is organised by audience. Pick the folder that
 matches what you're trying to do.
 
 ## Categories
 
-### [`operator/`](./operator/) — running Agent-MCP
+### [`operator/`](./operator/) — running CoNexus
 
 For operators standing up the router, the dashboard, or a
 per-project backend.
@@ -17,10 +17,10 @@ per-project backend.
 ### [`integrations/`](./integrations/) — connecting external clients
 
 For wiring Claude Code, IDE plugins, ad-hoc scripts, or the REST
-admin surface to a running Agent-MCP project.
+admin surface to a running CoNexus project.
 
 - [`external-mcp-client.md`](./integrations/external-mcp-client.md) — per-agent bearer tokens; required after the `system_token` retirement (PRs #208–#211).
-- [`api-versioning.md`](./integrations/api-versioning.md) — the strict `Accept: application/vnd.agent-mcp.v1+json` gate on `/agent-mcp/api/<name>/…`.
+- [`api-versioning.md`](./integrations/api-versioning.md) — the strict `Accept: application/vnd.conexus.v1+json` gate on `/conexus/api/<name>/…`.
 
 ### [`adr/`](./adr/) — architecture decision records
 
@@ -57,7 +57,7 @@ The MCD authoring guide plus a worked example.
 
 ### [`theory/`](./theory/) — background reading
 
-Chapters on the cognitive model behind Agent-MCP: empathy,
+Chapters on the cognitive model behind CoNexus: empathy,
 context, tools, intelligent judgement. Source PDFs live under
 [`theory/chapters/`](./theory/chapters/).
 

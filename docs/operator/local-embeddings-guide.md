@@ -1,4 +1,4 @@
-# Local Embeddings Setup Guide for Agent-MCP
+# Local Embeddings Setup Guide for CoNexus
 
 **A Beginner-Friendly Guide to Using Free Local Embedding Models**
 
@@ -10,7 +10,7 @@
 3. [Prerequisites](#prerequisites)
 4. [Installing Ollama](#installing-ollama)
 5. [Pulling Embedding Models](#pulling-embedding-models)
-6. [Configuring Agent-MCP](#configuring-agent-mcp)
+6. [Configuring CoNexus](#configuring-agent-mcp)
 7. [Testing Your Setup](#testing-your-setup)
 8. [Performance Benchmarks](#performance-benchmarks)
 9. [Troubleshooting](#troubleshooting)
@@ -33,7 +33,7 @@ Think of it like this: If you want to know how similar "cat" and "dog" are, you 
 
 When you compare these vectors, "cat" and "dog" would be very similar (high score), while "cat" and "car" would be less similar (lower score).
 
-**Why Agent-MCP Uses Embeddings**:
+**Why CoNexus Uses Embeddings**:
 - Search through your project documentation intelligently
 - Find relevant code snippets
 - Understand relationships between tasks
@@ -61,7 +61,7 @@ When you compare these vectors, "cat" and "dog" would be very similar (high scor
 ### When to Use OpenAI vs Local
 
 **Use OpenAI if:**
-- You're just testing Agent-MCP briefly
+- You're just testing CoNexus briefly
 - You already have OpenAI credits
 - You need absolute best quality (minor difference)
 
@@ -137,7 +137,7 @@ ollama serve
 
 ### Recommended Model: Qwen3-Embedding 0.6B
 
-**Why Qwen3?** (Recommended by LR, Agent-MCP maintainer)
+**Why Qwen3?** (Recommended by LR, CoNexus maintainer)
 - ✅ Best balance of speed and quality
 - ✅ Small size (640MB)
 - ✅ Fast inference (~37ms per text)
@@ -180,7 +180,7 @@ ollama pull mxbai-embed-large       # 1024D, 670MB
 
 ---
 
-## Configuring Agent-MCP
+## Configuring CoNexus
 
 The Rust `conexus-backend`/`conexus-router` binaries read real process
 environment variables only — there is no `.env`-file-loading mechanism
@@ -196,7 +196,7 @@ OpenAI key and OpenAI is used instead. `OPENAI_API_KEY` is NOT a
 sentinel you set to `"ollama"` — any non-empty value (including the
 literal string `"ollama"`) routes through the OpenAI branch, which
 reads a completely different set of variables (`OPENAI_BASE_URL`, not
-`AGENT_MCP_LLM_BASE_URL`) and would silently try to reach OpenAI's
+`CONEXUS_LLM_BASE_URL`) and would silently try to reach OpenAI's
 real cloud endpoint with a garbage key. There is no separate
 `EMBEDDING_PROVIDER`/`EMBEDDING_PROVIDERS` fallback-chain variable —
 this is a single either/or switch, not a chain (see
@@ -207,9 +207,9 @@ for the authoritative table).
 
 ```bash
 unset OPENAI_API_KEY                                    # must be UNSET, not "ollama" — see above
-export AGENT_MCP_LLM_BASE_URL=http://localhost:11434/v1  # Ollama's OpenAI-compatible endpoint
-export AGENT_MCP_EMBEDDING_MODEL=qwen3-embedding:0.6b
-export AGENT_MCP_EMBEDDING_DIMENSION=1024               # must match the embedding model
+export CONEXUS_LLM_BASE_URL=http://localhost:11434/v1  # Ollama's OpenAI-compatible endpoint
+export CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
+export CONEXUS_EMBEDDING_DIMENSION=1024               # must match the embedding model
 ```
 
 ### Step 2: Verify Configuration
@@ -220,7 +220,7 @@ against a real project succeeds — there is no separate `.env` file to
 inspect.
 
 **Important**:
-- Agent-MCP itself doesn't need an Anthropic key — that's your MCP
+- CoNexus itself doesn't need an Anthropic key — that's your MCP
   client's (e.g. Claude Code's) own concern, not this server's.
 - Only embeddings/RAG run through this switch; it has no effect on
   which chat model your MCP client uses for its own reasoning.
@@ -242,7 +242,7 @@ curl http://localhost:11434/api/embeddings -d '{
 
 **Expected output**: `1024` (dimension count)
 
-### Full Test: Agent-MCP Integration
+### Full Test: CoNexus Integration
 
 Once configured, start `conexus-router` normally (with the variables
 from Step 1 exported) and confirm RAG queries succeed against a real
@@ -358,7 +358,7 @@ Expected 1536 dimensions, got 1024
 
 **This is actually NORMAL**:
 - Qwen3-embedding produces 1024D vectors
-- Agent-MCP automatically pads them to 1536D
+- CoNexus automatically pads them to 1536D
 - The test should show: ✅ Padding detected
 
 **If you see this as an error**, the auto-padding might not be working. Check that you're using the latest version of the code.
@@ -388,7 +388,7 @@ ollama serve
 
 ### Q: Do I still need an OpenAI API key?
 
-**A**: No, not for embeddings — Agent-MCP itself doesn't touch your
+**A**: No, not for embeddings — CoNexus itself doesn't touch your
 MCP client's own LLM key (e.g. Claude Code's `ANTHROPIC_API_KEY`,
 which is that client's concern, not this server's).
 
@@ -456,7 +456,7 @@ ollama pull qwen3-embedding:0.6b
 
 ### Q: Can I use multiple models simultaneously?
 
-**A**: Yes, but one at a time per Agent-MCP instance. Change `OLLAMA_MODEL` in `.env` to switch models.
+**A**: Yes, but one at a time per CoNexus instance. Change `OLLAMA_MODEL` in `.env` to switch models.
 
 ### Q: What's the quality difference vs OpenAI?
 
@@ -478,7 +478,7 @@ Once your local embeddings are working:
    conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/agent-mcp-sockets --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
    ```
 
-2. **Test RAG functionality**: Try searching your codebase through the Agent-MCP dashboard
+2. **Test RAG functionality**: Try searching your codebase through the CoNexus dashboard
 
 3. **Monitor performance**: Watch `journalctl`/stderr for embedding generation times
 
@@ -489,7 +489,7 @@ Once your local embeddings are working:
 ## Additional Resources
 
 - **Ollama Documentation**: https://ollama.ai/docs
-- **Agent-MCP README**: [README.md](../../README.md)
+- **CoNexus README**: [README.md](../../README.md)
 - **Discord Community**: [Join for help](https://discord.gg/7Jm7nrhjGn)
 
 ---
@@ -501,8 +501,8 @@ Found an issue with this guide? Have suggestions?
 
 ---
 
-**Written by**: Claude (with testing by the Agent-MCP team)
-**Tested on**: Qwen3-embedding:0.6b, Agent-MCP (conexus-backend/conexus-router, Rust)
+**Written by**: Claude (with testing by the CoNexus team)
+**Tested on**: Qwen3-embedding:0.6b, CoNexus (conexus-backend/conexus-router, Rust)
 
 ---
 
@@ -518,14 +518,14 @@ ollama pull qwen3-embedding:0.6b
 # Start service
 ollama serve
 
-# Configure the environment (no .env file — see "Configuring Agent-MCP" above)
+# Configure the environment (no .env file — see "Configuring CoNexus" above)
 unset OPENAI_API_KEY
-export AGENT_MCP_LLM_BASE_URL=http://localhost:11434/v1
-export AGENT_MCP_EMBEDDING_MODEL=qwen3-embedding:0.6b
-export AGENT_MCP_EMBEDDING_DIMENSION=1024
+export CONEXUS_LLM_BASE_URL=http://localhost:11434/v1
+export CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
+export CONEXUS_EMBEDDING_DIMENSION=1024
 
 # Start the router (see Getting Started for the full command)
 conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/agent-mcp-sockets --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
 ```
 
-**That's it!** You're now running Agent-MCP with free, fast, private local embeddings! 🚀
+**That's it!** You're now running CoNexus with free, fast, private local embeddings! 🚀

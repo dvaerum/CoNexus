@@ -1,4 +1,4 @@
-# Agent-MCP — NixOS VM for end-to-end testing
+# CoNexus — NixOS VM for end-to-end testing
 
 This directory ships a Nix flake that boots a self-contained NixOS
 VM running the full agent-mcp deployment (router, per-project
@@ -28,10 +28,10 @@ QEMU itself is brought in by the flake.
 nix run github:dvaerum/CoNexus
 
 # Once the boot output stops scrolling, open the dashboard:
-xdg-open http://localhost:5454/agent-mcp/
+xdg-open http://localhost:5454/conexus/
 # First boot lands on /setup — create the first operator. Subsequent
 # boots land on /login. Create projects from the dashboard UI after
-# signing in (the legacy `POST /agent-mcp/__create` form-encoded
+# signing in (the legacy `POST /conexus/__create` form-encoded
 # endpoint was retired in ADR 0014).
 ```
 
@@ -42,7 +42,7 @@ VM down.
 There is also an interactive dashboard-E2E sandbox:
 
 ```sh
-nix run .#vm-dev        # dashboard on http://localhost:18080/agent-mcp/
+nix run .#vm-dev        # dashboard on http://localhost:18080/conexus/
                         # operator dev/dev, root SSH on :18222 — DEV ONLY
 ```
 
@@ -85,16 +85,16 @@ the CoNexus Rust implementation (`rust/conexus-router`,
 
 - `conexus-router.service` — always-on proxy on `:1337` that fronts
   per-project backends and serves the static Next.js dashboard under
-  `/agent-mcp/`.
+  `/conexus/`.
 - `conexus@<name>.service` — systemd template; one instance per
   registered project, listening on a UDS at
-  `/run/agent-mcp/<name>/backend.sock`. Lazy-started by the router
+  `/run/conexus/<name>/backend.sock`. Lazy-started by the router
   on first request, idle-reaped after 4 h.
 
 Project creation goes through the dashboard's authenticated REST API
 (`POST /api/router/projects`); see the post-Phase-1+2 router for the
 URL convention. The legacy `agent-mcp-bootstrap.service` that POSTed
-to `/agent-mcp/__create` on first boot was retired with ADR 0014 —
+to `/conexus/__create` on first boot was retired with ADR 0014 —
 the `__create` endpoint no longer exists.
 
 ## State layout
@@ -110,7 +110,7 @@ directory (the `ollama/` half exists in `llm = "internal"` mode only —
     └── models/blobs/sha256-…        # ~610 MB qwen3-embedding blob
 
 # Inside the VM:
-/var/lib/agent-mcp/                  # on disk.qcow2
+/var/lib/conexus/                  # on disk.qcow2
 ├── projects.local.json              # {<name>: <path>} registry
 ├── router.db                        # operator identity store (sqlite)
 └── projects/<name>/                 # workspace (SQLite DB in .agent/)
@@ -139,7 +139,7 @@ where `vm.nix` is imported; `nix/vm-dev.nix` is the worked example.
 | Ollama | `services.ollama` inside the guest, `loadModels` preloads `qwen3-embedding:0.6b` + `qwen3:1.7b` | not installed at all |
 | Guest RAM (`memorySize`) | **4096 MB** | **2048 MB** |
 | Guest disk (`diskSize`) | **8192 MB** | **4096 MB** |
-| 9p `ollama-models` share | yes (`$AGENT_MCP_OLLAMA_DIR`) | no |
+| 9p `ollama-models` share | yes (`$CONEXUS_OLLAMA_DIR`) | no |
 | Needs anything on the host | no — self-contained | yes — a live chat + embedding endpoint |
 
 `internal` is what `nix run .#` (and every VM the CI workflow builds)
@@ -179,12 +179,12 @@ ollama for embeddings). `external` mode sets, on the backend units
 only:
 
 ```
-AGENT_MCP_LLM_BASE_URL=http://10.0.2.2:11435/v1   # chat/completion
+CONEXUS_LLM_BASE_URL=http://10.0.2.2:11435/v1   # chat/completion
 OPENAI_BASE_URL=http://10.0.2.2:11434/v1          # embeddings
 OPENAI_API_KEY=external                           # non-empty sentinel
 OPENAI_MODEL=qwen2.5:3b-instruct
-AGENT_MCP_EMBEDDING_MODEL=qwen3-embedding:0.6b
-AGENT_MCP_EMBEDDING_DIMENSION=1024
+CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
+CONEXUS_EMBEDDING_DIMENSION=1024
 ```
 
 No Python change is involved — see `rust/conexus-tools/src/completion_client.rs`
@@ -213,9 +213,9 @@ VM URL today — the repo's real test coverage (Rust `#[test]`s,
 dashboard `vitest` suites, `nix/tests/checks/`) runs against
 in-process fixtures or `nix eval`/`nix build`, not a booted VM. To
 exercise this VM by hand, drive it the same way a real client would:
-log in at `http://localhost:5454/agent-mcp/`, provision a per-agent
+log in at `http://localhost:5454/conexus/`, provision a per-agent
 token from the dashboard, and curl
-`http://localhost:5454/agent-mcp/mcp/<project>` with that bearer (see
+`http://localhost:5454/conexus/mcp/<project>` with that bearer (see
 [`docs/integrations/external-mcp-client.md`](../integrations/external-mcp-client.md)
 for the full request shape).
 
@@ -266,9 +266,9 @@ The module covers the systemd shape only — TLS termination
 - The router is `conexus-router` (`rust/conexus-router`), the sole
   implementation now that the Python one and the `router.impl` A/B
   flip between them were retired. Two env knobs matter in the VM:
-  `AGENT_MCP_SYSTEMCTL_MODE` switches between `systemctl --user`
+  `CONEXUS_SYSTEMCTL_MODE` switches between `systemctl --user`
   (production, home-manager) and plain `systemctl` (VM, where there's
-  no per-user systemd instance), and `AGENT_MCP_ROUTER_HOST` lets the
+  no per-user systemd instance), and `CONEXUS_ROUTER_HOST` lets the
   VM bind `0.0.0.0` for qemu hostfwd.
 - A polkit rule (in `nix/module.nix`) grants the unprivileged
   `agent-mcp` user permission to start/stop `conexus@*.service`

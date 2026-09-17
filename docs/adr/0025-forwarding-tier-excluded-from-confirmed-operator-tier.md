@@ -12,7 +12,7 @@ near-miss that prompted it.
 (`rust/conexus-backend/src/rest_principal.rs:198`, REST side) both
 preserve this exclusion bit-for-bit; the Links section below cites the
 now-deleted Python files this was ported from.
-**Builds on**: ADR-0015 (SSO — the `AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN`
+**Builds on**: ADR-0015 (SSO — the `CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN`
 precedent this ADR's escape hatch copies), ADR-0017 (no content-based
 secret redaction — the reason token disclosure is gated by an
 *authorization* predicate rather than by scanning payloads).
@@ -129,11 +129,11 @@ identity, not to read the existing one back out of a dashboard payload.
 
 If a real deployment ever needs this widened, the sanctioned path is an
 explicit, named, **off-by-default** config flag —
-`AGENT_MCP_FORWARDING_CONFIRMS_OPERATOR_TIER`, default `false` — read
+`CONEXUS_FORWARDING_CONFIRMS_OPERATOR_TIER`, default `false` — read
 alongside the other trust settings and threaded into the adapter as an
 input, leaving the shared predicate untouched.
 
-That shape matches the precedent `AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN`
+That shape matches the precedent `CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN`
 already set (ADR-0015) for an equally consequential trust decision: a
 widening an operator may knowingly opt into, visible in their
 configuration, greppable, and documentable — rather than a silent
@@ -224,7 +224,7 @@ predicate".
   including the pre-existing all-defaults forwarding assertion this one
   broadens (left unchanged).
 * [ADR-0015](0015-sso-oidc-and-proxy-header.md) — the
-  `AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN` precedent for an
+  `CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN` precedent for an
   off-by-default trust-widening flag.
 * [ADR-0017](0017-no-content-secret-redaction.md) — why secret
   withholding is an authorization decision, not content scanning.

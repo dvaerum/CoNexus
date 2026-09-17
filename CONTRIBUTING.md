@@ -124,10 +124,10 @@ There is no repo-root `tests/` tree anymore — every test lives next to
 what it tests.
 
 End-to-end tests against a real systemd + Ollama deployment live in
-[nixos-developer-system/users/dennis/agent-mcp/tests/] and are run
+[nixos-developer-system/users/dennis/conexus/tests/] and are run
 manually as part of release verification — **not** part of CI here.
 
-[nixos-developer-system/users/dennis/agent-mcp/tests/]: https://cms.best.aau.dk/dennis/nixos-developer-system/src/branch/main/users/dennis/agent-mcp/tests
+[nixos-developer-system/users/dennis/conexus/tests/]: https://cms.best.aau.dk/dennis/nixos-developer-system/src/branch/main/users/dennis/conexus/tests
 
 ## CI must pass
 
@@ -208,4 +208,4 @@ regression suite covering neither.
 
 See [ADRs] in the deployment repo for the trade-offs.
 
-[ADRs]: https://cms.best.aau.dk/dennis/nixos-developer-system/src/branch/main/users/dennis/agent-mcp/docs/adr
+[ADRs]: https://cms.best.aau.dk/dennis/nixos-developer-system/src/branch/main/users/dennis/conexus/docs/adr

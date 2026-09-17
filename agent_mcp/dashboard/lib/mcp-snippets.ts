@@ -9,8 +9,8 @@
  * pulling in the store, the API client, and six sibling dialogs. It is
  * pure data-in/data-out, so it belongs in `lib/`, not in a component.
  *
- * The server name is the fixed string `agent-mcp` to match the user's
- * .claude.json convention (slash-command prefix `agent-mcp:`); a single
+ * The server name is the fixed string `conexus` to match the user's
+ * .claude.json convention (slash-command prefix `conexus:`); a single
  * fixed key is fine because .mcp.json entries are scoped per cwd/project,
  * so the project scoping lives in the URL, not the key. URL is derived
  * from the path-prefix adapter (lib/project-context.ts, PR #56).
@@ -52,19 +52,19 @@ export const CLIENT_TABS: ReadonlyArray<{ value: ClientTab; label: string }> = [
 ]
 
 /** localStorage key for the operator's sticky "preferred client" tab. */
-export const ACTIVE_TAB_STORAGE_KEY = 'agent-mcp-popup-active-client'
+export const ACTIVE_TAB_STORAGE_KEY = 'conexus-popup-active-client'
 
 /**
  * Derive the public MCP endpoint URL for this dashboard's project.
  *
  * Under path-prefix deployments (the production shape) the dashboard
- * loads from `/agent-mcp/app/<name>/...` and the MCP transport lives
- * at `<origin>/agent-mcp/<name>/mcp` (PR-D will move it under the
+ * loads from `/conexus/app/<name>/...` and the MCP transport lives
+ * at `<origin>/conexus/<name>/mcp` (PR-D will move it under the
  * top-level /mcp/ prefix). Standalone deployments (single-tenant, no
  * path prefix) expose the MCP transport at `<origin>/mcp` directly.
  *
  * Pre-PR-B this function had a bug (audit §1.1): it concatenated
- * `apiPrefix + "/mcp"`, which produced `/agent-mcp/__api/<name>/mcp`
+ * `apiPrefix + "/mcp"`, which produced `/conexus/__api/<name>/mcp`
  * — a path that doesn't exist (the MCP route is a sibling of __api,
  * not a child). PR-B routes the URL build through ``mcpUrl()`` in
  * ``lib/urls.ts`` so the next URL rename (PR-D) is a one-line change.
@@ -90,7 +90,7 @@ export type SnippetPart = {
 }
 
 export function buildSnippetBlocks(tab: ClientTab, token: string, url: string): SnippetPart[] {
-  const name = 'agent-mcp'
+  const name = 'conexus'
   const t = token || '<AGENT_TOKEN>'
   switch (tab) {
     case 'claude-code':

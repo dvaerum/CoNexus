@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
 // Live dashboard bug hunt (Firefox-MCP verify-all pass, 2026-09-06) —
-// at a 390px mobile viewport the root `/agent-mcp/app/` overview's
-// header row ("Agent MCP — Projects" + Add project/Refresh/Log out
+// at a 390px mobile viewport the root `/conexus/app/` overview's
+// header row ("CoNexus — Projects" + Add project/Refresh/Log out
 // buttons) used a plain `flex items-center justify-between` with no
 // responsive stacking. The three fixed-width buttons never shrink, so
 // the title column is squeezed narrow enough to wrap onto 3 lines;
@@ -46,7 +46,7 @@ beforeEach(() => {
 describe("<ProjectsOverviewDashboard> header — mobile stacking", () => {
   it("stacks the title above the button row below the sm breakpoint instead of overlapping", () => {
     render(<ProjectsOverviewDashboard />)
-    const heading = screen.getByRole("heading", { name: /Agent MCP — Projects/ })
+    const heading = screen.getByRole("heading", { name: /CoNexus — Projects/ })
     // Same header row that contains both the title block and the
     // Add project/Refresh/Log out button row (their nearest common
     // flex container).
