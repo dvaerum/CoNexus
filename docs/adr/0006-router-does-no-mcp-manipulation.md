@@ -9,7 +9,7 @@ routes) in the CoNexus Rust rewrite. Still the live architectural
 stance for `conexus-router`.
 
 **Provenance**: originally filed in the `home-manager-config` deploy
-repo's `common/user/conexus/docs/adr/` (as
+repo's `common/user/agent-mcp/docs/adr/` (as
 `0006-router-does-no-mcp-manipulation.md`). Moved here 2026-09-06 —
 see ADR-0003's own provenance note for why. The `prancy-napping-pie.md`
 plan-file citation below is to a different, now-deleted ephemeral plan
@@ -34,8 +34,8 @@ in the router's filter logic instead of the tool's actual code, and
 new MCP-protocol behavior having two possible homes.
 
 Decision (`prancy-napping-pie.md` Q7.1, Phase 7f): the router becomes a
-byte-level HTTP proxy for `/conexus/__sse/*`, `/conexus/__messages/*`,
-and `/conexus/__api/*`, plus the systemd lifecycle glue (`systemctl
+byte-level HTTP proxy for `/agent-mcp/__sse/*`, `/agent-mcp/__messages/*`,
+and `/agent-mcp/__api/*`, plus the systemd lifecycle glue (`systemctl
 --user start/stop agent-mcp@<name>`). It does not parse MCP frames,
 does not know what a tool is, does not hold an admin session. Expected
 size: ~2100 → ~800 LOC. The single-call ergonomics this costs (e.g.

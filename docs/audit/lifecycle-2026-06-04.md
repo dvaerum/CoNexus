@@ -17,7 +17,7 @@ Read-through trace from each row-action button down to its API
 client method, REST route, backend handler, MCP tool implementation
 (where applicable), and the SQL the row eventually flows through.
 Cross-checked against the live production stack
-(`https://nixos-developer-system.tailfdae0.ts.net/conexus/api/washing-brothers/...`)
+(`https://nixos-developer-system.tailfdae0.ts.net/agent-mcp/api/washing-brothers/...`)
 with `curl` for the observable wire shape.
 
 ## Behaviour model (post-PR #121)

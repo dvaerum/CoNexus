@@ -34,7 +34,7 @@ and the dashboard polish shipped alongside this ADR in PR-3.
 | Decision | Choice |
 |--|--|
 | Worker model | Always-alive Claude Code session |
-| Wake mechanism | Long-poll on server, **60s default** timeout, configurable via `CONEXUS_EVENT_WAIT_TIMEOUT` (max 300s) |
+| Wake mechanism | Long-poll on server, **60s default** timeout, configurable via `AGENT_MCP_EVENT_WAIT_TIMEOUT` (max 300s) |
 | Events in MVP | (a) `new_message`, (b) `task_assigned`, (c) `unassigned_task_appeared` |
 | Capability matching | **Subset**: agent matches if `agent.capabilities ⊇ task.required_capabilities`. Lowercase-normalised free-text labels. Empty `required_capabilities` ⇒ wake everyone. Empty `agent.capabilities` ⇒ match only empty-required tasks. |
 | Wake-loop kickoff | `serverInfo.instructions` primary + MCP prompt (`event-loop`) fallback |
