@@ -9,9 +9,9 @@
 //! `main.rs`'s own router-assembly comment) -- both handlers do their
 //! OWN bearer/Accept-header admission logic before ever calling
 //! `proxy_core::proxy_to_backend`, matching Python's real route
-//! registration (`/agent-mcp/mcp/{name}` is itself in
+//! registration (`/conexus/mcp/{name}` is itself in
 //! `path_policy::UNAUTH_PREFIXES` -- the session gate already passes
-//! it through unconditionally; `/agent-mcp/api/` is REDIRECT-exempt
+//! it through unconditionally; `/conexus/api/` is REDIRECT-exempt
 //! but not unauth-exempt in Python's real path-policy tables, since a
 //! cookie-authenticated dashboard browser call also flows through this
 //! same route). [`api_proxy_handler`]/[`api_proxy_handler_no_rest`]
@@ -56,7 +56,7 @@ fn handler_request(
     }
 }
 
-/// `/agent-mcp/mcp/{name}` -- port of the `"*"` route Python registers
+/// `/conexus/mcp/{name}` -- port of the `"*"` route Python registers
 /// for `backend_mcp_handler`.
 pub async fn mcp_proxy_handler(
     State(state): State<Arc<RouterState>>,
@@ -122,7 +122,7 @@ async fn resolve_cookie_role_for_proxy(
         .flatten()
 }
 
-/// `/agent-mcp/api/{name}/{*rest}` -- the common case, a real
+/// `/conexus/api/{name}/{*rest}` -- the common case, a real
 /// sub-path under the project's API.
 pub async fn api_proxy_handler(
     State(state): State<Arc<RouterState>>,
@@ -151,7 +151,7 @@ pub async fn api_proxy_handler(
     .into_response()
 }
 
-/// `/agent-mcp/api/{name}` -- the no-trailing-segment case (Python's
+/// `/conexus/api/{name}` -- the no-trailing-segment case (Python's
 /// `{rest:.*}` matches a zero-length suffix too; axum's `{*rest}`
 /// catch-all requires a real segment, so this is a second route
 /// mapping to the identical handler with `rest = ""`).

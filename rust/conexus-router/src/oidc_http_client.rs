@@ -515,7 +515,7 @@ mod tests {
             metadata,
             "client-id",
             "secret",
-            "https://router.example.test/agent-mcp/sso/callback"
+            "https://router.example.test/conexus/sso/callback"
         )
         .is_ok());
     }
@@ -544,7 +544,7 @@ mod tests {
             metadata,
             "client-id",
             "secret",
-            "https://router.example.test/agent-mcp/sso/callback",
+            "https://router.example.test/conexus/sso/callback",
         );
         assert!(result.is_ok());
     }

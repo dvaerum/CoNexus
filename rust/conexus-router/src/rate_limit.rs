@@ -102,21 +102,21 @@ impl RateLimitConfig {
     /// threaded explicitly (this crate's own Phase D2 convention --
     /// sidesteps `cargo test`'s parallel-thread env-var-race hazard).
     pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> Self {
-        let enabled = !env_truthy(get_env("AGENT_MCP_RATELIMIT_DISABLED").as_deref());
-        let trusted_raw = get_env("AGENT_MCP_RATELIMIT_TRUSTED_PROXIES")
+        let enabled = !env_truthy(get_env("CONEXUS_RATELIMIT_DISABLED").as_deref());
+        let trusted_raw = get_env("CONEXUS_RATELIMIT_TRUSTED_PROXIES")
             .unwrap_or_else(|| DEFAULT_TRUSTED_PROXIES.to_string());
         Self {
             enabled,
-            auth_max: env_u32(&get_env, "AGENT_MCP_RATELIMIT_AUTH_MAX", 10),
+            auth_max: env_u32(&get_env, "CONEXUS_RATELIMIT_AUTH_MAX", 10),
             auth_window: Duration::from_secs(env_u64(
                 &get_env,
-                "AGENT_MCP_RATELIMIT_AUTH_WINDOW",
+                "CONEXUS_RATELIMIT_AUTH_WINDOW",
                 60,
             )),
-            global_max: env_u32(&get_env, "AGENT_MCP_RATELIMIT_GLOBAL_MAX", 0),
+            global_max: env_u32(&get_env, "CONEXUS_RATELIMIT_GLOBAL_MAX", 0),
             global_window: Duration::from_secs(env_u64(
                 &get_env,
-                "AGENT_MCP_RATELIMIT_GLOBAL_WINDOW",
+                "CONEXUS_RATELIMIT_GLOBAL_WINDOW",
                 60,
             )),
             trusted_proxies: parse_trusted_proxies(&trusted_raw),
@@ -295,13 +295,13 @@ pub fn resolve_client_ip(
 /// verbs count. `path` MUST already be `mount::canonical_path`'d by
 /// the caller (this crate's own convention); `method` is uppercase.
 pub fn is_auth_path(path: &str, method: &str) -> bool {
-    if path == "/agent-mcp/login" && method == "POST" {
+    if path == "/conexus/login" && method == "POST" {
         return true;
     }
-    if path == "/agent-mcp/setup" && method == "POST" {
+    if path == "/conexus/setup" && method == "POST" {
         return true;
     }
-    path.starts_with("/agent-mcp/sso/")
+    path.starts_with("/conexus/sso/")
 }
 
 /// Port of `_too_many_requests`: 429 with an integer `Retry-After`
@@ -399,14 +399,12 @@ mod tests {
     #[test]
     fn resolve_honours_every_env_override() {
         let cfg = RateLimitConfig::resolve(|key| match key {
-            "AGENT_MCP_RATELIMIT_DISABLED" => Some("true".to_string()),
-            "AGENT_MCP_RATELIMIT_AUTH_MAX" => Some("5".to_string()),
-            "AGENT_MCP_RATELIMIT_AUTH_WINDOW" => Some("30".to_string()),
-            "AGENT_MCP_RATELIMIT_GLOBAL_MAX" => Some("100".to_string()),
-            "AGENT_MCP_RATELIMIT_GLOBAL_WINDOW" => Some("120".to_string()),
-            "AGENT_MCP_RATELIMIT_TRUSTED_PROXIES" => {
-                Some("10.0.0.1, garbage, 10.0.0.2".to_string())
-            }
+            "CONEXUS_RATELIMIT_DISABLED" => Some("true".to_string()),
+            "CONEXUS_RATELIMIT_AUTH_MAX" => Some("5".to_string()),
+            "CONEXUS_RATELIMIT_AUTH_WINDOW" => Some("30".to_string()),
+            "CONEXUS_RATELIMIT_GLOBAL_MAX" => Some("100".to_string()),
+            "CONEXUS_RATELIMIT_GLOBAL_WINDOW" => Some("120".to_string()),
+            "CONEXUS_RATELIMIT_TRUSTED_PROXIES" => Some("10.0.0.1, garbage, 10.0.0.2".to_string()),
             _ => None,
         });
         assert!(!cfg.enabled);
@@ -420,8 +418,8 @@ mod tests {
     #[test]
     fn resolve_falls_back_to_default_on_a_negative_or_garbage_int() {
         let cfg = RateLimitConfig::resolve(|key| match key {
-            "AGENT_MCP_RATELIMIT_AUTH_MAX" => Some("-5".to_string()),
-            "AGENT_MCP_RATELIMIT_GLOBAL_MAX" => Some("not-a-number".to_string()),
+            "CONEXUS_RATELIMIT_AUTH_MAX" => Some("-5".to_string()),
+            "CONEXUS_RATELIMIT_GLOBAL_MAX" => Some("not-a-number".to_string()),
             _ => None,
         });
         assert_eq!(cfg.auth_max, 10);
@@ -601,12 +599,12 @@ mod tests {
 
     #[test]
     fn is_auth_path_matches_only_the_mutating_credential_endpoints() {
-        assert!(is_auth_path("/agent-mcp/login", "POST"));
-        assert!(!is_auth_path("/agent-mcp/login", "GET"));
-        assert!(is_auth_path("/agent-mcp/setup", "POST"));
-        assert!(!is_auth_path("/agent-mcp/setup", "GET"));
-        assert!(is_auth_path("/agent-mcp/sso/callback", "GET"));
-        assert!(!is_auth_path("/agent-mcp/api/tasks", "POST"));
+        assert!(is_auth_path("/conexus/login", "POST"));
+        assert!(!is_auth_path("/conexus/login", "GET"));
+        assert!(is_auth_path("/conexus/setup", "POST"));
+        assert!(!is_auth_path("/conexus/setup", "GET"));
+        assert!(is_auth_path("/conexus/sso/callback", "GET"));
+        assert!(!is_auth_path("/conexus/api/tasks", "POST"));
     }
 
     // -- check_rate_limit (the composed decision) -----------------------
@@ -625,7 +623,7 @@ mod tests {
         let now = Instant::now();
         for _ in 0..1000 {
             assert!(
-                check_rate_limit(&mut state, &cfg, "1.2.3.4", "/agent-mcp/login", "POST", now)
+                check_rate_limit(&mut state, &cfg, "1.2.3.4", "/conexus/login", "POST", now)
                     .is_none()
             );
         }
@@ -644,11 +642,10 @@ mod tests {
         let mut state = RateLimitState::new(&cfg);
         let now = Instant::now();
         assert!(
-            check_rate_limit(&mut state, &cfg, "1.2.3.4", "/agent-mcp/login", "POST", now)
-                .is_none()
+            check_rate_limit(&mut state, &cfg, "1.2.3.4", "/conexus/login", "POST", now).is_none()
         );
         let resp =
-            check_rate_limit(&mut state, &cfg, "1.2.3.4", "/agent-mcp/login", "POST", now).unwrap();
+            check_rate_limit(&mut state, &cfg, "1.2.3.4", "/conexus/login", "POST", now).unwrap();
         assert_eq!(resp.status, 429);
         assert!(resp
             .headers
@@ -669,7 +666,7 @@ mod tests {
                 &mut state,
                 &cfg,
                 "1.2.3.4",
-                "/agent-mcp/api/tasks",
+                "/conexus/api/tasks",
                 "GET",
                 now
             )
@@ -693,7 +690,7 @@ mod tests {
             &mut state,
             &cfg,
             "1.2.3.4",
-            "/agent-mcp/api/tasks",
+            "/conexus/api/tasks",
             "GET",
             now
         )
@@ -702,7 +699,7 @@ mod tests {
             &mut state,
             &cfg,
             "1.2.3.4",
-            "/agent-mcp/api/tasks",
+            "/conexus/api/tasks",
             "GET",
             now,
         )

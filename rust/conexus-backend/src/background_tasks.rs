@@ -369,10 +369,10 @@ mod claude_session_monitor {
 ///
 /// **Simple-mode only, and that's a real, evidence-based scope cut,
 /// not a corner cut**: Python's periodic cycle also scans code files
-/// and tasks, but ONLY when `AGENT_MCP_EMBEDDING_DIMENSION`/`--advanced`
+/// and tasks, but ONLY when `CONEXUS_EMBEDDING_DIMENSION`/`--advanced`
 /// puts the deployment in "advanced" mode -- confirmed directly against
 /// the real deploy repo's own config (`home-manager-config/common/
-/// user/agent-mcp/default.nix`) that neither is ever set, so that
+/// user/conexus/default.nix`) that neither is ever set, so that
 /// whole branch (and the ~584-LOC code-aware chunker it would need)
 /// has zero real production call site today. Markdown files + project
 /// context are scanned unconditionally in both modes and are the only
@@ -556,7 +556,7 @@ mod rag_indexing {
         // 1. Markdown files -- gated the same way Python's own
         // DISABLE_AUTO_INDEXING flag does, resolved fresh each cycle
         // so a runtime env change is honoured immediately.
-        let auto_indexing_disabled = get_env("AGENT_MCP_DISABLE_AUTO_INDEXING")
+        let auto_indexing_disabled = get_env("CONEXUS_DISABLE_AUTO_INDEXING")
             .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
             .unwrap_or(false);
         if !auto_indexing_disabled {
@@ -1249,7 +1249,7 @@ mod subject_backfill_tests {
         let (_dir, shared) = test_shared().await;
         let titled = backfill_null_subjects(
             &shared,
-            env(&[("AGENT_MCP_SUBJECT_MODEL", "qwen2.5:3b-instruct")]),
+            env(&[("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct")]),
             25,
         )
         .await
@@ -1271,9 +1271,9 @@ mod subject_backfill_tests {
         let titled = backfill_null_subjects(
             &shared,
             env(&[
-                ("AGENT_MCP_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
-                ("AGENT_MCP_LLM_BASE_URL", "http://127.0.0.1:1/v1"),
-                ("AGENT_MCP_MODEL_CONTEXT_WINDOW", "4096"),
+                ("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
+                ("CONEXUS_LLM_BASE_URL", "http://127.0.0.1:1/v1"),
+                ("CONEXUS_MODEL_CONTEXT_WINDOW", "4096"),
             ]),
             25,
         )
@@ -1342,9 +1342,9 @@ mod subject_backfill_tests {
         let titled = backfill_null_subjects(
             &shared,
             env(&[
-                ("AGENT_MCP_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
-                ("AGENT_MCP_LLM_BASE_URL", &base_url),
-                ("AGENT_MCP_MODEL_CONTEXT_WINDOW", "4096"),
+                ("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct"),
+                ("CONEXUS_LLM_BASE_URL", &base_url),
+                ("CONEXUS_MODEL_CONTEXT_WINDOW", "4096"),
             ]),
             25,
         )
@@ -1653,8 +1653,8 @@ mod rag_indexing_tests {
 
     fn embed_env(base_url: &str) -> Vec<(&'static str, String)> {
         vec![
-            ("AGENT_MCP_LLM_BASE_URL", base_url.to_string()),
-            ("AGENT_MCP_EMBEDDING_DIMENSION", "3".to_string()),
+            ("CONEXUS_LLM_BASE_URL", base_url.to_string()),
+            ("CONEXUS_EMBEDDING_DIMENSION", "3".to_string()),
         ]
     }
 
@@ -1817,7 +1817,7 @@ mod rag_indexing_tests {
 
         let (base_url, server) = embed_server().await;
         let mut pairs = embed_env(&base_url);
-        pairs.push(("AGENT_MCP_DISABLE_AUTO_INDEXING", "true".to_string()));
+        pairs.push(("CONEXUS_DISABLE_AUTO_INDEXING", "true".to_string()));
         let get_env = env(&pairs
             .iter()
             .map(|(k, v)| (*k, v.as_str()))
@@ -1860,8 +1860,8 @@ mod rag_indexing_tests {
         std::fs::write(project_dir.path().join("notes.md"), "will fail to embed").unwrap();
 
         let get_env = env(&[
-            ("AGENT_MCP_LLM_BASE_URL", "http://127.0.0.1:1/v1"),
-            ("AGENT_MCP_EMBEDDING_DIMENSION", "3"),
+            ("CONEXUS_LLM_BASE_URL", "http://127.0.0.1:1/v1"),
+            ("CONEXUS_EMBEDDING_DIMENSION", "3"),
         ]);
 
         let report = run_indexing_cycle(

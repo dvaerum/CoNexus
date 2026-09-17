@@ -133,8 +133,8 @@ mod tests {
             username: "",
             next: "",
             sso_provider_name: None,
-            login_action: "/agent-mcp/login",
-            sso_login_url: "/agent-mcp/sso/login",
+            login_action: "/conexus/login",
+            sso_login_url: "/conexus/sso/login",
         });
         // minijinja's HTML autoescape escapes `/` to `&#x2f;` (an
         // OWASP-recommended, defense-in-depth escaper choice stricter
@@ -143,7 +143,7 @@ mod tests {
         // assertion, not assumed byte-identical to Python. Still
         // correct, safe HTML: a browser decodes the entity back to `/`
         // when parsing the attribute value.
-        assert!(html.contains(r#"<form method="post" action="&#x2f;agent-mcp&#x2f;login">"#));
+        assert!(html.contains(r#"<form method="post" action="&#x2f;conexus&#x2f;login">"#));
         assert!(html.contains("name=\"username\""));
         assert!(html.contains("name=\"password\""));
         assert!(!html.contains("Sign in via your organisation"));
@@ -156,8 +156,8 @@ mod tests {
             username: "<b>alice</b>",
             next: "/app/",
             sso_provider_name: None,
-            login_action: "/agent-mcp/login",
-            sso_login_url: "/agent-mcp/sso/login",
+            login_action: "/conexus/login",
+            sso_login_url: "/conexus/sso/login",
         });
         assert!(!html.contains("<script>alert(1)</script>"));
         assert!(html.contains("&lt;script&gt;alert(1)&lt;&#x2f;script&gt;"));
@@ -172,8 +172,8 @@ mod tests {
             username: "",
             next: "",
             sso_provider_name: Some("Example IdP"),
-            login_action: "/agent-mcp/login",
-            sso_login_url: "/agent-mcp/sso/login",
+            login_action: "/conexus/login",
+            sso_login_url: "/conexus/sso/login",
         });
         assert!(html.contains("Sign in with"));
         assert!(html.contains("Example IdP"));
@@ -187,12 +187,10 @@ mod tests {
             username: "",
             next: "/app/foo/",
             sso_provider_name: None,
-            login_action: "/agent-mcp/login",
-            sso_login_url: "/agent-mcp/sso/login",
+            login_action: "/conexus/login",
+            sso_login_url: "/conexus/sso/login",
         });
-        assert!(
-            html.contains("action=\"&#x2f;agent-mcp&#x2f;login?next=&#x2f;app&#x2f;foo&#x2f;\"")
-        );
+        assert!(html.contains("action=\"&#x2f;conexus&#x2f;login?next=&#x2f;app&#x2f;foo&#x2f;\""));
     }
 
     #[test]

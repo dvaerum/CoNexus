@@ -87,7 +87,7 @@ enum RouterCommand {
     /// Bring `router.db` up to date against the sea-orm-migration
     /// schema authority (idempotent, matching the per-project
     /// `migrate` command). Path resolution matches
-    /// `router create-operator`'s own `AGENT_MCP_ROUTER_DB`-or-
+    /// `router create-operator`'s own `CONEXUS_ROUTER_DB`-or-
     /// production-default rule.
     Migrate,
 }

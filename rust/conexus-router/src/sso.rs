@@ -63,7 +63,7 @@ pub enum SsoMode {
 
 impl SsoMode {
     /// Port of `SSOMode`'s own `str` values (`mode.value` in Python) --
-    /// `admin_sso_api.py`'s `GET /agent-mcp/api/router/sso/config`
+    /// `admin_sso_api.py`'s `GET /conexus/api/router/sso/config`
     /// response reports this verbatim.
     pub fn as_str(self) -> &'static str {
         match self {
@@ -155,16 +155,16 @@ pub fn load_sso_config(
     get_env: impl Fn(&str) -> Option<String>,
     read_secret_file: impl Fn(&str) -> std::io::Result<String>,
 ) -> Result<SsoSettings, SsoConfigError> {
-    let oidc_issuer = get_env("AGENT_MCP_SSO_OIDC_ISSUER")
+    let oidc_issuer = get_env("CONEXUS_SSO_OIDC_ISSUER")
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    let proxy_header = get_env("AGENT_MCP_SSO_PROXY_HEADER")
+    let proxy_header = get_env("CONEXUS_SSO_PROXY_HEADER")
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
     if oidc_issuer.is_some() && proxy_header.is_some() {
         return Err(SsoConfigError(
-            "both AGENT_MCP_SSO_OIDC_ISSUER and AGENT_MCP_SSO_PROXY_HEADER are set. Pick one: \
+            "both CONEXUS_SSO_OIDC_ISSUER and CONEXUS_SSO_PROXY_HEADER are set. Pick one: \
              OIDC or proxy-header SSO, not both."
                 .to_string(),
         ));
@@ -172,38 +172,38 @@ pub fn load_sso_config(
 
     if let Some(issuer) = oidc_issuer {
         let allow_insecure =
-            rate_limit::env_truthy(get_env("AGENT_MCP_SSO_OIDC_ALLOW_INSECURE").as_deref());
+            rate_limit::env_truthy(get_env("CONEXUS_SSO_OIDC_ALLOW_INSECURE").as_deref());
         let scheme_ok =
             issuer.starts_with("https://") || (issuer.starts_with("http://") && allow_insecure);
         if !scheme_ok {
             return Err(SsoConfigError(format!(
-                "AGENT_MCP_SSO_OIDC_ISSUER {issuer:?} must be an https:// URL (set \
-                 AGENT_MCP_SSO_OIDC_ALLOW_INSECURE=true to allow http:// for local testing)"
+                "CONEXUS_SSO_OIDC_ISSUER {issuer:?} must be an https:// URL (set \
+                 CONEXUS_SSO_OIDC_ALLOW_INSECURE=true to allow http:// for local testing)"
             )));
         }
-        let client_id = get_env("AGENT_MCP_SSO_OIDC_CLIENT_ID")
+        let client_id = get_env("CONEXUS_SSO_OIDC_CLIENT_ID")
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .ok_or_else(|| {
-                SsoConfigError("AGENT_MCP_SSO_OIDC_CLIENT_ID is required for OIDC mode".to_string())
+                SsoConfigError("CONEXUS_SSO_OIDC_CLIENT_ID is required for OIDC mode".to_string())
             })?;
-        let secret_path = get_env("AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE").ok_or_else(|| {
+        let secret_path = get_env("CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE").ok_or_else(|| {
             SsoConfigError(
-                "AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE is required for OIDC mode".to_string(),
+                "CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE is required for OIDC mode".to_string(),
             )
         })?;
         let client_secret = read_secret_file(&secret_path)
             .map_err(|e| SsoConfigError(format!("could not read client secret file: {e}")))?
             .trim()
             .to_string();
-        let provider_name = get_env("AGENT_MCP_SSO_OIDC_PROVIDER_NAME")
+        let provider_name = get_env("CONEXUS_SSO_OIDC_PROVIDER_NAME")
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| "SSO".to_string());
         let group_mapping =
-            parse_group_mapping(get_env("AGENT_MCP_SSO_OIDC_GROUP_MAPPING").as_deref());
+            parse_group_mapping(get_env("CONEXUS_SSO_OIDC_GROUP_MAPPING").as_deref());
         let redirect_url =
-            get_env("AGENT_MCP_SSO_OIDC_REDIRECT_URL").filter(|s| !s.trim().is_empty());
-        let scopes = get_env("AGENT_MCP_SSO_OIDC_SCOPES")
+            get_env("CONEXUS_SSO_OIDC_REDIRECT_URL").filter(|s| !s.trim().is_empty());
+        let scopes = get_env("CONEXUS_SSO_OIDC_SCOPES")
             .filter(|s| !s.trim().is_empty())
             .map(|s| s.split_whitespace().map(str::to_string).collect())
             .unwrap_or_else(|| {
@@ -213,7 +213,7 @@ pub fn load_sso_config(
                     .collect()
             });
         let default_is_sysadmin =
-            rate_limit::env_truthy(get_env("AGENT_MCP_SSO_OIDC_DEFAULT_SYSADMIN").as_deref());
+            rate_limit::env_truthy(get_env("CONEXUS_SSO_OIDC_DEFAULT_SYSADMIN").as_deref());
         return Ok(SsoSettings {
             mode: SsoMode::Oidc,
             oidc: Some(OidcSettings {
@@ -231,9 +231,9 @@ pub fn load_sso_config(
     }
 
     if let Some(trust_header) = proxy_header {
-        let trusted_ips = parse_trusted_ips(get_env("AGENT_MCP_SSO_PROXY_TRUSTED_IPS").as_deref());
+        let trusted_ips = parse_trusted_ips(get_env("CONEXUS_SSO_PROXY_TRUSTED_IPS").as_deref());
         let default_is_sysadmin =
-            rate_limit::env_truthy(get_env("AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN").as_deref());
+            rate_limit::env_truthy(get_env("CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN").as_deref());
         return Ok(SsoSettings {
             mode: SsoMode::ProxyHeader,
             oidc: None,
@@ -489,8 +489,8 @@ mod tests {
     fn both_modes_configured_is_a_startup_error() {
         let err = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_OIDC_ISSUER", "https://idp.example.test"),
-                ("AGENT_MCP_SSO_PROXY_HEADER", "X-Remote-User"),
+                ("CONEXUS_SSO_OIDC_ISSUER", "https://idp.example.test"),
+                ("CONEXUS_SSO_PROXY_HEADER", "X-Remote-User"),
             ]),
             no_secret_file,
         )
@@ -504,9 +504,9 @@ mod tests {
     fn proxy_header_mode_reads_trust_header_and_trusted_ips() {
         let settings = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_PROXY_HEADER", "X-Remote-User"),
-                ("AGENT_MCP_SSO_PROXY_TRUSTED_IPS", "10.0.0.5"),
-                ("AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN", "true"),
+                ("CONEXUS_SSO_PROXY_HEADER", "X-Remote-User"),
+                ("CONEXUS_SSO_PROXY_TRUSTED_IPS", "10.0.0.5"),
+                ("CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN", "true"),
             ]),
             no_secret_file,
         )
@@ -521,7 +521,7 @@ mod tests {
     #[test]
     fn proxy_header_mode_defaults_trusted_ips_to_loopback() {
         let settings = load_sso_config(
-            env_map(&[("AGENT_MCP_SSO_PROXY_HEADER", "X-Remote-User")]),
+            env_map(&[("CONEXUS_SSO_PROXY_HEADER", "X-Remote-User")]),
             no_secret_file,
         )
         .unwrap();
@@ -535,9 +535,9 @@ mod tests {
     fn oidc_mode_rejects_a_plain_http_issuer_by_default() {
         let err = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_OIDC_ISSUER", "http://idp.example.test"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_ID", "abc"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
+                ("CONEXUS_SSO_OIDC_ISSUER", "http://idp.example.test"),
+                ("CONEXUS_SSO_OIDC_CLIENT_ID", "abc"),
+                ("CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
             ]),
             no_secret_file,
         )
@@ -554,10 +554,10 @@ mod tests {
         // scheme like `ftp://`.
         let err = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_OIDC_ISSUER", "ftp://idp.example.test"),
-                ("AGENT_MCP_SSO_OIDC_ALLOW_INSECURE", "true"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_ID", "abc"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
+                ("CONEXUS_SSO_OIDC_ISSUER", "ftp://idp.example.test"),
+                ("CONEXUS_SSO_OIDC_ALLOW_INSECURE", "true"),
+                ("CONEXUS_SSO_OIDC_CLIENT_ID", "abc"),
+                ("CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
             ]),
             no_secret_file,
         )
@@ -569,10 +569,10 @@ mod tests {
     fn oidc_mode_allows_http_issuer_with_the_insecure_opt_in() {
         let settings = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_OIDC_ISSUER", "http://idp.example.test"),
-                ("AGENT_MCP_SSO_OIDC_ALLOW_INSECURE", "true"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_ID", "abc"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
+                ("CONEXUS_SSO_OIDC_ISSUER", "http://idp.example.test"),
+                ("CONEXUS_SSO_OIDC_ALLOW_INSECURE", "true"),
+                ("CONEXUS_SSO_OIDC_CLIENT_ID", "abc"),
+                ("CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
             ]),
             no_secret_file,
         )
@@ -585,9 +585,9 @@ mod tests {
     fn oidc_mode_defaults_provider_name_and_scopes() {
         let settings = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_OIDC_ISSUER", "https://idp.example.test"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_ID", "abc"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
+                ("CONEXUS_SSO_OIDC_ISSUER", "https://idp.example.test"),
+                ("CONEXUS_SSO_OIDC_CLIENT_ID", "abc"),
+                ("CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
             ]),
             no_secret_file,
         )
@@ -601,8 +601,8 @@ mod tests {
     fn oidc_mode_requires_a_client_id() {
         let err = load_sso_config(
             env_map(&[
-                ("AGENT_MCP_SSO_OIDC_ISSUER", "https://idp.example.test"),
-                ("AGENT_MCP_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
+                ("CONEXUS_SSO_OIDC_ISSUER", "https://idp.example.test"),
+                ("CONEXUS_SSO_OIDC_CLIENT_SECRET_FILE", "/tmp/secret"),
             ]),
             no_secret_file,
         )

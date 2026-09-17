@@ -16,7 +16,7 @@ pub enum PrincipalKind {
     OperatorSession,
     /// A per-agent token on `Authorization: Bearer`.
     AgentBearer,
-    /// The signed `X-Agent-MCP-Forwarded-Operator` header the router
+    /// The signed `X-Conexus-Forwarded-Operator` header the router
     /// attaches when proxying a cookie-authenticated dashboard request
     /// to the per-project backend.
     ForwardingHeader,

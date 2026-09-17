@@ -159,17 +159,17 @@ pub fn accept_prefers_html(accept_header: &str) -> bool {
 /// useful build fingerprinting no operator consumes.
 pub fn service_descriptor(single_tenant_name: Option<&str>) -> serde_json::Value {
     serde_json::json!({
-        "service": "agent-mcp",
+        "service": "conexus",
         "mode": if single_tenant_name.is_some() { "single-tenant" } else { "multi-tenant" },
         "endpoints": {
-            "api": "/agent-mcp/api",
-            "app": "/agent-mcp/app",
-            "assets": "/agent-mcp/assets",
-            "mcp": "/agent-mcp/mcp",
+            "api": "/conexus/api",
+            "app": "/conexus/app",
+            "assets": "/conexus/assets",
+            "mcp": "/conexus/mcp",
         },
-        "projects_url": "/agent-mcp/api/router/projects",
-        "overview_url": "/agent-mcp/api/router/overview",
-        "health_url": "/agent-mcp/api/router/health",
+        "projects_url": "/conexus/api/router/projects",
+        "overview_url": "/conexus/api/router/overview",
+        "health_url": "/conexus/api/router/health",
         "single_tenant_project": single_tenant_name,
     })
 }
@@ -277,7 +277,7 @@ mod tests {
         let path = dir.path().join("logo.png");
         fs::write(&path, [0x89, 0x50, 0x4e, 0x47]).unwrap();
         let (body, content_type) =
-            resolve_dashboard_body(&cache, &path, "/agent-mcp/assets").unwrap();
+            resolve_dashboard_body(&cache, &path, "/conexus/assets").unwrap();
         assert_eq!(body, vec![0x89, 0x50, 0x4e, 0x47]);
         assert_eq!(content_type, "image/png");
     }
@@ -289,15 +289,15 @@ mod tests {
         let path = dir.path().join("index.html");
         fs::write(
             &path,
-            b"<script src=\"__AGENT_MCP_ASSET_PREFIX__/_next/x.js\">",
+            b"<script src=\"__CONEXUS_ASSET_PREFIX__/_next/x.js\">",
         )
         .unwrap();
         let (body, content_type) =
-            resolve_dashboard_body(&cache, &path, "/agent-mcp/assets").unwrap();
+            resolve_dashboard_body(&cache, &path, "/conexus/assets").unwrap();
         assert_eq!(content_type, "text/html; charset=utf-8");
         assert_eq!(
             String::from_utf8(body).unwrap(),
-            "<script src=\"/agent-mcp/assets/_next/x.js\">"
+            "<script src=\"/conexus/assets/_next/x.js\">"
         );
     }
 
@@ -322,7 +322,7 @@ mod tests {
         let d = service_descriptor(None);
         assert_eq!(d["mode"], "multi-tenant");
         assert_eq!(d["single_tenant_project"], serde_json::Value::Null);
-        assert_eq!(d["endpoints"]["api"], "/agent-mcp/api");
+        assert_eq!(d["endpoints"]["api"], "/conexus/api");
     }
 
     #[test]

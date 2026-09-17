@@ -100,7 +100,7 @@ fn serve_candidate(
     }
 }
 
-/// Port of `index_handler`. `GET /agent-mcp/` -- content-negotiated:
+/// Port of `index_handler`. `GET /conexus/` -- content-negotiated:
 /// a browser (`Accept: text/html`) gets a 302 to the dashboard;
 /// anything else gets the JSON service descriptor.
 pub async fn index_handler(
@@ -140,7 +140,7 @@ pub async fn index_handler(
         .into_response()
 }
 
-/// Port of `dashboard_assets_handler`. `GET /agent-mcp/assets/{*rest}`
+/// Port of `dashboard_assets_handler`. `GET /conexus/assets/{*rest}`
 /// -- Next.js content-hashes every chunk filename, so a hit is
 /// immutable forever.
 pub async fn dashboard_assets_handler(
@@ -169,7 +169,7 @@ pub async fn dashboard_assets_handler(
     )
 }
 
-/// Port of `overview_dashboard_handler`. `GET /agent-mcp/app/` -- the
+/// Port of `overview_dashboard_handler`. `GET /conexus/app/` -- the
 /// cross-project React overview shell.
 pub async fn overview_dashboard_handler(
     State(state): State<Arc<RouterState>>,
@@ -255,7 +255,7 @@ fn schedule_backend_warm(state: &Arc<RouterState>, name: &str) {
 /// `middleware::WarmAuthorized`'s doc) -- serving the response itself
 /// stays a uniform 200/404 shell for member/non-member/bogus slug
 /// alike; only the spawn is authorization-gated, closing the
-/// arbitrary-tenant-activation gap a plain `GET /agent-mcp/app/<victim>/`
+/// arbitrary-tenant-activation gap a plain `GET /conexus/app/<victim>/`
 /// would otherwise open for any authenticated non-member.
 // 8 args: private, single-call-shape helper shared by the two real
 // axum handlers below (bare `/app/{name}/` vs `/app/{name}/{*rest}`,
@@ -302,7 +302,7 @@ async fn dashboard_handler_impl(
     serve_candidate(state, candidate, &prefix, "no-store")
 }
 
-/// Port of `dashboard_handler` for `GET /agent-mcp/app/{name}/` (the
+/// Port of `dashboard_handler` for `GET /conexus/app/{name}/` (the
 /// bare per-project shell, `rest = ""`).
 pub async fn dashboard_index_handler(
     State(state): State<Arc<RouterState>>,
@@ -325,7 +325,7 @@ pub async fn dashboard_index_handler(
     .await
 }
 
-/// Port of `dashboard_handler` for `GET /agent-mcp/app/{name}/{*rest}`.
+/// Port of `dashboard_handler` for `GET /conexus/app/{name}/{*rest}`.
 pub async fn dashboard_handler(
     State(state): State<Arc<RouterState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -427,7 +427,7 @@ mod tests {
         let resp = dashboard_handler_impl(
             &state,
             addr(),
-            "/agent-mcp/app/wrong-name/",
+            "/conexus/app/wrong-name/",
             None,
             &HeaderMap::new(),
             "wrong-name",
@@ -441,7 +441,7 @@ mod tests {
             .get(header::LOCATION)
             .and_then(|v| v.to_str().ok())
             .unwrap();
-        assert_eq!(location, "/agent-mcp/app/only-project/");
+        assert_eq!(location, "/conexus/app/only-project/");
         // A real gap this same missing check would have opened: the
         // wrong-name path must NEVER warm-start a backend either.
         assert!(state.runtime.snapshot("wrong-name").is_none());
@@ -453,7 +453,7 @@ mod tests {
         let resp = dashboard_handler_impl(
             &state,
             addr(),
-            "/agent-mcp/app/only-project/",
+            "/conexus/app/only-project/",
             None,
             &HeaderMap::new(),
             "only-project",
@@ -546,7 +546,7 @@ mod tests {
         let _ = dashboard_handler_impl(
             &state,
             addr(),
-            "/agent-mcp/app/victim/",
+            "/conexus/app/victim/",
             None,
             &HeaderMap::new(),
             "victim",
@@ -572,7 +572,7 @@ mod tests {
         let _ = dashboard_handler_impl(
             &state,
             addr(),
-            "/agent-mcp/app/shared/",
+            "/conexus/app/shared/",
             None,
             &HeaderMap::new(),
             "shared",

@@ -110,14 +110,14 @@ fn cache_set(base_url: &str, value: Option<u64>) {
 /// The chat model's usable per-slot context window in tokens, or
 /// `None` when it can't be determined.
 ///
-/// Resolution order: (1) `AGENT_MCP_MODEL_CONTEXT_WINDOW` explicit
+/// Resolution order: (1) `CONEXUS_MODEL_CONTEXT_WINDOW` explicit
 /// override; (2) a cached probe of `{base_url}/props`; (3) `None` when
 /// no `base_url` is given.
 pub async fn resolve_context_window(
     get_env: impl Fn(&str) -> Option<String>,
     base_url: Option<&str>,
 ) -> Option<u64> {
-    if let Some(v) = env_nonempty(&get_env, "AGENT_MCP_MODEL_CONTEXT_WINDOW") {
+    if let Some(v) = env_nonempty(&get_env, "CONEXUS_MODEL_CONTEXT_WINDOW") {
         return Some(v.parse::<u64>().unwrap_or(DEFAULT_WINDOW));
     }
     let base_url = base_url?;
@@ -134,14 +134,14 @@ pub async fn resolve_context_window(
 /// word-vs-token unit mismatch this derivation reconciles by dividing
 /// by the worst-case tokens/word ratio).
 ///
-/// Override-on-top: an explicit `AGENT_MCP_MAX_CONTEXT_TOKENS` always
+/// Override-on-top: an explicit `CONEXUS_MAX_CONTEXT_TOKENS` always
 /// wins; otherwise derived from the discovered window, or unbounded
 /// (today's Python behaviour) when the window is undiscoverable.
 pub async fn resolve_max_context_tokens(
     get_env: impl Fn(&str) -> Option<String>,
     base_url: Option<&str>,
 ) -> u64 {
-    if let Some(v) = env_nonempty(&get_env, "AGENT_MCP_MAX_CONTEXT_TOKENS") {
+    if let Some(v) = env_nonempty(&get_env, "CONEXUS_MAX_CONTEXT_TOKENS") {
         return v.parse::<u64>().unwrap_or(LEGACY_UNBOUNDED_BUDGET);
     }
     let Some(window) = resolve_context_window(get_env, base_url).await else {
@@ -187,14 +187,14 @@ mod tests {
     #[tokio::test]
     async fn explicit_window_override_wins_without_needing_a_base_url() {
         let value =
-            resolve_context_window(env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "8192")]), None).await;
+            resolve_context_window(env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "8192")]), None).await;
         assert_eq!(value, Some(8192));
     }
 
     #[tokio::test]
     async fn a_malformed_window_override_falls_back_to_the_default() {
         let value = resolve_context_window(
-            env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "not-a-number")]),
+            env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "not-a-number")]),
             None,
         )
         .await;
@@ -210,8 +210,7 @@ mod tests {
     #[tokio::test]
     async fn explicit_max_context_tokens_override_wins_regardless_of_window() {
         let budget =
-            resolve_max_context_tokens(env(&[("AGENT_MCP_MAX_CONTEXT_TOKENS", "12345")]), None)
-                .await;
+            resolve_max_context_tokens(env(&[("CONEXUS_MAX_CONTEXT_TOKENS", "12345")]), None).await;
         assert_eq!(budget, 12345);
     }
 
@@ -219,7 +218,7 @@ mod tests {
     async fn budget_is_derived_from_an_explicit_window_override() {
         // (8192 - 1024 - 512) / 2 = 3328
         let budget =
-            resolve_max_context_tokens(env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "8192")]), None)
+            resolve_max_context_tokens(env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "8192")]), None)
                 .await;
         assert_eq!(budget, 3328);
     }
@@ -227,7 +226,7 @@ mod tests {
     #[tokio::test]
     async fn a_degenerate_window_floors_at_the_minimum_budget() {
         let budget =
-            resolve_max_context_tokens(env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "1000")]), None)
+            resolve_max_context_tokens(env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "1000")]), None)
                 .await;
         assert_eq!(budget, MIN_BUDGET);
     }
@@ -288,26 +287,23 @@ mod tests {
     async fn a_small_window_shrinks_below_the_ceiling() {
         // (2048 - 128) * 2 = 3840, below the 4000 ceiling.
         let chars =
-            resolve_subject_input_chars(env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "2048")]), None)
+            resolve_subject_input_chars(env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "2048")]), None)
                 .await;
         assert_eq!(chars, 3840);
     }
 
     #[tokio::test]
     async fn a_huge_window_stays_capped_at_the_ceiling() {
-        let chars = resolve_subject_input_chars(
-            env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "1000000")]),
-            None,
-        )
-        .await;
+        let chars =
+            resolve_subject_input_chars(env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "1000000")]), None)
+                .await;
         assert_eq!(chars, SUBJECT_CHARS_CEILING);
     }
 
     #[tokio::test]
     async fn a_degenerate_window_never_yields_a_zero_or_negative_cap() {
         let chars =
-            resolve_subject_input_chars(env(&[("AGENT_MCP_MODEL_CONTEXT_WINDOW", "1")]), None)
-                .await;
+            resolve_subject_input_chars(env(&[("CONEXUS_MODEL_CONTEXT_WINDOW", "1")]), None).await;
         assert_eq!(chars, 2); // max(1, 1-128 saturating) * 2 = 1 * 2
     }
 }

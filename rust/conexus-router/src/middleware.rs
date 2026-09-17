@@ -187,7 +187,7 @@ pub async fn empty_users_redirect_layer(
     if login::should_redirect_to_setup(&path, users_empty) {
         return HandlerResponse {
             status: 303,
-            headers: vec![("Location".to_string(), "/agent-mcp/setup".to_string())],
+            headers: vec![("Location".to_string(), "/conexus/setup".to_string())],
             body: HandlerBody::Empty,
         }
         .into_response();
@@ -394,7 +394,7 @@ mod tests {
         fn assert_hardened(headers: &axum::http::HeaderMap) {
             assert_eq!(
                 headers.get("server").and_then(|v| v.to_str().ok()),
-                Some("agent-mcp")
+                Some("conexus")
             );
             assert_eq!(
                 headers
@@ -461,10 +461,7 @@ mod tests {
         async fn an_inner_session_gate_rejection_still_carries_the_full_hardened_header_set() {
             let (_dir, state) = test_router_state().await;
             let protected = Router::new()
-                .route(
-                    "/agent-mcp/app/secret/",
-                    get(|| async { "should never run" }),
-                )
+                .route("/conexus/app/secret/", get(|| async { "should never run" }))
                 .layer(axum::middleware::from_fn_with_state(
                     Arc::clone(&state),
                     session_gate_layer,
@@ -479,7 +476,7 @@ mod tests {
             // No cookie at all + a JSON Accept header -> session_gate's
             // own `unauthorized_response` (401), not the HTML login
             // redirect -- exercises `SessionGateOutcome::Reject` cleanly.
-            let resp = oneshot_get(app, "/agent-mcp/app/secret/", Some("application/json")).await;
+            let resp = oneshot_get(app, "/conexus/app/secret/", Some("application/json")).await;
             assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "{resp:?}");
             assert_hardened(resp.headers());
         }

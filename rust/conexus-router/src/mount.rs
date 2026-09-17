@@ -1,10 +1,10 @@
 //! External mount / URL-prefix derivation (ADR-0020). Port of
 //! `agent_mcp/router/mount.py`.
 //!
-//! The router's routes live under an INTERNAL namespace (`/agent-mcp`),
+//! The router's routes live under an INTERNAL namespace (`/conexus`),
 //! but the EXTERNAL mount prefix is owned by the reverse proxy and
 //! varies per front door: the tailnet serves the router under
-//! `/agent-mcp/`, while a Traefik proxy may serve it at the host
+//! `/conexus/`, while a Traefik proxy may serve it at the host
 //! ROOT. The same process handles both concurrently, so the external
 //! prefix + origin must be derived PER REQUEST -- a static config can
 //! encode only one mount.
@@ -29,10 +29,10 @@
 
 /// The app's internal route namespace. Every route + path-check is
 /// expressed relative to this; it is decoupled from the external mount.
-pub const INTERNAL_MOUNT: &str = "/agent-mcp";
+pub const CONEXUS_MOUNT: &str = "/conexus";
 
 fn arrived_under_mount(path: &str) -> bool {
-    path == INTERNAL_MOUNT || path.starts_with(&format!("{INTERNAL_MOUNT}/"))
+    path == CONEXUS_MOUNT || path.starts_with(&format!("{CONEXUS_MOUNT}/"))
 }
 
 /// Normalise a prefix to `""` or `/seg[/seg...]` (no trailing `/`).
@@ -45,24 +45,24 @@ fn norm_prefix(raw: &str) -> String {
     }
 }
 
-/// Request path in the internal `/agent-mcp` namespace.
+/// Request path in the internal `/conexus` namespace.
 ///
-/// Tailnet requests already arrive under `/agent-mcp` (unchanged). A
+/// Tailnet requests already arrive under `/conexus` (unchanged). A
 /// root request (proxy stripped the prefix / Traefik mounted at root)
-/// is normalised to its `/agent-mcp` form so every existing path check
+/// is normalised to its `/conexus` form so every existing path check
 /// + the auth gate treat it identically to the tailnet twin.
 ///
 /// **SECURITY**: the operator-session gate MUST key off this, never
 /// the raw request path -- otherwise a root-aliased route skips the
-/// `starts_with("/agent-mcp")` gate and serves unauthenticated.
+/// `starts_with("/conexus")` gate and serves unauthenticated.
 pub fn canonical_path(path: &str) -> String {
     if arrived_under_mount(path) {
         return path.to_string();
     }
     if path == "/" {
-        return format!("{INTERNAL_MOUNT}/");
+        return format!("{CONEXUS_MOUNT}/");
     }
-    format!("{INTERNAL_MOUNT}{path}")
+    format!("{CONEXUS_MOUNT}{path}")
 }
 
 /// The URL prefix the client's browser sees (`""` at root).
@@ -74,7 +74,7 @@ pub fn external_prefix(path: &str, is_trusted: bool, forwarded_prefix: Option<&s
     }
     // No trusted declaration: infer from how the request arrived.
     if arrived_under_mount(path) {
-        INTERNAL_MOUNT.to_string()
+        CONEXUS_MOUNT.to_string()
     } else {
         String::new()
     }
@@ -104,7 +104,7 @@ pub fn external_origin(
 }
 
 /// Client-facing path from an internal suffix (the part AFTER the
-/// mount). e.g. `/app/foo/` -> `/agent-mcp/app/foo/` on the tailnet,
+/// mount). e.g. `/app/foo/` -> `/conexus/app/foo/` on the tailnet,
 /// `/app/foo/` at root.
 pub fn external_path(
     path: &str,
@@ -155,14 +155,14 @@ mod tests {
 
     #[test]
     fn canonical_path_passes_through_tailnet_requests_unchanged() {
-        assert_eq!(canonical_path("/agent-mcp/login"), "/agent-mcp/login");
-        assert_eq!(canonical_path("/agent-mcp"), "/agent-mcp");
+        assert_eq!(canonical_path("/conexus/login"), "/conexus/login");
+        assert_eq!(canonical_path("/conexus"), "/conexus");
     }
 
     #[test]
     fn canonical_path_normalises_a_root_mounted_request() {
-        assert_eq!(canonical_path("/"), "/agent-mcp/");
-        assert_eq!(canonical_path("/login"), "/agent-mcp/login");
+        assert_eq!(canonical_path("/"), "/conexus/");
+        assert_eq!(canonical_path("/login"), "/conexus/login");
     }
 
     #[test]
@@ -179,18 +179,15 @@ mod tests {
         // An untrusted caller can't forge a prefix -- falls back to
         // path inference regardless of what it claims.
         assert_eq!(
-            external_prefix("/agent-mcp/login", false, Some("/evil")),
-            "/agent-mcp"
+            external_prefix("/conexus/login", false, Some("/evil")),
+            "/conexus"
         );
         assert_eq!(external_prefix("/login", false, Some("/evil")), "");
     }
 
     #[test]
     fn external_prefix_infers_from_path_shape_with_no_forwarded_header() {
-        assert_eq!(
-            external_prefix("/agent-mcp/login", true, None),
-            "/agent-mcp"
-        );
+        assert_eq!(external_prefix("/conexus/login", true, None), "/conexus");
         assert_eq!(external_prefix("/login", true, None), "");
     }
 
@@ -225,7 +222,7 @@ mod tests {
     #[test]
     fn external_url_composes_origin_prefix_and_suffix() {
         let url = external_url(
-            "/agent-mcp/app",
+            "/conexus/app",
             "https",
             "example.test",
             true,
@@ -234,6 +231,6 @@ mod tests {
             None,
             "/foo/",
         );
-        assert_eq!(url, "https://example.test/agent-mcp/foo/");
+        assert_eq!(url, "https://example.test/conexus/foo/");
     }
 }

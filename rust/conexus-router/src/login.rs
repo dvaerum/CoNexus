@@ -26,7 +26,7 @@
 //!   `sso.py` isn't ported yet): whatever later PR renders the login
 //!   page always resolves "no SSO provider" (the legacy form) until
 //!   then.
-//! - **`AGENT_MCP_BOOTSTRAP_USERNAME`/`PASSWORD` env-var bootstrap**
+//! - **`CONEXUS_BOOTSTRAP_USERNAME`/`PASSWORD` env-var bootstrap**
 //!   (ADR-0013's OTHER first-operator path, distinct from the setup
 //!   wizard): lives in `app.py`'s startup hook, not
 //!   `login.py`/`setup_wizard.py` -- app-wiring's job (PR 23).
@@ -50,7 +50,7 @@ use sea_orm::DatabaseConnection;
 use crate::identity::{self, verify_password, IdentityError, UserRow};
 
 /// Port of `SESSION_COOKIE_NAME`.
-pub const SESSION_COOKIE_NAME: &str = "agent_mcp_session";
+pub const SESSION_COOKIE_NAME: &str = "conexus_session";
 
 /// Port of `COOKIE_MAX_AGE` -- 30 days, mirrors
 /// `identity::DEFAULT_SESSION_LIFETIME_DAYS` (two independent 30-day
@@ -74,7 +74,7 @@ static DECOY_PASSWORD_HASH: LazyLock<String> =
 /// protocol-relative `//host/...`, an absolute `scheme://...` URL, or
 /// anything not starting with `/`) falls back to `default` (the
 /// caller's own `mount::external_path(request, "/")`, already
-/// mount-aware). Not pinned to `/agent-mcp/` specifically (ADR-0020:
+/// mount-aware). Not pinned to `/conexus/` specifically (ADR-0020:
 /// a root-mounted deploy must be able to redirect to `/`, `/app/...`,
 /// etc.) -- any same-origin absolute path is honoured verbatim.
 pub fn safe_next(raw: Option<&str>, default: &str) -> String {
@@ -142,7 +142,7 @@ pub fn enforce_same_origin(
 }
 
 /// Port of `cookie_secure_flag`: forced `true` if the operator has
-/// set `AGENT_MCP_REQUIRE_SECURE_COOKIES` (`require_secure_env`,
+/// set `CONEXUS_REQUIRE_SECURE_COOKIES` (`require_secure_env`,
 /// resolved by the caller); else honours `X-Forwarded-Proto` ONLY
 /// when the caller has already established the peer is a trusted
 /// proxy (`forwarded_proto_if_trusted: None` when untrusted or
@@ -210,7 +210,7 @@ impl SessionCookie {
 /// Port of `_set_session_cookie`: mints the real cookie with
 /// `Max-Age=`[`COOKIE_MAX_AGE_SECS`]. `path` is the caller's own
 /// `mount::external_prefix(request) + "/"` (ADR-0020: `/` at root,
-/// `/agent-mcp/` on the tailnet) -- never the module-level constant a
+/// `/conexus/` on the tailnet) -- never the module-level constant a
 /// literal port of Python's `COOKIE_PATH` would suggest, since that
 /// constant is superseded at every real call site.
 pub fn set_session_cookie(session_id: &str, path: &str, secure: bool) -> SessionCookie {
@@ -445,11 +445,11 @@ pub async fn create_first_operator(
 /// Port of `empty_users_redirect_middleware`'s own decision (the
 /// `mount.canonical_path`/`path_policy.is_redirect_exempt` calls
 /// themselves are the caller's job -- `path` here is ALREADY the
-/// canonical `/agent-mcp/...` form, matching `path_policy.rs`'s own
+/// canonical `/conexus/...` form, matching `path_policy.rs`'s own
 /// "canonical form in, canonical form out" convention). `true` means
 /// "redirect this request to `/setup`".
 pub fn should_redirect_to_setup(path: &str, users_table_empty: bool) -> bool {
-    if !path.starts_with(crate::mount::INTERNAL_MOUNT) {
+    if !path.starts_with(crate::mount::CONEXUS_MOUNT) {
         return false;
     }
     if crate::path_policy::is_redirect_exempt(path) {
@@ -458,7 +458,7 @@ pub fn should_redirect_to_setup(path: &str, users_table_empty: bool) -> bool {
     users_table_empty
 }
 
-/// `GET /agent-mcp/setup`'s only real decision -- port of
+/// `GET /conexus/setup`'s only real decision -- port of
 /// `setup_get_handler`. Once the wizard has been completed there is
 /// nothing left to render; the caller 303s to `/login` instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -475,7 +475,7 @@ pub fn setup_get_outcome(users_table_empty: bool) -> SetupGetOutcome {
     }
 }
 
-/// `POST /agent-mcp/setup`'s outcome -- port of `setup_post_handler`'s
+/// `POST /conexus/setup`'s outcome -- port of `setup_post_handler`'s
 /// own flow around [`create_first_operator`]. Two Python code paths
 /// collapse onto the SAME [`SetupPostOutcome::AlreadySetUp`] variant,
 /// deliberately: a POST arriving after the wizard is already done (a
@@ -673,10 +673,10 @@ mod tests {
 
     #[test]
     fn set_session_cookie_has_the_exact_attribute_contract() {
-        let cookie = set_session_cookie("abc123", "/agent-mcp/", true);
+        let cookie = set_session_cookie("abc123", "/conexus/", true);
         assert_eq!(cookie.name, SESSION_COOKIE_NAME);
         assert_eq!(cookie.value, "abc123");
-        assert_eq!(cookie.path, "/agent-mcp/");
+        assert_eq!(cookie.path, "/conexus/");
         assert!(cookie.http_only);
         assert!(cookie.secure);
         assert_eq!(cookie.same_site, SameSite::Lax);
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn clear_session_cookie_has_max_age_zero_and_an_empty_value() {
-        let cookie = clear_session_cookie("/agent-mcp/", false);
+        let cookie = clear_session_cookie("/conexus/", false);
         assert_eq!(cookie.value, "");
         assert_eq!(cookie.max_age, 0);
         assert!(cookie.http_only);
@@ -695,7 +695,7 @@ mod tests {
 
     #[test]
     fn parse_cookie_header_finds_the_named_cookie() {
-        let raw = "foo=bar; agent_mcp_session=abc123; baz=qux";
+        let raw = "foo=bar; conexus_session=abc123; baz=qux";
         assert_eq!(
             parse_cookie_header(raw, SESSION_COOKIE_NAME),
             Some("abc123".to_string())
@@ -710,7 +710,7 @@ mod tests {
 
     #[test]
     fn parse_cookie_header_skips_a_malformed_segment() {
-        let raw = "garbage; agent_mcp_session=abc123";
+        let raw = "garbage; conexus_session=abc123";
         assert_eq!(
             parse_cookie_header(raw, SESSION_COOKIE_NAME),
             Some("abc123".to_string())
@@ -973,22 +973,22 @@ mod tests {
 
     #[test]
     fn should_redirect_to_setup_when_the_users_table_is_empty() {
-        assert!(should_redirect_to_setup("/agent-mcp/", true));
-        assert!(should_redirect_to_setup("/agent-mcp/login", true));
+        assert!(should_redirect_to_setup("/conexus/", true));
+        assert!(should_redirect_to_setup("/conexus/login", true));
     }
 
     #[test]
     fn should_redirect_to_setup_never_fires_once_users_exist() {
-        assert!(!should_redirect_to_setup("/agent-mcp/login", false));
+        assert!(!should_redirect_to_setup("/conexus/login", false));
     }
 
     #[test]
     fn should_redirect_to_setup_is_exempt_for_setup_assets_api_mcp_and_sso() {
-        assert!(!should_redirect_to_setup("/agent-mcp/setup", true));
-        assert!(!should_redirect_to_setup("/agent-mcp/assets/app.css", true));
-        assert!(!should_redirect_to_setup("/agent-mcp/api/tasks", true));
-        assert!(!should_redirect_to_setup("/agent-mcp/mcp/proj", true));
-        assert!(!should_redirect_to_setup("/agent-mcp/sso/callback", true));
+        assert!(!should_redirect_to_setup("/conexus/setup", true));
+        assert!(!should_redirect_to_setup("/conexus/assets/app.css", true));
+        assert!(!should_redirect_to_setup("/conexus/api/tasks", true));
+        assert!(!should_redirect_to_setup("/conexus/mcp/proj", true));
+        assert!(!should_redirect_to_setup("/conexus/sso/callback", true));
     }
 
     #[test]
@@ -1003,8 +1003,8 @@ mod tests {
         // login/logout are auth-bypass-only (path_policy.rs's own
         // documented divergence) -- an empty-database operator must
         // still be bounced to /setup even when hitting /login.
-        assert!(should_redirect_to_setup("/agent-mcp/login", true));
-        assert!(should_redirect_to_setup("/agent-mcp/logout", true));
+        assert!(should_redirect_to_setup("/conexus/login", true));
+        assert!(should_redirect_to_setup("/conexus/logout", true));
     }
 
     // -- setup_get_outcome --------------------------------------------------

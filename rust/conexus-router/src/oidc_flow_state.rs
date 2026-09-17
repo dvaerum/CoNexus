@@ -28,8 +28,8 @@ use crate::json_sanitize::decode_untrusted_body;
 use crate::login::SessionCookie;
 
 /// Port of `_FLOW_COOKIE_NAME`/`_FLOW_COOKIE_PATH`/`_FLOW_COOKIE_MAX_AGE`.
-pub const FLOW_COOKIE_NAME: &str = "agent_mcp_sso_flow";
-pub const FLOW_COOKIE_PATH: &str = "/agent-mcp/sso/";
+pub const FLOW_COOKIE_NAME: &str = "conexus_sso_flow";
+pub const FLOW_COOKIE_PATH: &str = "/conexus/sso/";
 /// 10 minutes -- plenty for the round-trip to the IdP and back.
 pub const FLOW_COOKIE_MAX_AGE_SECS: i64 = 10 * 60;
 

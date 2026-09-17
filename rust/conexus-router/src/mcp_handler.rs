@@ -189,7 +189,7 @@ fn unauthorized_response() -> HandlerResponse {
         status: 401,
         headers: vec![(
             "WWW-Authenticate".to_string(),
-            "Bearer realm=\"agent-mcp\"".to_string(),
+            "Bearer realm=\"conexus\"".to_string(),
         )],
         body: HandlerBody::Text("invalid or missing agent bearer token".to_string()),
     }
@@ -238,7 +238,7 @@ pub fn maybe_single_tenant_redirect(
 
 /// Port of the `API_VERSION_*`/`API_MEDIA_TYPE` constants.
 pub const API_VERSION_CURRENT: &str = "v1";
-pub const API_MEDIA_TYPE: &str = "application/vnd.agent-mcp.v1+json";
+pub const API_MEDIA_TYPE: &str = "application/vnd.conexus.v1+json";
 const API_DOCS_URL: &str =
     "https://github.com/dvaerum/CoNexus/blob/main/docs/integrations/api-versioning.md";
 
@@ -272,7 +272,7 @@ pub(crate) fn api_version_required_response() -> HandlerResponse {
         body: HandlerBody::Json(serde_json::json!({
             "error": "version_required",
             "message": format!(
-                "agent-mcp REST endpoints require an Accept header specifying the API version. Resend with: Accept: {API_MEDIA_TYPE}"
+                "conexus REST endpoints require an Accept header specifying the API version. Resend with: Accept: {API_MEDIA_TYPE}"
             ),
             "supported_versions": [API_VERSION_CURRENT],
             "current_default": API_VERSION_CURRENT,
@@ -410,7 +410,7 @@ fn path_and_query(path: &str, query: Option<&str>) -> String {
     }
 }
 
-/// `/agent-mcp/<name>/mcp` -> backend `/mcp`. Port of
+/// `/conexus/<name>/mcp` -> backend `/mcp`. Port of
 /// `backend_mcp_handler`'s bearer-authenticated path -- see the module
 /// doc for the cookie-path scope this deliberately omits.
 #[allow(clippy::too_many_arguments)]
@@ -516,7 +516,7 @@ pub async fn backend_mcp_handler(
     }
 }
 
-/// `/agent-mcp/__api/<name>/{rest}` -> backend `/api/{rest}`. Port of
+/// `/conexus/__api/<name>/{rest}` -> backend `/api/{rest}`. Port of
 /// `backend_api_handler`, PLUS the cookie-authenticated forwarding
 /// bridge Python's OWN `backend_api_handler` never had either (see
 /// this module's own doc and `crate::cookie_forwarding`'s doc for why
@@ -935,7 +935,7 @@ mod tests {
             ..fast_cfg()
         };
         let redirect =
-            maybe_single_tenant_redirect(&cfg, "foo", "/agent-mcp/__dashboard/foo/tasks/foo", None)
+            maybe_single_tenant_redirect(&cfg, "foo", "/conexus/__dashboard/foo/tasks/foo", None)
                 .unwrap();
         assert_eq!(redirect.status, 302);
         let location = redirect
@@ -943,7 +943,7 @@ mod tests {
             .iter()
             .find(|(k, _)| k == "Location")
             .unwrap();
-        assert_eq!(location.1, "/agent-mcp/__dashboard/bar/tasks/foo");
+        assert_eq!(location.1, "/conexus/__dashboard/bar/tasks/foo");
     }
 
     #[test]
@@ -964,7 +964,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("proj-a", "/agent-mcp/proj-a/mcp");
+        let mut req = base_req("proj-a", "/conexus/proj-a/mcp");
         req.headers = HeaderMap::new(); // no Authorization at all
 
         let resp = backend_mcp_handler(
@@ -1002,7 +1002,7 @@ mod tests {
             &fast_ensure_cfg(),
             &cfg,
             test_now(),
-            base_req("nope", "/agent-mcp/nope/mcp"),
+            base_req("nope", "/conexus/nope/mcp"),
         )
         .await;
         let elapsed = t0.elapsed();
@@ -1021,7 +1021,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("proj-a", "/agent-mcp/proj-a/mcp");
+        let mut req = base_req("proj-a", "/conexus/proj-a/mcp");
         req.method = Method::PUT;
 
         let resp = backend_mcp_handler(
@@ -1066,7 +1066,7 @@ mod tests {
             &fast_ensure_cfg(),
             &fast_cfg(),
             test_now(),
-            base_req("proj-a", "/agent-mcp/proj-a/mcp"),
+            base_req("proj-a", "/conexus/proj-a/mcp"),
         )
         .await;
         // SEC5: the backend's own 401 (with its own body/Server header)
@@ -1108,7 +1108,7 @@ mod tests {
             &fast_ensure_cfg(),
             &fast_cfg(),
             test_now(),
-            base_req("proj-a", "/agent-mcp/proj-a/mcp"),
+            base_req("proj-a", "/conexus/proj-a/mcp"),
         )
         .await;
         assert_eq!(resp.status, 200);
@@ -1132,7 +1132,7 @@ mod tests {
             ..fast_cfg()
         };
 
-        let mut req = base_req("proj-a", "/agent-mcp/proj-a/mcp");
+        let mut req = base_req("proj-a", "/conexus/proj-a/mcp");
         req.body = Bytes::from_static(b"way too big for the cap");
 
         let resp = backend_mcp_handler(
@@ -1201,7 +1201,7 @@ mod tests {
             &fast_ensure_cfg(),
             &cfg,
             test_now(),
-            base_req("proj-a", "/agent-mcp/proj-a/mcp"),
+            base_req("proj-a", "/conexus/proj-a/mcp"),
         )
         .await;
         let elapsed = t0.elapsed();
@@ -1276,7 +1276,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut no_bearer_req = base_req("proj-a", "/agent-mcp/proj-a/mcp");
+        let mut no_bearer_req = base_req("proj-a", "/conexus/proj-a/mcp");
         no_bearer_req.headers = HeaderMap::new();
         let resp_no_bearer = backend_mcp_handler(
             &store,
@@ -1298,7 +1298,7 @@ mod tests {
             &fast_ensure_cfg(),
             &fast_cfg(),
             test_now(),
-            base_req("does-not-exist", "/agent-mcp/does-not-exist/mcp"),
+            base_req("does-not-exist", "/conexus/does-not-exist/mcp"),
         )
         .await;
 
@@ -1306,7 +1306,7 @@ mod tests {
             mcp_max_body_bytes: 4,
             ..fast_cfg()
         };
-        let mut big_req = base_req("proj-a", "/agent-mcp/proj-a/mcp");
+        let mut big_req = base_req("proj-a", "/conexus/proj-a/mcp");
         big_req.body = Bytes::from_static(b"way too big for the cap");
         let resp_oversized_body = backend_mcp_handler(
             &store,
@@ -1343,7 +1343,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("proj-a", "/agent-mcp/__api/proj-a/agents");
+        let mut req = base_req("proj-a", "/conexus/__api/proj-a/agents");
         req.method = Method::GET;
         req.headers = HeaderMap::new(); // no Accept header at all
 
@@ -1380,7 +1380,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("proj-a", "/agent-mcp/__api/proj-a/events");
+        let mut req = base_req("proj-a", "/conexus/__api/proj-a/events");
         req.method = Method::GET;
         req.headers = HeaderMap::new();
 
@@ -1411,7 +1411,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("nope", "/agent-mcp/__api/nope/agents");
+        let mut req = base_req("nope", "/conexus/__api/nope/agents");
         req.method = Method::GET;
         req.headers.insert(
             hyper::header::ACCEPT,
@@ -1446,7 +1446,7 @@ mod tests {
             assert_eq!(req.uri().path(), "/api/agents");
             let alias_header = req
                 .headers()
-                .get("x-agent-mcp-alias")
+                .get("x-conexus-alias")
                 .map(|v| v.to_str().unwrap().to_string())
                 .unwrap_or_default();
             Response::builder()
@@ -1463,7 +1463,7 @@ mod tests {
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("old-name", "/agent-mcp/__api/old-name/agents");
+        let mut req = base_req("old-name", "/conexus/__api/old-name/agents");
         req.method = Method::GET;
         req.headers.insert(
             hyper::header::ACCEPT,
@@ -1502,7 +1502,7 @@ mod tests {
         spawn_backend(sock_path, |req| {
             let header = req
                 .headers()
-                .get("x-agent-mcp-forwarded-operator")
+                .get("x-conexus-forwarded-operator")
                 .map(|v| v.to_str().unwrap().to_string())
                 .unwrap_or_default();
             Response::builder()
@@ -1514,7 +1514,7 @@ mod tests {
     }
 
     fn cookie_bridge_req(no_bearer: bool) -> HandlerRequest {
-        let mut req = base_req("proj-a", "/agent-mcp/__api/proj-a/all-data");
+        let mut req = base_req("proj-a", "/conexus/__api/proj-a/all-data");
         req.method = Method::GET;
         req.headers.insert(
             hyper::header::ACCEPT,

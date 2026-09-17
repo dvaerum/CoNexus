@@ -50,12 +50,12 @@ pub struct RouterStateConfig {
     pub max_streams_global: u32,
     /// Parent dir for a new project's workspace when the caller omits
     /// one -- port of `app.py`'s `DEFAULT_WORKSPACE_PARENT`
-    /// (`$AGENT_MCP_DEFAULT_WORKSPACE`, default `~/.local/share/
-    /// agent-mcp/projects`). Needed by `project_gate::
+    /// (`$CONEXUS_DEFAULT_WORKSPACE`, default `~/.local/share/
+    /// conexus/projects`). Needed by `project_gate::
     /// decide_create_project`/`lifecycle::workspace_label`.
     pub default_workspace_parent: PathBuf,
     /// Agent-token directory -- port of `admin_api.py::_token_dir()`
-    /// (`$AGENT_MCP_TOKENS_DIR`, default `~/.config/agent-mcp/tokens`).
+    /// (`$CONEXUS_TOKENS_DIR`, default `~/.config/conexus/tokens`).
     /// `None` only in a test/dev context with no real `$HOME` to fall
     /// back to; a production boot always resolves a concrete path (the
     /// env-var-presence branch this mirrors is itself a fix for a real
@@ -143,7 +143,7 @@ impl RouterState {
             session_gate_config: SessionGateConfig {
                 single_tenant_name: config.single_tenant_name,
                 // Port of `path_policy.py`'s own `public_route`
-                // registration for `GET /agent-mcp/api/router/health`
+                // registration for `GET /conexus/api/router/health`
                 // (`admin_api.py:1723-1728`) -- the ONE lifecycle-rest
                 // route with no session requirement at all. Both
                 // forms are listed explicitly: Python's real
@@ -152,14 +152,14 @@ impl RouterState {
                 // `main.rs`'s own `admin_api_route` registers), so
                 // the public marking is inherited by that alias too
                 // -- confirmed live (a bare hand-reviewed single-entry
-                // list here left `/agent-mcp/api/router/health/`
+                // list here left `/conexus/api/router/health/`
                 // 401ing while its canonical twin correctly 200'd).
                 // The 2 root-mounted variants need no separate entry:
                 // `mount::canonical_path` folds them back to one of
                 // these 2 forms before this list is ever checked.
                 extra_exact_paths: vec![
-                    "/agent-mcp/api/router/health".to_string(),
-                    "/agent-mcp/api/router/health/".to_string(),
+                    "/conexus/api/router/health".to_string(),
+                    "/conexus/api/router/health/".to_string(),
                 ],
             },
             sock_dir: config.sock_dir,
@@ -181,7 +181,7 @@ mod tests {
 
     fn test_config() -> RouterStateConfig {
         RouterStateConfig {
-            sock_dir: PathBuf::from("/tmp/agent-mcp-sockets"),
+            sock_dir: PathBuf::from("/tmp/conexus-sockets"),
             dashboard_dir: None,
             external_url: None,
             idle_sec: 14400,
@@ -190,7 +190,7 @@ mod tests {
             single_tenant_workspace: None,
             max_streams_per_agent: 4,
             max_streams_global: 64,
-            default_workspace_parent: PathBuf::from("/tmp/agent-mcp-projects"),
+            default_workspace_parent: PathBuf::from("/tmp/conexus-projects"),
             token_dir: None,
         }
     }
@@ -210,7 +210,7 @@ mod tests {
             EnsureConfig::from_env(|_| None),
             test_config(),
         );
-        assert_eq!(state.sock_dir, PathBuf::from("/tmp/agent-mcp-sockets"));
+        assert_eq!(state.sock_dir, PathBuf::from("/tmp/conexus-sockets"));
         assert_eq!(state.idle_sec, 14400);
         assert!(state.mcp_handler_config.single_tenant_name.is_none());
         assert!(state.session_gate_config.single_tenant_name.is_none());
@@ -265,7 +265,7 @@ mod tests {
             .session_gate_config
             .extra_exact_paths
             .iter()
-            .any(|p| p == "/agent-mcp/api/router/health"));
+            .any(|p| p == "/conexus/api/router/health"));
         assert_eq!(
             state.default_workspace_parent,
             dir.path().join("workspaces")

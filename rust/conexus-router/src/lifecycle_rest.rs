@@ -879,7 +879,7 @@ mod tests {
 
     #[tokio::test]
     async fn stop_result_to_failure_response_never_reflects_systemctl_stderr() {
-        let secret = "/nix/store/SECRET-unit-path/agent-mcp-leaky-backend.service";
+        let secret = "/nix/store/SECRET-unit-path/conexus-leaky-backend.service";
         let stop_result: Result<SystemctlResult, HandlerResponse> = Ok(SystemctlResult {
             returncode: 1,
             stdout: String::new(),

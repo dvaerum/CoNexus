@@ -22,7 +22,7 @@
 //! **Deliberately NOT ported**: the alias-deprecation contributor
 //! (ADR-0010, `_alias_warning_contributor`). It gates on
 //! `ctx.alias_info`, populated in Python only when the upstream router
-//! proxies a request carrying an `X-Agent-MCP-Alias` header -- no
+//! proxies a request carrying an `X-Conexus-Alias` header -- no
 //! Rust representation exists anywhere in `conexus-backend` today
 //! (alias resolution is router-territory, Phase E2). There is no fact
 //! to contribute yet, not a dropped feature -- revisit once the router

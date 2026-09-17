@@ -10,7 +10,7 @@
 //! `SsoSubject` type, and `bootstrap_sysadmin` hardcoded `true`
 //! (the proxy path's own always-on policy). OIDC needs a genuinely
 //! wider contract -- `bootstrap_sysadmin` is caller-supplied here
-//! (`AGENT_MCP_SSO_OIDC_DEFAULT_SYSADMIN`, defaulting OFF), and the
+//! (`CONEXUS_SSO_OIDC_DEFAULT_SYSADMIN`, defaulting OFF), and the
 //! reconciliation key is a real [`SsoSubject`], not a bare `&str`.
 //!
 //! Matching algorithm, in order (byte-for-byte the real Python
@@ -52,7 +52,7 @@ pub struct OidcReconcileInput<'a> {
     /// JIT-created row, regardless of table emptiness -- per
     /// `sso.py`'s own `find_or_create_sso_user` docstring, "only the
     /// proxy-header path passes True today"
-    /// (`AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN`). The real OIDC call
+    /// (`CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN`). The real OIDC call
     /// site (`oidc_handlers.rs::oidc_reconcile_sysadmin_flags`) always
     /// hardcodes this `false` -- OIDC's own bootstrap opt-in only ever
     /// threads through `bootstrap_sysadmin` below, never this field.
@@ -61,7 +61,7 @@ pub struct OidcReconcileInput<'a> {
     /// inside `identity::create_user`'s own `BEGIN IMMEDIATE`
     /// bootstrap cluster (AC-R9-2) -- a fresh OIDC deploy's first IdP
     /// user is only auto-promoted when the operator opted in via
-    /// `AGENT_MCP_SSO_OIDC_DEFAULT_SYSADMIN`.
+    /// `CONEXUS_SSO_OIDC_DEFAULT_SYSADMIN`.
     pub bootstrap_sysadmin: bool,
 }
 

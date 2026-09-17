@@ -1,4 +1,4 @@
-//! `GET /agent-mcp/api/router/sso/config` -- port of
+//! `GET /conexus/api/router/sso/config` -- port of
 //! `agent_mcp/router/admin_sso_api.py` (120 LOC, Phase E2 PR23
 //! step 10/10, `conexus-router-sso-admin-config`).
 //!
@@ -84,7 +84,7 @@ pub fn sso_config_response(result: &Result<SsoSettings, sso::SsoConfigError>) ->
     }
 }
 
-/// `GET /agent-mcp/api/router/sso/config` -- gated on
+/// `GET /conexus/api/router/sso/config` -- gated on
 /// `system.sso.configure` (sysadmins admit unconditionally via the
 /// wildcard cap set; a sysadmin can ALSO delegate SSO configuration
 /// to a group without promoting members to sysadmin, matching
@@ -140,9 +140,7 @@ mod tests {
                 client_secret: "super-secret-value".to_string(),
                 provider_name: "Example IdP".to_string(),
                 group_mapping,
-                redirect_url: Some(
-                    "https://router.example.test/agent-mcp/sso/callback".to_string(),
-                ),
+                redirect_url: Some("https://router.example.test/conexus/sso/callback".to_string()),
                 scopes: vec!["openid".to_string(), "email".to_string()],
                 default_is_sysadmin: false,
             }),
@@ -160,7 +158,7 @@ mod tests {
         assert_eq!(oidc["group_mapping"]["engineers"], "operator");
         assert_eq!(
             oidc["redirect_url"],
-            "https://router.example.test/agent-mcp/sso/callback"
+            "https://router.example.test/conexus/sso/callback"
         );
         assert_eq!(oidc["scopes"], json!(["openid", "email"]));
     }
@@ -194,7 +192,7 @@ mod tests {
             mode: SsoMode::ProxyHeader,
             oidc: None,
             proxy: Some(ProxyHeaderSettings {
-                trust_header: "X-Agent-MCP-SSO-User".to_string(),
+                trust_header: "X-Conexus-SSO-User".to_string(),
                 trusted_ips,
                 default_is_sysadmin: true,
             }),
@@ -202,7 +200,7 @@ mod tests {
         let payload = sso_config_payload(&settings);
         assert_eq!(payload["mode"], "proxy_header");
         let proxy = &payload["proxy"];
-        assert_eq!(proxy["trust_header"], "X-Agent-MCP-SSO-User");
+        assert_eq!(proxy["trust_header"], "X-Conexus-SSO-User");
         assert_eq!(proxy["trusted_ips"], json!(["10.0.0.1", "10.0.0.5"]));
         assert_eq!(proxy["default_is_sysadmin"], true);
     }
@@ -210,7 +208,7 @@ mod tests {
     #[test]
     fn response_reports_a_config_load_error_as_a_500() {
         let result = Err(sso::SsoConfigError(
-            "both AGENT_MCP_SSO_OIDC_ISSUER and AGENT_MCP_SSO_PROXY_HEADER are set".to_string(),
+            "both CONEXUS_SSO_OIDC_ISSUER and CONEXUS_SSO_PROXY_HEADER are set".to_string(),
         ));
         let resp = sso_config_response(&result);
         assert_eq!(resp.status, 500);
@@ -221,7 +219,7 @@ mod tests {
         assert_eq!(body["error"], "sso_config_error");
         assert_eq!(
             body["message"],
-            "both AGENT_MCP_SSO_OIDC_ISSUER and AGENT_MCP_SSO_PROXY_HEADER are set"
+            "both CONEXUS_SSO_OIDC_ISSUER and CONEXUS_SSO_PROXY_HEADER are set"
         );
     }
 

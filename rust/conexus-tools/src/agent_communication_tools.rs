@@ -137,7 +137,7 @@ pub enum EntryOutcome {
     EnterSlowPath(SlowPathSetup),
 }
 
-/// Best-effort env-var lookup for `AGENT_MCP_SUBJECT_MODEL` (the AI
+/// Best-effort env-var lookup for `CONEXUS_SUBJECT_MODEL` (the AI
 /// subject-gen on/off flag `collect_events_with_cap`'s title-hold gate
 /// needs) -- the real process environment, not a test fixture. See
 /// `event_feed::collect_events_with_cap`'s own doc for why this is an
@@ -1008,7 +1008,7 @@ impl conexus_auth::Tool for SendAgentMessageTool {
             "message": {"type": "string", "description": "Message content (max 4000 characters)"},
             "message_type": {"type": "string", "description": "Type of message", "enum": ["text", "assistance_request", "task_update", "notification", "stop_command"], "default": "text"},
             "priority": {"type": "string", "description": "Message priority", "enum": ["low", "normal", "high", "urgent"], "default": "normal"},
-            "deliver_method": {"type": "string", "description": "Vestigial since Wave 7 (coordinator transition). Every message is stored in the DB and surfaced via wait_for_events / get_agent_messages -- agent-mcp no longer pushes to a tmux session. Accepted for back-compat; the value is ignored.", "enum": ["tmux", "store", "both"], "default": "store"},
+            "deliver_method": {"type": "string", "description": "Vestigial since Wave 7 (coordinator transition). Every message is stored in the DB and surfaced via wait_for_events / get_agent_messages -- conexus no longer pushes to a tmux session. Accepted for back-compat; the value is ignored.", "enum": ["tmux", "store", "both"], "default": "store"},
             "subject": {"type": ["string", "null"], "description": "Optional one-line subject for root messages. For a reply, use parent_message_id rather than an 'RE:' subject -- replies are threaded, not subject-bearing (subject is ignored / forced NULL when parent_message_id is set)."},
             "parent_message_id": {"type": ["string", "null"], "description": "How you reply / thread a message: set this to the message_id you are replying to and this message is linked as a reply under that thread. Prefer this over typing 'RE:' into the subject. Replies always have subject = NULL (the thread shows the root's subject as the conversation title)."}
         },
