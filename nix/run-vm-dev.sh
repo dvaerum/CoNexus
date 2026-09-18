@@ -3,8 +3,8 @@
 #
 # Boots the same NixOS multi-tenant VM as `nix run .#` but forwards
 # the guest router port to host:18080 (by default) instead of
-# host:5454, and pre-seeds a sentinel operator (dev / dev) via the
-# env-var bootstrap (CONEXUS_BOOTSTRAP_USERNAME/_PASSWORD wired on
+# host:5454, and pre-seeds a sentinel operator (dev / dev-sandbox-password)
+# via the env-var bootstrap (CONEXUS_BOOTSTRAP_USERNAME/_PASSWORD wired on
 # conexus-router.service in nix/vm-dev.nix) so Firefox-MCP can hit
 # /login immediately and drive the dashboard at
 # http://localhost:18080/conexus/ without first having to walk
@@ -62,8 +62,8 @@ is at:
 
 where HOST_PORT is ${DEFAULT_HOST_PORT} unless overridden.
 
-A sentinel operator (username \`dev\`, password \`dev\`) is seeded on
-first boot via the env-var bootstrap, so /login is reachable
+A sentinel operator (username \`dev\`, password \`dev-sandbox-password\`)
+is seeded on first boot via the env-var bootstrap, so /login is reachable
 immediately. Projects are created through the dashboard UI after
 sign-in.
 
@@ -234,7 +234,7 @@ cat <<INFO
 conexus-vm-dev: booting Path B interactive sandbox
 conexus-vm-dev: dashboard      http://localhost:${host_port}/conexus/
 conexus-vm-dev: ssh access     ssh root@localhost -p ${ssh_port}  (no password — DEV-MODE)
-conexus-vm-dev: operator       dev / dev  (seeded via env-var bootstrap)
+conexus-vm-dev: operator       dev / dev-sandbox-password  (seeded via env-var bootstrap)
 conexus-vm-dev: llm mode       external — 2 GB guest, endpoints on the HOST:
 conexus-vm-dev:                  chat       127.0.0.1:11435  (guest: 10.0.2.2)
 conexus-vm-dev:                  embeddings 127.0.0.1:11434  (guest: 10.0.2.2)
