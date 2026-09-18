@@ -183,7 +183,16 @@ pkgs.testers.nixosTest {
         RuntimeDirectory = "conexus-bootstrap-seed";
         RuntimeDirectoryMode = "0700";
         ExecStart = "${pkgs.coreutils}/bin/install -m 0600 ${bootstrapPasswordEnvFile} /run/conexus-bootstrap-seed/bootstrap.env";
-      };
+        # Pentest class-sweep: this file's sibling units (conexus@,
+        # conexus-router below) already merge the shared hardening
+        # baseline; this one was the odd one out. `install` only reads
+        # a world-readable nix-store file and writes into its own
+        # RuntimeDirectory, so no root capability is needed — and
+        # conexus-router still reads the resulting EnvironmentFile=
+        # fine regardless of which uid wrote it (systemd/PID 1 loads
+        # EnvironmentFile= as root before conexus-router's own exec).
+        DynamicUser = true;
+      } // hardening;
     };
 
     systemd.services.conexus-router = {

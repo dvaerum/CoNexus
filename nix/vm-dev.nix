@@ -124,6 +124,40 @@ let
     "CONEXUS_BOOTSTRAP_PASSWORD=${bootstrapPassword}\n";
   bootstrapPasswordRuntimeDir = "conexus-vm-dev-bootstrap";
   bootstrapPasswordRuntimePath = "/run/${bootstrapPasswordRuntimeDir}/bootstrap.env";
+
+  # Pentest class-sweep: the shared hardening baseline (nix/hardening.nix)
+  # is merged into conexus-router / conexus@ by vm.nix already, but this
+  # file's own hand-rolled dev-support units (bootstrap-seed, the SSH
+  # warning banner, the fixture preloader) predate that convention and
+  # were never wired up — confirmed live via `systemd-analyze security`:
+  # conexus-vm-dev-bootstrap-seed scored 9.6 UNSAFE vs. conexus-router's
+  # 2.8 OK in the same unit file. Merge it into all three below.
+  hardening = import ./hardening.nix;
+  # conexus-vm-dev-preload runs `tar --same-owner` as root specifically
+  # to restore the archived conexus uid/gid into a 0750 conexus:conexus
+  # directory (see the ExecStart comment below) — that needs CAP_CHOWN
+  # (reassign ownership) and CAP_DAC_OVERRIDE (write into a directory it
+  # doesn't own), plus CAP_FOWNER (tar's post-chown chmod/utime calls on
+  # a file it no longer nominally owns once ExecStart's ownership no
+  # longer matches root). hardening.nix's CapabilityBoundingSet = [""]
+  # would silently no-op the restore even though the unit still "runs",
+  # so override just that one key back open — same override idiom as
+  # nix/module.nix's `systemHardening = hardening // { ... }`.
+  #
+  # ProcSubset is overridden back to its systemd default ("all") for the
+  # same reason: hardening.nix's ProcSubset = "pid" hides every /proc
+  # entry not keyed to a specific pid, which includes /proc/cmdline —
+  # confirmed live: with the plain `// hardening` merge the script's own
+  # `read -ra _cmdline </proc/cmdline` failed ("No such file or
+  # directory") and the unit silently no-op'd ("no conexus_preload= on
+  # kernel cmdline; nothing to do") even when a bundle WAS requested.
+  # ProtectProc="invisible" alone is unaffected (it only hides OTHER
+  # processes' /proc/<pid> entries, not top-level files like cmdline)
+  # and stays in effect.
+  preloadHardening = hardening // {
+    CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
+    ProcSubset = "all";
+  };
 in
 {
   imports = [
@@ -175,7 +209,14 @@ in
       RuntimeDirectory = bootstrapPasswordRuntimeDir;
       RuntimeDirectoryMode = "0700";
       ExecStart = "${pkgs.coreutils}/bin/install -m 0600 ${bootstrapPasswordEnvFile} ${bootstrapPasswordRuntimePath}";
-    };
+      # `install` only needs to read a world-readable nix-store file and
+      # write into the RuntimeDirectory systemd creates for THIS unit —
+      # no root capability required. conexus-router.service still reads
+      # the resulting EnvironmentFile= fine regardless of which uid wrote
+      # it: EnvironmentFile= is loaded by PID 1 (root) before that unit's
+      # own exec, not read by conexus-router's own runtime uid.
+      DynamicUser = true;
+    } // hardening;
   };
 
   systemd.services.conexus-router = {
@@ -290,7 +331,10 @@ in
       RemainAfterExit = true;
       StandardOutput = "journal+console";
       StandardError = "journal+console";
-    };
+      # Pure echo to the console/journal fd systemd already opened and
+      # inherited before exec — no privilege of any kind needed.
+      DynamicUser = true;
+    } // hardening;
     script = ''
       echo ""
       echo "============================================================"
@@ -359,10 +403,12 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      # Root so tar --same-owner restores the archived conexus uid.
+      # Root so tar --same-owner restores the archived conexus uid; see
+      # `preloadHardening` above for exactly which capabilities that
+      # needs to survive the shared hardening merge.
       ExecStart = "${preloadScript}/bin/conexus-vm-dev-preload";
       StandardOutput = "journal+console";
       StandardError = "journal+console";
-    };
+    } // preloadHardening;
   };
 }
