@@ -16,6 +16,7 @@ use rusqlite::Connection;
 use crate::admin_users_gate::{self, AdminUsersError, MembershipKind};
 use crate::identity::{self, ProjectMembershipRow};
 use crate::mcp_handler::HandlerResponse;
+use crate::orchestrator::runtime::RuntimeStore;
 use crate::project_gate::{self, CrossTenantOutcome, GateError};
 use crate::project_registry::ProjectRegistry;
 
@@ -255,13 +256,35 @@ pub fn gate_add_project_membership(
 /// The `sea_orm`-backed write half of `add_project_membership_handler`
 /// -- call only after [`gate_add_project_membership`] returns
 /// `Proceed`.
+///
+/// Same class as F5's delete/rename in-lock existence recheck
+/// (`project_teardown::project_existence_recheck`): `gate_add_project_
+/// membership` ran its own existence check OUTSIDE any lock, so a
+/// concurrent delete/rename can purge/rekey `project_membership` for
+/// `project_name` in the window between that check and this write --
+/// confirmed live, twice, as an orphaned-row privilege resurrection
+/// when the freed name is later reused. Acquiring the SAME per-
+/// `(project_name, "backend")` `ensure_lock` delete/rename hold for
+/// their own purge/rekey, then re-checking existence before the
+/// INSERT, closes the window the same way their own in-lock recheck
+/// does.
 pub async fn finish_add_project_membership(
     sea_orm_db: &sea_orm::DatabaseConnection,
+    store: &RuntimeStore,
+    registry: &ProjectRegistry,
     project_name: &str,
     user_id: Option<&str>,
     group_id: Option<&str>,
     role: &str,
 ) -> Result<AddProjectMembershipOutcome, GateError> {
+    let lock = store.ensure_lock(project_name, "backend");
+    let _guard = lock.lock_owned().await;
+    if registry.get(project_name)?.is_none() {
+        return Ok(AddProjectMembershipOutcome::Rejected(unknown_project(
+            project_name,
+        )));
+    }
+
     if let Err(e) =
         identity::grant_project_membership(sea_orm_db, project_name, user_id, group_id, role).await
     {
@@ -420,9 +443,18 @@ pub fn gate_change_project_membership_role(
 /// applied the grant-side guard against `new_role`), then writes the
 /// change -- both now genuinely `sea_orm`-backed reads/writes, so both
 /// stay in this async half rather than splitting further.
+///
+/// Not independently exploitable today (a race just `UPDATE`s 0 rows
+/// if `project_name` was purged mid-flight -- no row to combine with a
+/// later-reused name), but the same architectural gap as [`finish_add_
+/// project_membership`]'s TOCTOU: given the SAME in-lock existence
+/// recheck for consistency, rather than leaving this writer as the odd
+/// one out relying on an accident of "0 rows affected" staying safe.
 #[allow(clippy::too_many_arguments)]
 pub async fn finish_change_project_membership_role(
     sea_orm_db: &sea_orm::DatabaseConnection,
+    store: &RuntimeStore,
+    registry: &ProjectRegistry,
     caller_is_sysadmin: bool,
     caller_username: &str,
     caller_principal_role: Option<&str>,
@@ -432,6 +464,14 @@ pub async fn finish_change_project_membership_role(
     group_id: Option<&str>,
     new_role: &str,
 ) -> Result<ChangeProjectMembershipRoleOutcome, GateError> {
+    let lock = store.ensure_lock(project_name, "backend");
+    let _guard = lock.lock_owned().await;
+    if registry.get(project_name)?.is_none() {
+        return Ok(ChangeProjectMembershipRoleOutcome::Rejected(
+            unknown_project(project_name),
+        ));
+    }
+
     let existing_role =
         identity::project_membership_role(sea_orm_db, project_name, user_id, group_id)
             .await
@@ -543,9 +583,16 @@ pub fn gate_delete_project_membership(
 /// The `sea_orm`-backed half of `delete_project_membership_handler` --
 /// call only after [`gate_delete_project_membership`] returns
 /// `Proceed`.
+///
+/// Not independently exploitable today (deleting an already-purged row
+/// is idempotent), but given the SAME in-lock existence recheck as
+/// [`finish_add_project_membership`]/[`finish_change_project_
+/// membership_role`] for consistency -- see those functions' own docs.
 #[allow(clippy::too_many_arguments)]
 pub async fn finish_delete_project_membership(
     sea_orm_db: &sea_orm::DatabaseConnection,
+    store: &RuntimeStore,
+    registry: &ProjectRegistry,
     caller_is_sysadmin: bool,
     caller_username: &str,
     caller_principal_role: Option<&str>,
@@ -554,6 +601,14 @@ pub async fn finish_delete_project_membership(
     user_id: Option<&str>,
     group_id: Option<&str>,
 ) -> Result<DeleteProjectMembershipOutcome, GateError> {
+    let lock = store.ensure_lock(project_name, "backend");
+    let _guard = lock.lock_owned().await;
+    if registry.get(project_name)?.is_none() {
+        return Ok(DeleteProjectMembershipOutcome::Rejected(unknown_project(
+            project_name,
+        )));
+    }
+
     let existing_role =
         identity::project_membership_role(sea_orm_db, project_name, user_id, group_id)
             .await
@@ -678,6 +733,7 @@ mod tests {
         conn: &Connection,
         sea_orm_db: &sea_orm::DatabaseConnection,
         registry: &ProjectRegistry,
+        store: &RuntimeStore,
         caller_is_sysadmin: bool,
         caller_username: &str,
         caller_user_id: Option<&str>,
@@ -706,6 +762,8 @@ mod tests {
             } => {
                 finish_add_project_membership(
                     sea_orm_db,
+                    store,
+                    registry,
                     &project_name,
                     user_id.as_deref(),
                     group_id.as_deref(),
@@ -721,6 +779,7 @@ mod tests {
         conn: &Connection,
         sea_orm_db: &sea_orm::DatabaseConnection,
         registry: &ProjectRegistry,
+        store: &RuntimeStore,
         caller_is_sysadmin: bool,
         caller_username: &str,
         caller_user_id: Option<&str>,
@@ -752,6 +811,8 @@ mod tests {
             } => {
                 finish_change_project_membership_role(
                     sea_orm_db,
+                    store,
+                    registry,
                     caller_is_sysadmin,
                     caller_username,
                     caller_principal_role,
@@ -771,6 +832,7 @@ mod tests {
         conn: &Connection,
         sea_orm_db: &sea_orm::DatabaseConnection,
         registry: &ProjectRegistry,
+        store: &RuntimeStore,
         caller_is_sysadmin: bool,
         caller_username: &str,
         caller_user_id: Option<&str>,
@@ -797,6 +859,8 @@ mod tests {
             } => {
                 finish_delete_project_membership(
                     sea_orm_db,
+                    store,
+                    registry,
                     caller_is_sysadmin,
                     caller_username,
                     caller_principal_role,
@@ -891,10 +955,12 @@ mod tests {
         let registry = registry_with(&dir, "proj-a");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
         let alice = seed_user(&db, "alice").await;
+        let store = RuntimeStore::default();
         let outcome = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -918,10 +984,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = registry_with(&dir, "proj-a");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let outcome = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -942,10 +1010,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = registry_with(&dir, "proj-a");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let outcome = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -973,10 +1043,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let outcome = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some("bob"),
@@ -1002,10 +1074,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = registry_with(&dir, "proj-hidden");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let hidden = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some("bob"),
@@ -1016,10 +1090,12 @@ mod tests {
         .await
         .unwrap();
         let empty_registry = ProjectRegistry::new(dir.path().join("empty.local.json"));
+        let store = RuntimeStore::default();
         let nonexistent = decide_add_project_membership(
             &c,
             &db,
             &empty_registry,
+            &store,
             false,
             "bob",
             Some("bob"),
@@ -1050,10 +1126,12 @@ mod tests {
             .await
             .unwrap();
         let alice = seed_user(&db, "alice").await;
+        let store = RuntimeStore::default();
         let outcome = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some(&bob),
@@ -1078,10 +1156,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_add_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -1108,10 +1188,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "viewer")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -1140,10 +1222,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-hidden", Some(&victim), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some("bob"),
@@ -1173,10 +1257,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = registry_with(&dir, "proj-a");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -1212,10 +1298,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some(&bob),
@@ -1243,10 +1331,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "root",
             None,
@@ -1278,10 +1368,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some(&bob),
@@ -1311,10 +1403,12 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = registry_with(&dir, "proj-a");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let outcome = decide_change_project_membership_role(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -1342,10 +1436,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "admin",
             None,
@@ -1379,10 +1475,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-hidden", Some(&victim), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some("bob"),
@@ -1410,8 +1508,9 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let registry = registry_with(&dir, "proj-a");
         let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
-            &c, &db, &registry, true, "admin", None, None, "proj-a", "u:nobody",
+            &c, &db, &registry, &store, true, "admin", None, None, "proj-a", "u:nobody",
         )
         .await
         .unwrap();
@@ -1435,10 +1534,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&victim), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "mallory",
             Some("mallory"),
@@ -1478,10 +1579,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&victim), None, "viewer")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some(&bob),
@@ -1508,10 +1611,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&victim), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             true,
             "root",
             None,
@@ -1540,10 +1645,12 @@ mod tests {
         identity::grant_project_membership(&db, "proj-a", Some(&alice), None, "operator")
             .await
             .unwrap();
+        let store = RuntimeStore::default();
         let outcome = decide_delete_project_membership(
             &c,
             &db,
             &registry,
+            &store,
             false,
             "bob",
             Some(&bob),
@@ -1563,5 +1670,311 @@ mod tests {
                 .unwrap()
                 .is_some()
         );
+    }
+
+    // -- HIGH finding: `finish_add_project_membership`/`finish_change_
+    // project_membership_role`/`finish_delete_project_membership` never
+    // acquired the per-`(project_name, "backend")` `ensure_lock`
+    // delete/rename hold for their own `project_membership` purge/
+    // rekey -- same class as F5's delete/rename in-lock existence
+    // recheck. Confirmed live (twice): a concurrent grant racing a
+    // delete/rename can land its INSERT AFTER the purge/rekey already
+    // ran, leaving an orphaned row that resurrects as an unauthorized
+    // grant if the freed name is later reused. These tests reproduce
+    // the race DETERMINISTICALLY by driving the two sides sequentially
+    // in the exact interleaving the finding describes (gate passes
+    // while the project still exists, then the concurrent delete/
+    // rename's own purge/rekey runs, THEN the write attempts to land)
+    // -- the same style `project_teardown::tests::existence_recheck_
+    // denies_when_the_project_was_renamed_away` already uses for its
+    // own sibling TOCTOU, since the property under test is "what does
+    // the write see", not "does a scheduler interleave two tasks a
+    // particular way". ----------------------------------------------
+
+    #[tokio::test]
+    async fn finish_add_project_membership_rejects_a_grant_that_lands_after_a_concurrent_delete() {
+        let dir = TempDir::new().unwrap();
+        let registry = registry_with(&dir, "racer-add-vs-delete");
+        let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let alice = seed_user(&db, "alice").await;
+        let store = RuntimeStore::default();
+
+        // Entry-time gate: the project genuinely exists at this point,
+        // exactly like the real `add_project_membership_handler`'s own
+        // `conn.lock().await`-scoped gate call.
+        let gate = gate_add_project_membership(
+            &c,
+            &registry,
+            true,
+            "admin",
+            None,
+            None,
+            "racer-add-vs-delete",
+            &serde_json::json!({"user_id": alice}),
+        )
+        .unwrap();
+        let AddProjectMembershipGate::Proceed {
+            project_name,
+            user_id,
+            group_id,
+            role,
+        } = gate
+        else {
+            panic!("expected Proceed");
+        };
+
+        // The concurrent delete "wins the race": its own in-lock
+        // critical section (finish_delete_project's unregister +
+        // AZ-R13-1's project_membership purge) completes in full
+        // before this grant's write gets a chance to run.
+        registry.unregister("racer-add-vs-delete").unwrap();
+        identity::remove_project_membership_by_project(&db, "racer-add-vs-delete")
+            .await
+            .unwrap();
+
+        let outcome = finish_add_project_membership(
+            &db,
+            &store,
+            &registry,
+            &project_name,
+            user_id.as_deref(),
+            group_id.as_deref(),
+            &role,
+        )
+        .await
+        .unwrap();
+
+        let AddProjectMembershipOutcome::Rejected(resp) = outcome else {
+            panic!(
+                "expected the grant to be rejected once the project vanished \
+                 mid-flight, got {outcome:?}"
+            );
+        };
+        assert_eq!(resp.status, 404);
+        assert!(
+            identity::project_membership_role(&db, "racer-add-vs-delete", Some(&alice), None)
+                .await
+                .unwrap()
+                .is_none(),
+            "the racing grant must NOT have left an orphaned project_membership row"
+        );
+    }
+
+    #[tokio::test]
+    async fn finish_add_project_membership_rejects_a_grant_that_lands_after_a_concurrent_rename() {
+        let dir = TempDir::new().unwrap();
+        let registry = registry_with(&dir, "racer-add-vs-rename");
+        let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let alice = seed_user(&db, "alice").await;
+        let store = RuntimeStore::default();
+
+        let gate = gate_add_project_membership(
+            &c,
+            &registry,
+            true,
+            "admin",
+            None,
+            None,
+            "racer-add-vs-rename",
+            &serde_json::json!({"user_id": alice}),
+        )
+        .unwrap();
+        let AddProjectMembershipGate::Proceed {
+            project_name,
+            user_id,
+            group_id,
+            role,
+        } = gate
+        else {
+            panic!("expected Proceed");
+        };
+
+        // The concurrent rename "wins the race": the project still
+        // exists, but no longer under the OLD name this grant is
+        // still targeting.
+        registry
+            .rename("racer-add-vs-rename", "racer-add-vs-rename-2", 30, now_dt())
+            .unwrap();
+        identity::rename_project_membership_project(
+            &db,
+            "racer-add-vs-rename",
+            "racer-add-vs-rename-2",
+        )
+        .await
+        .unwrap();
+
+        let outcome = finish_add_project_membership(
+            &db,
+            &store,
+            &registry,
+            &project_name,
+            user_id.as_deref(),
+            group_id.as_deref(),
+            &role,
+        )
+        .await
+        .unwrap();
+
+        let AddProjectMembershipOutcome::Rejected(resp) = outcome else {
+            panic!(
+                "expected the grant to be rejected once the project moved \
+                 mid-flight, got {outcome:?}"
+            );
+        };
+        assert_eq!(resp.status, 404);
+        assert!(
+            identity::project_membership_role(&db, "racer-add-vs-rename", Some(&alice), None)
+                .await
+                .unwrap()
+                .is_none(),
+            "no orphaned row must exist under the OLD (now-freed) project name"
+        );
+        assert!(
+            identity::project_membership_role(&db, "racer-add-vs-rename-2", Some(&alice), None)
+                .await
+                .unwrap()
+                .is_none(),
+            "a grant scoped to the OLD name must not silently land on the renamed project either"
+        );
+    }
+
+    #[tokio::test]
+    async fn finish_change_project_membership_role_rejects_a_change_that_lands_after_a_concurrent_delete(
+    ) {
+        // Not independently exploitable (an UPDATE against an
+        // already-purged row just affects 0 rows), but this function
+        // gets the SAME in-lock existence recheck for consistency --
+        // see its own doc. A caller must get a clean 404, not a
+        // misleading 200 "Changed" for a write that silently touched
+        // nothing.
+        let dir = TempDir::new().unwrap();
+        let registry = registry_with(&dir, "racer-role-vs-delete");
+        let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let alice = seed_user(&db, "alice").await;
+        identity::grant_project_membership(
+            &db,
+            "racer-role-vs-delete",
+            Some(&alice),
+            None,
+            "viewer",
+        )
+        .await
+        .unwrap();
+        let store = RuntimeStore::default();
+
+        let gate = gate_change_project_membership_role(
+            &c,
+            &registry,
+            true,
+            "admin",
+            None,
+            None,
+            "racer-role-vs-delete",
+            &format!("u:{alice}"),
+            &serde_json::json!({"role": "operator"}),
+        )
+        .unwrap();
+        let ChangeProjectMembershipRoleGate::Proceed {
+            project_name,
+            membership_id,
+            user_id,
+            group_id,
+            new_role,
+        } = gate
+        else {
+            panic!("expected Proceed");
+        };
+
+        registry.unregister("racer-role-vs-delete").unwrap();
+        identity::remove_project_membership_by_project(&db, "racer-role-vs-delete")
+            .await
+            .unwrap();
+
+        let outcome = finish_change_project_membership_role(
+            &db,
+            &store,
+            &registry,
+            true,
+            "admin",
+            None,
+            &project_name,
+            &membership_id,
+            user_id.as_deref(),
+            group_id.as_deref(),
+            &new_role,
+        )
+        .await
+        .unwrap();
+
+        let ChangeProjectMembershipRoleOutcome::Rejected(resp) = outcome else {
+            panic!("expected Rejected, got {outcome:?}");
+        };
+        assert_eq!(resp.status, 404);
+    }
+
+    #[tokio::test]
+    async fn finish_delete_project_membership_rejects_a_revoke_that_lands_after_a_concurrent_delete(
+    ) {
+        // Not independently exploitable (deleting an already-purged
+        // row is idempotent), but given the SAME in-lock existence
+        // recheck for consistency -- see this function's own doc.
+        let dir = TempDir::new().unwrap();
+        let registry = registry_with(&dir, "racer-revoke-vs-delete");
+        let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let alice = seed_user(&db, "alice").await;
+        identity::grant_project_membership(
+            &db,
+            "racer-revoke-vs-delete",
+            Some(&alice),
+            None,
+            "operator",
+        )
+        .await
+        .unwrap();
+        let store = RuntimeStore::default();
+
+        let gate = gate_delete_project_membership(
+            &c,
+            &registry,
+            true,
+            None,
+            "racer-revoke-vs-delete",
+            &format!("u:{alice}"),
+        )
+        .unwrap();
+        let DeleteProjectMembershipGate::Proceed {
+            project_name,
+            membership_id,
+            user_id,
+            group_id,
+        } = gate
+        else {
+            panic!("expected Proceed");
+        };
+
+        registry.unregister("racer-revoke-vs-delete").unwrap();
+        identity::remove_project_membership_by_project(&db, "racer-revoke-vs-delete")
+            .await
+            .unwrap();
+
+        let outcome = finish_delete_project_membership(
+            &db,
+            &store,
+            &registry,
+            true,
+            "admin",
+            None,
+            &project_name,
+            &membership_id,
+            user_id.as_deref(),
+            group_id.as_deref(),
+        )
+        .await
+        .unwrap();
+
+        let DeleteProjectMembershipOutcome::Rejected(resp) = outcome else {
+            panic!("expected Rejected, got {outcome:?}");
+        };
+        assert_eq!(resp.status, 404);
     }
 }

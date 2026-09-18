@@ -762,6 +762,8 @@ pub async fn add_project_membership_handler(
             role,
         }) => match admin_project_memberships::finish_add_project_membership(
             &state.sea_orm_db,
+            &state.runtime,
+            &state.registry,
             &project_name,
             user_id.as_deref(),
             group_id.as_deref(),
@@ -851,6 +853,8 @@ pub async fn change_project_membership_role_handler(
             new_role,
         }) => match admin_project_memberships::finish_change_project_membership_role(
             &state.sea_orm_db,
+            &state.runtime,
+            &state.registry,
             is_sysadmin,
             &identity.user.username,
             caller_role.as_deref(),
@@ -925,6 +929,8 @@ pub async fn delete_project_membership_handler(
             group_id,
         }) => match admin_project_memberships::finish_delete_project_membership(
             &state.sea_orm_db,
+            &state.runtime,
+            &state.registry,
             identity.is_sysadmin,
             &identity.user.username,
             caller_role.as_deref(),
@@ -1826,6 +1832,138 @@ mod tests {
         assert!(
             role.is_none(),
             "mallory must NOT have been granted membership"
+        );
+    }
+
+    /// Give the `current_thread` test runtime enough ticks to run a
+    /// just-spawned task up to its own blocking lock-acquire await --
+    /// same helper `lifecycle_rest`'s own delete/rename TOCTOU-race
+    /// tests use (private to that module's own `mod tests`, so
+    /// duplicated here rather than exposed crate-wide for one helper).
+    async fn let_spawned_task_reach_its_lock_wait() {
+        for _ in 0..8 {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    /// HIGH finding fix, live-exploit repro (real concurrency, not the
+    /// sequential simulation `admin_project_memberships::tests` uses
+    /// for the same race): unlike the capability/membership-revocation
+    /// races just above -- which have no real in-handler yield point
+    /// to hang a concurrent task on, since axum's `Bytes` extractor
+    /// resolves the body before any handler code runs -- this fix
+    /// itself ADDS a genuine one: `finish_add_project_membership`'s new
+    /// `store.ensure_lock(project_name, "backend").lock_owned().await`.
+    /// Holding that SAME per-`(project_name, "backend")` lock here
+    /// (exactly the shape `delete_project_handler`/`rename_project_
+    /// handler` themselves hold it under, via `perm_gates::
+    /// revalidated_lock`) lets a real concurrent grant get blocked on
+    /// it, then rejected cleanly once the "delete" (simulated inline,
+    /// while still holding the lock -- mirroring `delete_project_
+    /// handler`'s own in-lock unregister + AZ-R13-1 purge) releases it.
+    ///
+    /// Also holds `state.conn` (a DIFFERENT, unrelated lock the grant's
+    /// own entry-time gate needs) until the spawned task has genuinely
+    /// registered as a waiter on it -- without this, there is no
+    /// guarantee the gate's own `registry.get` runs BEFORE this test's
+    /// `unregister` call below (both are plain, un-awaited scheduling
+    /// events on the `current_thread` test runtime), which would let
+    /// the gate spuriously observe the project as already gone and
+    /// reject there instead of genuinely exercising `finish_add_
+    /// project_membership`'s own in-lock recheck this test targets.
+    #[tokio::test]
+    async fn add_project_membership_handler_toctou_race_delete_wins_gets_a_clean_rejection() {
+        let (_dir, state) = real_state().await;
+        let (root_id, _group_id, identity) =
+            seed_delegate(&state, "root", &[Capability::SystemProjectsManage.as_str()]).await;
+        let (newbie_id, _newbie_group, _newbie_identity) =
+            seed_delegate(&state, "newbie", &[]).await;
+        state
+            .registry
+            .register(
+                "racer-add-vs-delete-http",
+                "/ws/racer-add-vs-delete-http",
+                "python",
+                Utc::now(),
+            )
+            .unwrap();
+        // The caller needs project MEMBERSHIP too, not just the system
+        // capability -- `deny_cross_tenant_project_read`'s own uniform
+        // 404 (R3-F1) otherwise fires for a non-sysadmin delegate with
+        // zero membership, masking the recheck this test targets.
+        identity::grant_project_membership(
+            &state.sea_orm_db,
+            "racer-add-vs-delete-http",
+            Some(&root_id),
+            None,
+            "operator",
+        )
+        .await
+        .unwrap();
+
+        let lock = state
+            .runtime
+            .ensure_lock("racer-add-vs-delete-http", "backend");
+        let held = lock.lock_owned().await;
+        let conn_held = state.conn.lock().await;
+
+        let state2 = state.clone();
+        let body = json_body(serde_json::json!({"user_id": newbie_id, "role": "viewer"}));
+        let task = tokio::spawn(async move {
+            add_project_membership_handler(
+                State(state2),
+                Extension(identity),
+                Path("racer-add-vs-delete-http".to_string()),
+                HeaderMap::new(),
+                body,
+            )
+            .await
+        });
+        // The spawned task's very first await is `state.conn.lock()`,
+        // which we hold -- give it a chance to register as a waiter on
+        // it before we release it, so the gate is guaranteed to run
+        // (and observe the project as still registered) only once we
+        // choose to let it.
+        let_spawned_task_reach_its_lock_wait().await;
+        drop(conn_held);
+        // The gate itself is fully synchronous (no further real awaits
+        // until `finish_add_project_membership`'s own `ensure_lock`) --
+        // one more round of ticks lets it run to completion and reach
+        // that lock, which we are still holding.
+        let_spawned_task_reach_its_lock_wait().await;
+
+        // Simulate `delete_project_handler`'s own in-lock critical
+        // section completing while the grant above is blocked
+        // acquiring the SAME lock: unregister the project, then purge
+        // its `project_membership` rows (AZ-R13-1), exactly as
+        // `finish_delete_project` + `remove_project_membership_by_
+        // project` do in `lifecycle_rest::delete_project_handler`.
+        state
+            .registry
+            .unregister("racer-add-vs-delete-http")
+            .unwrap();
+        identity::remove_project_membership_by_project(
+            &state.sea_orm_db,
+            "racer-add-vs-delete-http",
+        )
+        .await
+        .unwrap();
+        drop(held);
+
+        let resp = task.await.unwrap();
+        assert_eq!(resp_status(&resp), 404, "{:?}", resp_json(resp).await);
+
+        assert!(
+            identity::project_membership_role(
+                &state.sea_orm_db,
+                "racer-add-vs-delete-http",
+                Some(&newbie_id),
+                None,
+            )
+            .await
+            .unwrap()
+            .is_none(),
+            "the racing grant must not have left an orphaned project_membership row"
         );
     }
 
