@@ -664,6 +664,31 @@ pub async fn backend_api_handler(
     };
     let alias_info = alias.map(|(name, expires_at)| AliasInfo { name, expires_at });
 
+    // F10 fix (regression in the already-merged F6/SEC-FINDING-1/5
+    // fix): a caller with NEITHER a bearer NOR a resolved cookie
+    // identity can never legitimately succeed here -- a real backend's
+    // own `rest_gate` unconditionally 401s a zero-credential caller,
+    // so there is nothing to gain by proxying at all. Short-circuit to
+    // the SAME floored `login_required` envelope the unknown-project
+    // arm above returns, BEFORE `proxy_to_backend`/`ensure()` ever
+    // runs. Without this, a known project whose backend has idle-
+    // stopped (this router's NORMAL operating mode) leaked its real
+    // cold-start cost (a systemd start + socket-poll wait, confirmed
+    // live at ~400ms+) straight through: `sleep_out_floor` only pads
+    // UP to the floor, it can't retroactively trim time already spent,
+    // so `ensure()`'s real activation cost became a cleanly-
+    // distinguishable "does this project exist" timing oracle even for
+    // a caller who was always going to get a 401. See
+    // `backend_api_handler_zero_credential_cold_start_converges_with_unknown_project`
+    // below for the confirmed live repro this closes -- a CREDENTIALED
+    // caller (a real bearer, or a resolved cookie identity) still
+    // reaches `ensure()` exactly as before, cold-start cost and all,
+    // because the router genuinely cannot know whether they'd succeed
+    // without asking the backend.
+    if extract_bearer(&req.headers).is_none() && cookie_role.is_none() {
+        return floor_response(cfg, t0, api_login_required_response()).await;
+    }
+
     // Cookie-forwarding bridge: only applied when the caller carries NO
     // bearer at all -- a bearer, even an invalid one, is a stronger
     // credential this crate never downgrades away from (re-checked
@@ -1291,6 +1316,55 @@ mod tests {
         );
     }
 
+    /// F10 companion for `/mcp`: unlike `/api`, `backend_mcp_handler`
+    /// already short-circuits a bearer-less caller BEFORE ever
+    /// resolving the project or calling `ensure()` (see this handler's
+    /// own "auth-before-resolve, owner-authorised" comment) -- proves
+    /// that stays true even for a KNOWN project whose backend genuinely
+    /// needs a cold start (no socket ever created here), not just an
+    /// unknown one. A regression here would show up as this test
+    /// timing out around `fast_ensure_cfg`'s ~500ms socket-poll budget
+    /// instead of returning promptly.
+    #[tokio::test]
+    async fn backend_mcp_handler_zero_bearer_never_pays_a_cold_starts_latency() {
+        let dir = tempfile::tempdir().unwrap();
+        let sock_dir = dir.path().join("sockets");
+        // Known project, but no socket directory/backend at all -- a
+        // genuine cold state, not just "not yet warmed up this test".
+        let registry = registry_with(dir.path(), "proj-a", "python");
+        let store = RuntimeStore::new();
+        let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
+        let cfg = McpHandlerConfig {
+            preauth_401_floor: Duration::from_millis(50),
+            ..fast_cfg()
+        };
+
+        let mut req = base_req("proj-a", "/conexus/proj-a/mcp");
+        req.headers = HeaderMap::new(); // no bearer at all
+
+        let t0 = Instant::now();
+        let resp = backend_mcp_handler(
+            &store,
+            &stream_caps,
+            &registry,
+            &sock_dir,
+            &fast_ensure_cfg(),
+            &cfg,
+            test_now(),
+            req,
+        )
+        .await;
+        let elapsed = t0.elapsed();
+
+        assert_eq!(resp.status, 401);
+        assert!(
+            elapsed < Duration::from_millis(200),
+            "a zero-bearer /mcp caller must never pay ensure()'s real \
+             cold-start cost, got {elapsed:?} (fast_ensure_cfg's socket-poll \
+             budget alone is ~500ms)"
+        );
+    }
+
     #[tokio::test]
     async fn floored_unauthorized_absorbs_elapsed_since_t0() {
         // Port of Python's test_floored_unauthorized_absorbs_elapsed_
@@ -1461,6 +1535,15 @@ mod tests {
         let mut req = base_req("proj-a", "/conexus/__api/proj-a/events");
         req.method = Method::GET;
         req.headers = HeaderMap::new();
+        // A bearer, deliberately -- this test is about the Accept-header
+        // version-gate exemption specifically, not about F10's separate
+        // zero-credential short-circuit (a caller with NEITHER a bearer
+        // NOR a resolved cookie identity never reaches the backend at
+        // all any more; see `backend_api_handler`'s own doc).
+        req.headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer test-events-tok"),
+        );
 
         let resp = backend_api_handler(
             &store,
@@ -1549,6 +1632,15 @@ mod tests {
         // match. The backend's own body/reason is preserved verbatim
         // (not replaced by a canonical envelope) -- the dashboard's
         // `ApiClient` depends on exactly this shape.
+        //
+        // Carries a (backend-rejected) BEARER, deliberately NOT the
+        // fully-unauthenticated shape: a caller with NO credential at
+        // all is F10's own zero-credential short-circuit (see
+        // `backend_api_handler_zero_credential_cold_start_converges_with_unknown_project`
+        // below) and never reaches the real backend at all any more --
+        // this test's whole point is the case that still DOES: a
+        // caller who presents SOME credential the router can't
+        // pre-judge, so the router must ask the real backend.
         let dir = tempfile::tempdir().unwrap();
         let sock_dir = dir.path().join("sockets");
         std::fs::create_dir_all(sock_dir.join("proj-a")).unwrap();
@@ -1571,7 +1663,11 @@ mod tests {
         };
 
         let t0 = Instant::now();
-        let req = unauthenticated_api_req("proj-a", "/conexus/__api/proj-a/agents");
+        let mut req = unauthenticated_api_req("proj-a", "/conexus/__api/proj-a/agents");
+        req.headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer some-real-looking-but-rejected-token"),
+        );
         let resp = backend_api_handler(
             &store,
             &stream_caps,
@@ -1598,6 +1694,144 @@ mod tests {
             elapsed >= Duration::from_millis(75),
             "a known project's real backend 401 must ALSO be floored to ~the \
              configured latency, got {elapsed:?}"
+        );
+    }
+
+    /// F10: the confirmed regression in the already-merged F6 fix. A
+    /// caller with NEITHER a bearer NOR a resolved cookie identity for
+    /// a KNOWN project whose backend has never started (idle-stop's
+    /// normal steady state -- no socket directory even exists here)
+    /// must converge on the SAME wall-clock floor the unknown-project
+    /// arm uses, not leak `ensure()`'s real cold-start cost. Before the
+    /// fix, this test's "known" arm took ~500ms (fast_ensure_cfg's
+    /// socket-poll timeout) while the "unknown" arm took ~50ms --
+    /// cleanly distinguishable, exactly the confirmed live repro.
+    #[tokio::test]
+    async fn backend_api_handler_zero_credential_cold_start_converges_with_unknown_project() {
+        let dir = tempfile::tempdir().unwrap();
+        let sock_dir = dir.path().join("sockets");
+        // "proj-a" is KNOWN (registered) but its backend has never been
+        // started -- no socket directory, no listener, nothing.
+        let registry = registry_with(dir.path(), "proj-a", "python");
+        let store = RuntimeStore::new();
+        let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
+        let cfg = McpHandlerConfig {
+            preauth_401_floor: Duration::from_millis(50),
+            ..fast_cfg()
+        };
+
+        let t0 = Instant::now();
+        let req_unknown = unauthenticated_api_req("nope", "/conexus/__api/nope/agents");
+        let resp_unknown = backend_api_handler(
+            &store,
+            &stream_caps,
+            &registry,
+            &sock_dir,
+            &fast_ensure_cfg(),
+            &cfg,
+            None,
+            test_now(),
+            "agents",
+            req_unknown,
+        )
+        .await;
+        let elapsed_unknown = t0.elapsed();
+
+        let t1 = Instant::now();
+        let req_known = unauthenticated_api_req("proj-a", "/conexus/__api/proj-a/agents");
+        let resp_known = backend_api_handler(
+            &store,
+            &stream_caps,
+            &registry,
+            &sock_dir,
+            &fast_ensure_cfg(),
+            &cfg,
+            None,
+            test_now(),
+            "agents",
+            req_known,
+        )
+        .await;
+        let elapsed_known = t1.elapsed();
+
+        assert_eq!(resp_unknown.status, 401);
+        assert_eq!(resp_known.status, 401);
+        match &resp_known.body {
+            HandlerBody::Json(v) => assert_eq!(v["error"], "login_required"),
+            other => panic!("expected the synthetic login_required JSON body, got {other:?}"),
+        }
+        assert!(
+            elapsed_known < Duration::from_millis(200),
+            "a zero-credential caller must never pay ensure()'s real cold-start \
+             cost -- got {elapsed_known:?} (fast_ensure_cfg's socket-poll budget \
+             alone is ~500ms)"
+        );
+        let diff = elapsed_known.abs_diff(elapsed_unknown);
+        assert!(
+            diff < Duration::from_millis(40),
+            "the unknown-project and known-project-cold-start-zero-credential \
+             arms must converge on the same wall-clock floor, got \
+             unknown={elapsed_unknown:?} known={elapsed_known:?} diff={diff:?}"
+        );
+    }
+
+    /// Positive/uncontested case: a caller who DOES present a
+    /// credential (a bearer, here) must still reach the real backend
+    /// even when it genuinely needs a cold start -- F10's fix only
+    /// short-circuits the zero-credential case; it must never add
+    /// artificial delay to, or block, a legitimate round trip.
+    #[tokio::test]
+    async fn backend_api_handler_credentialed_caller_still_proceeds_through_a_cold_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let sock_dir = dir.path().join("sockets");
+        std::fs::create_dir_all(sock_dir.join("proj-a")).unwrap();
+        // Spawn the backend only after a short real delay -- forces
+        // ensure()'s socket-poll loop to genuinely wait at least one
+        // real iteration before succeeding, a real (if brief) cold
+        // start rather than an already-warm socket.
+        let sock_path = sock_dir.join("proj-a").join("backend.sock");
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            spawn_backend(sock_path, |_req| {
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .body(Full::new(Bytes::from_static(b"ok")))
+                    .unwrap()
+            })
+            .await;
+        });
+
+        let registry = registry_with(dir.path(), "proj-a", "python");
+        let store = RuntimeStore::new();
+        let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
+        let cfg = McpHandlerConfig {
+            preauth_401_floor: Duration::from_millis(50),
+            ..fast_cfg()
+        };
+
+        let mut req = unauthenticated_api_req("proj-a", "/conexus/__api/proj-a/agents");
+        req.headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer a-real-credential"),
+        );
+
+        let resp = backend_api_handler(
+            &store,
+            &stream_caps,
+            &registry,
+            &sock_dir,
+            &fast_ensure_cfg(),
+            &cfg,
+            None,
+            test_now(),
+            "agents",
+            req,
+        )
+        .await;
+        assert_eq!(
+            resp.status, 200,
+            "a credentialed caller must still reach the real backend through \
+             a genuine cold start, not be short-circuited"
         );
     }
 
@@ -1831,10 +2065,20 @@ mod tests {
 
     #[tokio::test]
     async fn backend_api_handler_mints_no_header_when_cookie_role_is_none() {
+        // F10 update: `cookie_role: None` + no bearer is EXACTLY the
+        // zero-credential shape F10's fix short-circuits BEFORE ever
+        // proxying (see `backend_api_handler`'s own doc) -- this caller
+        // ("no cookie, no session, or not a project member") can never
+        // legitimately succeed, so it now never reaches the backend at
+        // all, let alone mints a forwarding header for it. Deliberately
+        // no backend socket is spawned here: if a future change
+        // regressed the short-circuit and this request fell through to
+        // `proxy_to_backend`/`ensure()` again, there is no real unit to
+        // start and no socket to ever appear, so it would time out into
+        // a 504 rather than quietly passing this test's assertions.
         let dir = tempfile::tempdir().unwrap();
         let sock_dir = dir.path().join("sockets");
         std::fs::create_dir_all(sock_dir.join("proj-a")).unwrap();
-        spawn_echo_forwarding_header_backend(sock_dir.join("proj-a").join("backend.sock")).await;
 
         let registry = registry_with(dir.path(), "proj-a", "python");
         let store = RuntimeStore::new();
@@ -1853,15 +2097,11 @@ mod tests {
             cookie_bridge_req(true),
         )
         .await;
-        assert_eq!(resp.status, 200);
-        let HandlerBody::Proxied(ProxyResponseBody::Buffered(body)) = resp.body else {
-            panic!("expected a buffered proxied body");
+        assert_eq!(resp.status, 401);
+        let HandlerBody::Json(body) = resp.body else {
+            panic!("expected the synthetic login_required JSON body");
         };
-        assert_eq!(
-            body.as_ref(),
-            b"",
-            "no resolved cookie_role must never mint a forwarding header"
-        );
+        assert_eq!(body["error"], "login_required");
     }
 
     #[tokio::test]
