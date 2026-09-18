@@ -26,11 +26,34 @@ use serde_json::{json, Value};
 
 const OLLAMA_DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
 const OLLAMA_DEFAULT_MODEL: &str = "qwen3:1.7b";
-const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 30;
+
+/// `CONEXUS_COMPLETION_CLIENT_TIMEOUT_SECONDS` default. Was 30s, which
+/// live-measurement against this deployment's real llama.cpp instance
+/// (qwen2.5:3b-instruct, `/slots`-endpoint-confirmed genuine inference,
+/// not a hang) showed to be too short: real `ask_project_rag`-shaped
+/// completions took 26-67s, so every real query was aborted client-side
+/// before the model finished -- `ask_project_rag` was non-functional on
+/// this deployment. 120s covers that measured range with headroom;
+/// override via env when a deployment's model is slower still.
+const DEFAULT_CLIENT_TIMEOUT_SECS: u64 = 120;
+
+/// Resolve the chat-completion HTTP client timeout from an env-lookup
+/// function -- same "explicit input over hidden `std::env::var`" style
+/// as [`resolve`] (see module doc), kept unit-testable in isolation
+/// from the process-wide [`HTTP_CLIENT`] static that consumes it.
+/// Unset, empty, or unparseable falls back to
+/// [`DEFAULT_CLIENT_TIMEOUT_SECS`] -- a bad env value must never crash
+/// client construction.
+fn resolve_client_timeout_secs(get_env: impl Fn(&str) -> Option<String>) -> u64 {
+    env_nonempty(&get_env, "CONEXUS_COMPLETION_CLIENT_TIMEOUT_SECONDS")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(DEFAULT_CLIENT_TIMEOUT_SECS)
+}
 
 static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    let timeout_secs = resolve_client_timeout_secs(|key| std::env::var(key).ok());
     reqwest::Client::builder()
-        .timeout(Duration::from_secs(DEFAULT_CLIENT_TIMEOUT_SECS))
+        .timeout(Duration::from_secs(timeout_secs))
         .build()
         .expect("reqwest client with a plain timeout always builds")
 });
@@ -271,6 +294,43 @@ mod tests {
         ]))
         .unwrap();
         assert_eq!(client.base_url, "https://my-gateway.example/v1");
+    }
+
+    // ── resolve_client_timeout_secs ──────────────────────────────────
+
+    #[test]
+    fn client_timeout_defaults_to_120_seconds_when_unset() {
+        assert_eq!(resolve_client_timeout_secs(env(&[])), 120);
+    }
+
+    #[test]
+    fn client_timeout_env_var_overrides_the_default() {
+        assert_eq!(
+            resolve_client_timeout_secs(env(&[(
+                "CONEXUS_COMPLETION_CLIENT_TIMEOUT_SECONDS",
+                "45"
+            )])),
+            45
+        );
+    }
+
+    #[test]
+    fn client_timeout_falls_back_to_default_on_unparseable_value() {
+        assert_eq!(
+            resolve_client_timeout_secs(env(&[(
+                "CONEXUS_COMPLETION_CLIENT_TIMEOUT_SECONDS",
+                "not-a-number"
+            )])),
+            120
+        );
+    }
+
+    #[test]
+    fn client_timeout_falls_back_to_default_on_empty_value() {
+        assert_eq!(
+            resolve_client_timeout_secs(env(&[("CONEXUS_COMPLETION_CLIENT_TIMEOUT_SECONDS", "")])),
+            120
+        );
     }
 
     // ── resolve_chat_base_url ────────────────────────────────────────
