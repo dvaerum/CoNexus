@@ -1,6 +1,6 @@
 //! The `openidconnect` crate-integration layer: discovery fetch +
 //! OBS-R17-SSO origin-pin + `CoreClient` construction. Port target:
-//! `agent_mcp/router/sso.py`'s `_fetch_oidc_metadata`/
+//! `conexus/router/sso.py`'s `_fetch_oidc_metadata`/
 //! `_assert_discovery_same_origin`/`_origin_tuple` (Phase E2 PR22
 //! step 5/8, `conexus-router-oidc-http-client`).
 //!

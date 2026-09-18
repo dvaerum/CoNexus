@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/project_context_tools.py` (Phase D5, PR 8
+//! Port of `conexus/tools/project_context_tools.py` (Phase D5, PR 8
 //! — 2557 LOC, the second-largest file in the migration after
 //! `task_tools.py`, given its own dedicated scoping pass per this
 //! migration's established discipline). 7 registered tools:

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "CoNexus MCP tool catalogue -- one module per agent_mcp/tools/*.py (Phase D). See /home/dennis/.claude/plans/prancy-napping-pie.md."
+description = "CoNexus MCP tool catalogue -- one module per conexus/tools/*.py (Phase D). See /home/dennis/.claude/plans/prancy-napping-pie.md."
 
 [dependencies]
 conexus-core = { path = "../conexus-core" }

@@ -6,19 +6,19 @@ the actual current behavior of every component the PR will touch so the
 
 ## Files in scope
 
-- `agent_mcp/tools/agent_communication_tools.py` (`wait_for_events_tool_impl`, lines 632-683).
-- `agent_mcp/core/globals.py` (`signal_for`, `notify_agent_inbox`, lines 134-215).
-- `agent_mcp/core/session_registry.py` (runtime queue fan-out — already wired).
-- `agent_mcp/tools/task_tools.py` (`assign_task_tool_impl`, `_create_unassigned_tasks`).
-- `agent_mcp/app/main_app.py` (`_patched_create_initialization_options`, alias warning pattern).
-- `agent_mcp/prompts/__init__.py` + `catalog.json` (Prompt Book registration).
-- `agent_mcp/tools/access.py` (`TOOL_ACCESS` — visibility classification).
+- `conexus/tools/agent_communication_tools.py` (`wait_for_events_tool_impl`, lines 632-683).
+- `conexus/core/globals.py` (`signal_for`, `notify_agent_inbox`, lines 134-215).
+- `conexus/core/session_registry.py` (runtime queue fan-out — already wired).
+- `conexus/tools/task_tools.py` (`assign_task_tool_impl`, `_create_unassigned_tasks`).
+- `conexus/app/main_app.py` (`_patched_create_initialization_options`, alias warning pattern).
+- `conexus/prompts/__init__.py` + `catalog.json` (Prompt Book registration).
+- `conexus/tools/access.py` (`TOOL_ACCESS` — visibility classification).
 
 ## Behavior matrix vs. spec
 
 | # | Spec requirement | Today | Delta needed |
 |---|---|---|---|
-| 1 | Default timeout 60s, configurable via `AGENT_MCP_EVENT_WAIT_TIMEOUT`, per-call override up to ceiling. | Default 60 (`WAIT_FOR_EVENTS_DEFAULT_TIMEOUT = 60`). Ceiling 900 (`WAIT_FOR_EVENTS_MAX_TIMEOUT = 900`). No env var. | Add env-var read at module load (or per-call). Lower ceiling to 300 per locked decisions table. |
+| 1 | Default timeout 60s, configurable via `CONEXUS_EVENT_WAIT_TIMEOUT`, per-call override up to ceiling. | Default 60 (`WAIT_FOR_EVENTS_DEFAULT_TIMEOUT = 60`). Ceiling 900 (`WAIT_FOR_EVENTS_MAX_TIMEOUT = 900`). No env var. | Add env-var read at module load (or per-call). Lower ceiling to 300 per locked decisions table. |
 | 2 | One-call-per-agent (HTTP-409-equivalent). | NOT enforced. A second concurrent call just clears the same `signal_for(agent_id)` Event and races. | Add `agent_event_locks: dict[str, asyncio.Lock]` in `globals.py`; tool acquires non-blocking; second call returns error envelope. |
 | 3 | On every call, check `project_context.config_auto_event_loop_global` AND `agents.auto_event_loop`. If either OFF, return `stop_listening` immediately. | Not checked. | Add flag-check at top of impl; build `_stop_listening_envelope()` helper. |
 | 4 | Mid-flight stop on flag flip — toggle-write code wakes affected waiters; on wake, rechecks flags. | No mid-flight wake path. Toggle dashboard endpoint doesn't notify. | Wire `signal_for(agent_id).set()` into the toggle-write paths (per-agent + global). After `wait()` returns, recheck flags before returning. |
@@ -26,7 +26,7 @@ the actual current behavior of every component the PR will touch so the
 | 6 | Capability subset routing for `unassigned_task_appeared`. | No code path. Unassigned task create does not wake anyone. | New helper `g.notify_unassigned_task_appeared(task_id, required_capabilities)` in `globals.py`; subset-match all non-terminated agents in Python; push event to per-agent queue + `signal_for(agent_id).set()`. Call site: `_create_unassigned_tasks`. Reuse `normalize_capabilities` helper from PR-1. |
 | 7 | Per-event server-assigned cursor; `agents.last_event_seen_at` updated post-call. | `next_cursor` is the max event timestamp in the envelope. `agents.last_event_seen_at` is NOT written. | After returning events, UPDATE `agents.last_event_seen_at = max(timestamps)`. Keep existing `next_cursor` envelope field (it's already the API). |
 | 8 | New tool `fetch_events_since(cursor)`. Pure DB query, no blocking. Uses `last_event_seen_at` if cursor is None. | Tool does not exist. Tool `wait_for_events` accepts a `since` parameter and the impl exposes a `_collect_events_for(agent_id, since)` helper that's exactly what this needs. | Add new tool `fetch_events_since`; thin wrapper around the existing collector + last-cursor lookup. Register in `TOOL_ACCESS` as `any`. |
-| 9 | `serverInfo.instructions` wake-loop bootstrap, gated by both flags. | Alias-warning injection pattern present in `_patched_create_initialization_options`. No wake-loop text. | New module `agent_mcp/app/event_loop_instructions.py` holds `WAKE_LOOP_INSTRUCTIONS` constant. Extend the patched function to append the text when bearer's agent has both flags ON. |
+| 9 | `serverInfo.instructions` wake-loop bootstrap, gated by both flags. | Alias-warning injection pattern present in `_patched_create_initialization_options`. No wake-loop text. | New module `conexus/app/event_loop_instructions.py` holds `WAKE_LOOP_INSTRUCTIONS` constant. Extend the patched function to append the text when bearer's agent has both flags ON. |
 | 10 | MCP prompt `event-loop` (same text). | Not registered in catalog. Prompt Book uses `catalog.json`. | Add entry to `catalog.json` with `category: coordination`. Template = `WAKE_LOOP_INSTRUCTIONS`. |
 | 11 | New mutator hook for unassigned tasks. | `g.notify_agent_inbox(agent_id)` already wakes message + task-assigned. | `g.notify_unassigned_task_appeared(task_id, required_capabilities)` — additive. Call site: in `_create_unassigned_tasks`, after successful write. |
 

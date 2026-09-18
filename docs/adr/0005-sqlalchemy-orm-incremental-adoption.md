@@ -15,7 +15,7 @@ it explains the raw-`sqlite3` → SQLAlchemy ORM → sea-orm lineage the
 current schema-ownership model descends from.
 
 **Provenance**: originally filed in the `home-manager-config` deploy
-repo's `common/user/agent-mcp/docs/adr/` (as
+repo's `common/user/conexus/docs/adr/` (as
 `0005-sqlalchemy-orm-incremental-adoption.md`). Moved here 2026-09-06
 — see ADR-0003's own provenance note for why. The `prancy-napping-pie.md`
 plan-file citation below is to a DIFFERENT, ephemeral, no-longer-extant
@@ -28,7 +28,7 @@ coincidence, not the same document.
 
 ## Original decision (verbatim, unedited)
 
-Upstream agent-mcp uses raw `sqlite3` everywhere (~150
+Upstream conexus uses raw `sqlite3` everywhere (~150
 `cursor.execute(...)` sites across tools/, routes/, core/), with no
 migration runner or schema version tracking — schema changes are made
 by hand-editing `db/schema.py`. Phase 7b needs a real migration

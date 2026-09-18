@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/task_tools.py` (Phase D4, 6,812 LOC in
+//! Port of `conexus/tools/task_tools.py` (Phase D4, 6,812 LOC in
 //! Python -- the largest file in the codebase, deliberately ported
 //! last among tool modules). This PR (1/8, per the Phase D4 research
 //! pass) covers only the PURE, DB-free-or-single-query helpers every

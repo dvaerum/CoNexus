@@ -1,6 +1,6 @@
 //! The OIDC per-flow state cookie: state + PKCE verifier + nonce,
 //! bound to the operator's browser across the redirect round-trip to
-//! the IdP and back. Port target: `agent_mcp/router/sso.py`'s
+//! the IdP and back. Port target: `conexus/router/sso.py`'s
 //! `_FlowState`/`_encode_flow_cookie`/`_decode_flow_cookie` (Phase E2
 //! PR22 step 6/8, `conexus-router-oidc-flow-state`).
 //!

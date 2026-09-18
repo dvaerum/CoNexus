@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/repositories/group_capability_repository.py`.
+//! Port of `conexus/repositories/group_capability_repository.py`.
 //!
 //! The DB seam for a sysadmin-configurable group -> capability grant
 //! table: an operator's resolved group memberships can additively

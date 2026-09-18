@@ -1,5 +1,5 @@
 //! Real fusion wrappers for the router's revalidation pattern. Port
-//! of `agent_mcp/router/perm_gates.py`'s `read_body_and_revalidate`/
+//! of `conexus/router/perm_gates.py`'s `read_body_and_revalidate`/
 //! `revalidated_lock`/`revalidate_after`. Phase E2,
 //! `conexus-router-revalidation-fusion` (PR23 step 5 of the 10-PR
 //! app-wiring breakdown).

@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/utility_tools.py` (Phase D5, PR 1). The
+//! Port of `conexus/tools/utility_tools.py` (Phase D5, PR 1). The
 //! smallest tool module in the codebase: one `PUBLIC` tool with no
 //! arguments and no side effects, used to verify the tool-calling
 //! mechanism itself works. The FIRST `Requirement::Public` tool this

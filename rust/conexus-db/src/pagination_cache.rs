@@ -3,7 +3,7 @@
 //! `offset=N`, `offset=2N`, ...) see a CONSISTENT ordering even if
 //! rows are mutated between page requests.
 //!
-//! Port of `agent_mcp/utils/pagination_cache.py`'s `StableOrderCache`.
+//! Port of `conexus/utils/pagination_cache.py`'s `StableOrderCache`.
 //! Used identically (in Python) by `AgentRepository`,
 //! `MessageRepository`, and `TaskQueryEngine`'s `view_tasks`
 //! pagination — each owns its OWN instance (this is why it lives here

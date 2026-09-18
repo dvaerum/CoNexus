@@ -1,6 +1,6 @@
 //! `RestPrincipal` — the typed identity admitted at the backend's
-//! `/api` REST door. Port of `agent_mcp/app/rest_principal.py` +
-//! `agent_mcp/app/deps.py::require_operator_session`, narrowed to the
+//! `/api` REST door. Port of `conexus/app/rest_principal.py` +
+//! `conexus/app/deps.py::require_operator_session`, narrowed to the
 //! two doors the operator kept for this port (2026-09-05 decision,
 //! `prancy-napping-pie.md` Phase E1): **forwarding-header only** —
 //! the per-project backend stays router-DB-blind, exactly like `/mcp`
@@ -29,7 +29,7 @@
 //! (the MCP-side, ADR-0025 predicate) confirms a forwarding caller
 //! whose signed role is "operator" via its "backend can SEE a resolved
 //! operator identity" clause; the REST-side predicate here does NOT,
-//! deliberately, matching `agent_mcp/app/routers/composition.py::
+//! deliberately, matching `conexus/app/routers/composition.py::
 //! is_confirmed_operator_tier`'s own documented scope note: even
 //! though the same signed role is technically available on the REST
 //! admission record, REST's `/api/tokens`/`/api/all-data` secret
@@ -187,7 +187,7 @@ pub fn resolve_rest_principal(
 /// REST-side "is this caller CONFIRMED operator tier?" — the
 /// defense-in-depth predicate behind the coarse capability gate,
 /// deciding whether a caller may receive plaintext agent bearer
-/// tokens / project secrets. Port of `agent_mcp/app/routers/
+/// tokens / project secrets. Port of `conexus/app/routers/
 /// composition.py::is_confirmed_operator_tier`'s two-remaining-door
 /// scope. See the module doc for why this deliberately does NOT reuse
 /// `conexus_core::principal::is_confirmed_operator_tier` (the MCP-side

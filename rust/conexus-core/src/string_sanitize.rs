@@ -2,7 +2,7 @@
 //! stripping, plus a combining-mark run cap. Moved here (Phase E2 PR 3,
 //! `conexus-router-identity-schema`) from `conexus-backend::
 //! json_sanitize`, where it was originally a private, JSON-Value-only
-//! helper (`sanitize_string_leaf`, ported from `agent_mcp/utils/
+//! helper (`sanitize_string_leaf`, ported from `conexus/utils/
 //! json_utils.py`'s `_strip_control_bytes` pipeline for PR #853's
 //! `/api` body-decode chokepoint). `conexus-router::identity`'s
 //! `create_user` needs the IDENTICAL stripper for `username`/`email`

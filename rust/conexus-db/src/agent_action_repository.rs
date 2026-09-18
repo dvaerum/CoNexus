@@ -1,5 +1,5 @@
 //! Port of the `agent_actions` insert path in
-//! `agent_mcp/db/actions/agent_actions_db.py::log_agent_action_to_db`.
+//! `conexus/db/actions/agent_actions_db.py::log_agent_action_to_db`.
 //!
 //! Scope note: only the legacy `agent_id=`-kwarg path is ported —
 //! every current tool-layer call site this crate's callers need

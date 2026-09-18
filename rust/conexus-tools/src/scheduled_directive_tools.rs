@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/scheduled_directive_tools.py` (Phase D5,
+//! Port of `conexus/tools/scheduled_directive_tools.py` (Phase D5,
 //! PR 7): the four `scheduled_directive` CRUD tools —
 //! `create_scheduled_directive`, `list_scheduled_directives`,
 //! `update_scheduled_directive`, `delete_scheduled_directive`. Every

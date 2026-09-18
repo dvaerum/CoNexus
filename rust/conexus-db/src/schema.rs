@@ -1,7 +1,7 @@
 //! Schema DDL for tables owned by `conexus-db`'s repositories.
 //!
 //! Source of truth for the REAL schema stays the Python SQLAlchemy
-//! ORM (`agent_mcp/db/models/*.py`) — confirmed by
+//! ORM (`conexus/db/models/*.py`) — confirmed by
 //! `tests/test_orm_is_source_of_truth.py` — and Alembic remains the
 //! authoritative migration owner until every Python backend is
 //! decommissioned (Phase F). This DDL exists only so Rust unit/
@@ -200,7 +200,7 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_single_root
             ON tasks ((parent_task IS NULL)) WHERE parent_task IS NULL;
 
-        -- Verbatim from agent_mcp/migrations/versions/0025_terminal_task_guard_trigger.py's
+        -- Verbatim from conexus/migrations/versions/0025_terminal_task_guard_trigger.py's
         -- _TASKS_SQL.
         CREATE TRIGGER IF NOT EXISTS trg_tasks_terminal_state_guard
         BEFORE UPDATE ON tasks
@@ -286,8 +286,8 @@ pub fn init_rag_embeddings_table(conn: &Connection, dimension: u32) -> Result<()
 /// `group_capability` live in the entirely different router DB
 /// (`router.db`) — two physically separate SQLite files in
 /// production, whose schemas happen to be owned by two different
-/// Alembic migration chains (`agent_mcp/db/` vs.
-/// `agent_mcp/router/migrations/`). A test standing up an in-memory
+/// Alembic migration chains (`conexus/db/` vs.
+/// `conexus/router/migrations/`). A test standing up an in-memory
 /// router-DB-shaped connection should call this, not [`init_schema`],
 /// to accurately reflect what tables actually coexist on that file.
 pub fn init_router_schema(conn: &Connection) -> Result<()> {
@@ -328,7 +328,7 @@ pub fn init_router_schema(conn: &Connection) -> Result<()> {
         );
 
         -- Edge in the group-membership graph (ported from
-        -- `agent_mcp/router/migrations/versions/0002_groups_and_roles.py`
+        -- `conexus/router/migrations/versions/0002_groups_and_roles.py`
         -- + `0006_group_membership_unique.py`), needed by
         -- `group_membership_repository::resolve_user_groups` for
         -- `conexus-auth`'s `resolve_capabilities`. Each edge is EITHER a

@@ -1,7 +1,7 @@
 //! Boot sequence: bind-host resolution + the fail-closed single-tenant
 //! safety guard, and the router's own DB path/open/init. Phase E2,
 //! `conexus-router-shared-state` (PR23 step 1 of the app-wiring
-//! breakdown). Port of `agent_mcp/router/app.py`'s
+//! breakdown). Port of `conexus/router/app.py`'s
 //! `_resolve_bind_host`/`_host_is_loopback`/`_assert_startup_safe`
 //! plus `migrations_runner.py::get_router_db_path`.
 //!

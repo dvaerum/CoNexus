@@ -19,7 +19,7 @@ server state more times than the user clicked a button.
 
 ## Method
 
-Read-through of every file under `agent_mcp/dashboard/` looking
+Read-through of every file under `conexus/dashboard/` looking
 for:
 
 1. `setInterval` / `setTimeout` that calls a state-changing API
@@ -55,7 +55,7 @@ for:
 
 ### 4. Detail — `request<T>()` retries POST/PATCH/DELETE on 5xx
 
-**File**: `agent_mcp/dashboard/lib/api.ts`, around lines 215–230 in
+**File**: `conexus/dashboard/lib/api.ts`, around lines 215–230 in
 the v5.0.4 source.
 
 **Pattern**:
@@ -145,11 +145,11 @@ The following were checked and judged safe:
 ## Sentinel
 
 This document is the human-readable index. Finding 4's structural pin
-(source-grep regression test) is `agent_mcp/dashboard/tests/api-no-mutation-retry.test.ts`.
+(source-grep regression test) is `conexus/dashboard/tests/api-no-mutation-retry.test.ts`.
 
 Findings 1–3's original guard, `tests/test_dashboard_no_auto_cleanup.py`,
 was never ported when the Python test suite was deleted — no
-`agent_mcp/dashboard/tests/*.test.ts` equivalent exists today. Spot-
+`conexus/dashboard/tests/*.test.ts` equivalent exists today. Spot-
 checked the underlying fixes directly: `getIdleAgentsForCleanup` (the
 dead selector finding 3 flagged) is gone from the dashboard source
 entirely, consistent with it having been deleted rather than
@@ -157,7 +157,7 @@ regressed. `shouldDisplayAgent` itself (findings 1–2) no longer exists
 either — it was removed in the Wave 6 `all-data` TanStack Query
 migration (commit `09ac1139`); the 3 remaining references to it are
 stale comments, not live code. The equivalent filtering behavior now
-lives in `useActiveAgents()` (`agent_mcp/dashboard/lib/queries/all-data.ts`),
+lives in `useActiveAgents()` (`conexus/dashboard/lib/queries/all-data.ts`),
 which excludes `status === "terminated"` — the fixes look intact
 under their new name, but there is currently no automated regression
 guard for findings 1–3 — a future contributor could reintroduce

@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/repositories/project_settings_repository.py`.
+//! Port of `conexus/repositories/project_settings_repository.py`.
 //!
 //! Byte-for-byte identical SQL/behavior shape to
 //! [`crate::project_context_repository`] — same 5 CRUD functions, same
@@ -53,7 +53,7 @@ pub struct DeletedSettingEntry {
     pub description: Option<String>,
 }
 
-/// Read a boolean toggle. Port of `agent_mcp/tools/access.py::
+/// Read a boolean toggle. Port of `conexus/tools/access.py::
 /// _get_config_bool`, minus its ADR-0018 "resolve the default from the
 /// settings-schema registry when omitted" branch — that registry
 /// (`core/settings_schema.py`) is not ported to Rust yet, so `default`
@@ -85,7 +85,7 @@ pub async fn get_bool_override(db: &DatabaseConnection, context_key: &str) -> Op
     }
 }
 
-/// Read an integer knob. Port of `agent_mcp/tools/access.py::
+/// Read an integer knob. Port of `conexus/tools/access.py::
 /// _get_config_int` (same scope note as [`get_bool`] re: the
 /// settings-schema default registry).
 ///

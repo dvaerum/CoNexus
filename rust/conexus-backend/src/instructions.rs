@@ -1,6 +1,6 @@
 //! `initialize` `instructions` contributors (Phase E1 PR A).
 //!
-//! Port of `agent_mcp/app/instructions_contributors.py`'s wake-loop
+//! Port of `conexus/app/instructions_contributors.py`'s wake-loop
 //! contributor, wired through `rmcp`'s real `ServerHandler::
 //! initialize()` override in [`crate::server`] instead of Python's
 //! `_patched_create_initialization_options` monkeypatch on

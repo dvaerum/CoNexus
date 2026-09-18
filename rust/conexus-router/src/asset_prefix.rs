@@ -1,5 +1,5 @@
 //! Runtime asset-prefix substitution (Phase 4). Port of
-//! `agent_mcp/router/asset_prefix.py` (209 LOC, Phase E2 PR 15,
+//! `conexus/router/asset_prefix.py` (209 LOC, Phase E2 PR 15,
 //! `conexus-router-headers-misc`).
 //!
 //! The dashboard build emits a literal sentinel string wherever

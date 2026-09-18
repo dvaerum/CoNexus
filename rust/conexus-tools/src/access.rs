@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/access.py` -- role-filtered `tools/list`
+//! Port of `conexus/tools/access.py` -- role-filtered `tools/list`
 //! (Phase E1 PR C).
 //!
 //! Python derives a per-tool visibility tier from the LIVE
@@ -20,7 +20,7 @@
 //! matching `role == "manager"` branch -- both confirmed UNREACHABLE
 //! in the real, current call graph. `catalog_role()` (the ONLY
 //! function that ever supplies `role` to `is_visible_to_role`,
-//! confirmed by reading every real call site in `agent_mcp/`) collapses
+//! confirmed by reading every real call site in `conexus/`) collapses
 //! a manager agent bearer to `"worker"`, never `"manager"` -- so a tool
 //! whose capability derives to Python's "manager" tier is, in the code
 //! that actually runs, invisible to every role except admin: IDENTICAL
@@ -52,7 +52,7 @@ pub enum AccessTier {
 /// already `"any"`). Adding an entry here IS the review Python's own
 /// kwarg mechanism performed at registration time -- every entry below
 /// traces to a real Python `visibility=...` kwarg, confirmed by
-/// reading `agent_mcp/tools/*.py` directly, not assumed.
+/// reading `conexus/tools/*.py` directly, not assumed.
 ///
 /// Every OTHER Predicate-gated tool in this catalogue (`ask_project_
 /// rag`, `wait_for_events`, `fetch_events_since`, `get_agent_messages`,

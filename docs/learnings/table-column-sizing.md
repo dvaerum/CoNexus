@@ -1,7 +1,7 @@
 # Sizing columns in a `table-fixed` data table
 
 Notes from re-deriving the Agents table's column widths
-(`agent_mcp/dashboard/components/dashboard/agents/agent-columns.tsx`)
+(`conexus/dashboard/components/dashboard/agents/agent-columns.tsx`)
 after two rounds of trading pixels between columns. All numbers were
 measured in Firefox against the live 6-agent project via
 `getBoundingClientRect()`, not estimated.

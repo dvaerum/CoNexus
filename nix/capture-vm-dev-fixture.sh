@@ -79,7 +79,7 @@ done
 
 # ── Seed via the real REST API (default demo dataset) ──────────────
 echo "capture-vm-dev-fixture: seeding demo dataset..."
-curl -fsS -c "$cj" -X POST "$base/agent-mcp/login" \
+curl -fsS -c "$cj" -X POST "$base/conexus/login" \
   --data-urlencode username=dev --data-urlencode password=dev -o /dev/null
 api() { curl -fsS -b "$cj" -H "$V" -H "$CT" "$@"; }
 
@@ -99,7 +99,7 @@ echo "capture-vm-dev-fixture: seeded project '$slug' (root $root_id + 2 children
 # ── Quiesce + tar the state dir out over SSH ───────────────────────
 echo "capture-vm-dev-fixture: quiescing DBs + capturing state dir..."
 sshpass -p '' ssh "${ssh_opts[@]}" "$ssh_host" \
-  "systemctl stop 'agent-mcp@*' agent-mcp-router.service 2>/dev/null; sync"
+  "systemctl stop 'conexus@*' conexus-router.service 2>/dev/null; sync"
 mkdir -p "$(dirname "$out")"
 # Raw tar of the state-dir CONTENTS (rooted at the dir), zstd-compressed
 # on the host side so the guest needs no extra tooling.

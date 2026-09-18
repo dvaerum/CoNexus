@@ -6,7 +6,7 @@ Accepted (2026-06-03).
 
 ## Context
 
-When an agent-mcp project is renamed, the old name is referenced by several
+When an conexus project is renamed, the old name is referenced by several
 external artefacts:
 
 - Claude Code MCP configs (`.mcp.json` files in worker checkouts)
@@ -44,11 +44,11 @@ remove an alias manually via the dashboard.
 ### Agent warning
 
 When a request arrives via an alias, the router injects an
-`X-Agent-MCP-Alias: <alias_name>,<expires_at>` header into the backend
+`X-CoNexus-Alias: <alias_name>,<expires_at>` header into the backend
 request. The backend appends a deprecation warning block to
 `serverInfo.instructions` at MCP `initialize`. This is the
 spec-standard surface that Claude Code reliably reads — it is the field
-agent-mcp already uses for the system prompt, so we know it round-trips
+conexus already uses for the system prompt, so we know it round-trips
 intact.
 
 Workers see the warning at the start of every session until their

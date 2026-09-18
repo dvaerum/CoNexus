@@ -275,7 +275,7 @@ async fn dashboard_handler_impl(
 ) -> Response {
     // Phase F (prancy-napping-pie): W1 single-tenant redirect --
     // port of `dashboard_handler`'s own `_maybe_single_tenant_redirect`
-    // call site (`agent_mcp/router/app.py`, the third of three; the
+    // call site (`conexus/router/app.py`, the third of three; the
     // other two -- `backend_mcp_handler`/`backend_api_handler` -- were
     // already ported via `mcp_handler::maybe_single_tenant_redirect`,
     // this dashboard call site was missed). Checked before the warm

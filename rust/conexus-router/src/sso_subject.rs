@@ -1,5 +1,5 @@
 //! The stable OIDC `(iss, sub)` reconciliation key, as a value type.
-//! Port target: `agent_mcp/router/sso.py`'s `SsoSubject` (Phase E2
+//! Port target: `conexus/router/sso.py`'s `SsoSubject` (Phase E2
 //! PR22 step 1, `conexus-router-sso-subject`).
 //!
 //! Per the OIDC spec `sub` is unique+stable only WITHIN an issuer, so

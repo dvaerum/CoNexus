@@ -1,5 +1,5 @@
 //! `AgentRepository` — port of the pure DB-CRUD surface of
-//! `agent_mcp/repositories/agent_repository.py`'s `AgentRepository`
+//! `conexus/repositories/agent_repository.py`'s `AgentRepository`
 //! class.
 //!
 //! Scope note: this crate ports the SQL/schema surface only. The
@@ -76,7 +76,7 @@ fn is_valid_agent_id(agent_id: &str) -> bool {
 const RESERVED_AGENT_ID_PREFIX: &str = "admin";
 
 /// One row of the `agents` table, matching the ORM model
-/// (`agent_mcp/db/models/agent.py`) column-for-column.
+/// (`conexus/db/models/agent.py`) column-for-column.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct AgentRow {
     pub token: String,

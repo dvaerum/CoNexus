@@ -166,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: agent_mcp/dashboard
+        working-directory: conexus/dashboard
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -175,7 +175,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: agent_mcp/dashboard/package-lock.json
+          cache-dependency-path: conexus/dashboard/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -245,7 +245,7 @@ jobs:
     # no-auto-cleanup were previously ungated and drifted — see #489). The
     # VM checks exercise the full server boot + HTTP assertions (including
     # the Path A asset-prefix sentinel regression guard from #166) which
-    # nothing else covers. The agent-mcp Python build + dashboard Next.js
+    # nothing else covers. The conexus Python build + dashboard Next.js
     # build are NOT gated here — the `python` and `dashboard` jobs above
     # cover those.
     name: Nix VM (${{ matrix.vm }})
@@ -344,10 +344,10 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: agent_mcp/dashboard/package-lock.json
+          cache-dependency-path: conexus/dashboard/package-lock.json
 
       - name: npm audit (dashboard deps)
-        working-directory: agent_mcp/dashboard
+        working-directory: conexus/dashboard
         # Gate on HIGH/CRITICAL only. Moderate/low advisories are surfaced
         # by Dependabot and its bump PRs but must not red the build on the
         # committed lockfile (currently 2 known moderate postcss/next

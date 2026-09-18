@@ -1,5 +1,5 @@
 //! `claude_code_sessions` table -- port of the DB half of
-//! `agent_mcp/features/claude_session_monitor.py`. Tracks Claude Code
+//! `conexus/features/claude_session_monitor.py`. Tracks Claude Code
 //! sessions discovered via `.agent/registry.json` (the git-agentmcp
 //! hook's own coordination file), independent of this crate's
 //! `agents`/MCP-session concepts entirely -- a session here is a

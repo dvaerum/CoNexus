@@ -9,7 +9,7 @@ Companion to [dashboard-safety-2026-06-04.md](./dashboard-safety-2026-06-04.md)
 #120 earlier today). That review covered *implicit* state-mutating
 behaviour. This one covers the *explicit* user-triggered lifecycle:
 the Create, Terminate, Restore, and Purge buttons on the Agents
-page (`agent_mcp/dashboard/components/dashboard/agents-dashboard.tsx`).
+page (`conexus/dashboard/components/dashboard/agents-dashboard.tsx`).
 
 ## Method
 
@@ -17,7 +17,7 @@ Read-through trace from each row-action button down to its API
 client method, REST route, backend handler, MCP tool implementation
 (where applicable), and the SQL the row eventually flows through.
 Cross-checked against the live production stack
-(`https://nixos-developer-system.tailfdae0.ts.net/agent-mcp/api/washing-brothers/...`)
+(`https://nixos-developer-system.tailfdae0.ts.net/conexus/api/washing-brothers/...`)
 with `curl` for the observable wire shape.
 
 ## Behaviour model (post-PR #121)
@@ -48,7 +48,7 @@ Dennis specified holds post-PR #123.**
 | L1 | **HIGH** | Deploy button completely non-functional. Three layered defects: `POST /api/agents` → 405 (route was GET-only); `apiClient.createAgent` omitted the admin token; `create_agent_tool_impl` required a non-empty `task_ids` list the modal cannot collect. All three combined since the dashboard was introduced (July 2025). | Fixed in **PR #121** (v5.0.6). Regression guard: `tests/test_dashboard_create_agent_endpoint.py` (6 assertions). |
 | L2 | **MEDIUM** | Purge cascade tombstone rows leak into the user-facing agents list. PR-G1 INSERTs `[deleted-<id>]` rows with `status='tombstone'` so `agent_messages.{sender_id,recipient_id}` FK targets exist before the original row is `DELETE`'d. The tombstone row then leaked into `/api/all-data` and `/api/agents`, so the dashboard's Total stat never dropped on Purge (smoke-target → `[deleted-smoke-target]` replaces it in the table). Direct violation of Dennis's spec: "purge drops the count by 1". Discovered during PR #121's post-deploy live smoke. | Fixed in **PR #123** (v5.0.7). Regression guard: `tests/test_purge_drops_visible_count.py` (4 assertions, including end-to-end create→terminate→purge with explicit Δ=1 assertion). |
 | L3 | LOW | Spec/UI naming drift. Dennis's spec uses "delete"; the row-action button is labelled "Terminate" (Trash2 icon). Both refer to the soft-delete (status='terminated'); the hard-delete is "Purge". Tooltip on the Terminate button already says "soft-delete; can be restored or purged after". | Documentation; no code change. |
-| L4 | LOW | "Working Directory" field in the Deploy modal is surfaced but post-PR #100 every agent shares the project root via file-level locking (see `agent_mcp/tools/admin_tools.py` line ~218 `# All agents work in the same shared directory`). The field is accepted by the REST shim and stored, but never honoured for non-daemon workers. | Out of scope for this lifecycle audit; flag for a future dashboard cleanup PR. |
+| L4 | LOW | "Working Directory" field in the Deploy modal is surfaced but post-PR #100 every agent shares the project root via file-level locking (see `conexus/tools/admin_tools.py` line ~218 `# All agents work in the same shared directory`). The field is accepted by the REST shim and stored, but never honoured for non-daemon workers. | Out of scope for this lifecycle audit; flag for a future dashboard cleanup PR. |
 | L5 | INFO | Purge dialog correctly fetches preview counts (`getPurgePreview`) and surfaces blast-radius (messages_sent, tasks_created, etc.) before confirming. Transaction is BEGIN/COMMIT-wrapped with `DELETE FROM agents` ordered last so half-purged state is impossible. | No action — model is correct. |
 | L6 | INFO | After Purge succeeds, the dialog's `onConfirmed` calls `void refreshData()` and the table re-renders. `stats.total = agents.length` reads from the post-refetch state, so the Total chip drops by one alongside the row disappearance — **once the tombstone leak in L2 is fixed**. | No action — model is correct. |
 
@@ -91,7 +91,7 @@ correctly on explicit user actions.
   Merged at `d3bdc95`.
 - **PR #123** (v5.0.7) — `fix(dashboard): purge tombstone rows leak
   into agents list`. RED `7ab474c` + GREEN `0196fe9`. 4 new tests,
-  2 endpoint filters in `agent_mcp/app/routes.py`. Merged at
+  2 endpoint filters in `conexus/app/routes.py`. Merged at
   `5b16aa7`. Discovered during PR #121's post-deploy live smoke;
   closes the spec's count-drops-by-1 assertion end-to-end.
 

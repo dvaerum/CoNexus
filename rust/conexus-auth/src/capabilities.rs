@@ -1,7 +1,7 @@
 //! `resolve_capabilities` — the DB-backed half `conexus_core::capability`'s
 //! own module doc explicitly deferred to this crate.
 //!
-//! Faithful port of `agent_mcp/core/capabilities.py::resolve_capabilities`,
+//! Faithful port of `conexus/core/capabilities.py::resolve_capabilities`,
 //! composing three already-ported pieces: the pure bundle functions
 //! (`agent_role_bundle`/`project_role_bundle`, `conexus-core`), the
 //! group-capability overlay

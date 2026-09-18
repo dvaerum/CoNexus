@@ -8,7 +8,7 @@
 # nix/module.nix's own module-doc comment for the full story). The
 # flake now builds exactly one derivation shape. Storage is layered:
 #
-#   - agent-mcp state    → /var/lib/agent-mcp on the qcow2 scratch
+#   - conexus state    → /var/lib/conexus on the qcow2 scratch
 #     disk (real ext4; SQLite WAL needs fcntl locks 9p can't fake).
 #   - Ollama model blobs → /var/lib/ollama bind-mounted via 9p from
 #     `$CONEXUS_OLLAMA_DIR` on the host. Plain files, no SQLite,
@@ -55,7 +55,7 @@
 #     llmEmbeddingDimension  1024
 #
 # Which env var drives which endpoint (see the module docstrings in
-# agent_mcp/external/{completion,embedding}_service.py — the seams
+# conexus/external/{completion,embedding}_service.py — the seams
 # resolve INDEPENDENTLY, no Python change is needed here):
 #
 #   CONEXUS_LLM_BASE_URL → chat / completion  (llmChatPort)
@@ -112,7 +112,7 @@ let
   chatBaseUrl = "http://${llmHost}:${toString llmChatPort}/v1";
   embeddingBaseUrl = "http://${llmHost}:${toString llmEmbeddingPort}/v1";
 
-  # Applied to whichever unit actually runs agent-mcp (the lazily
+  # Applied to whichever unit actually runs conexus (the lazily
   # spawned `conexus@` backends). The router is a pure proxy and never
   # embeds or completes, so it needs none of this.
   externalLlmEnvironment = {
@@ -127,7 +127,7 @@ let
     CONEXUS_EMBEDDING_DIMENSION = toString llmEmbeddingDimension;
   };
 
-  llmEndpointCheckUnit = "agent-mcp-llm-endpoint-check.service";
+  llmEndpointCheckUnit = "conexus-llm-endpoint-check.service";
 
   # CoNexus Rust backend (Phase D1 step 5) — `null` when the caller
   # doesn't pass `craneLib` (e.g. nix/vm-dev.nix's plain-function call
@@ -135,7 +135,7 @@ let
   # units are omitted (see module.nix's `conexusLauncherPackage`/
   # `conexusRouterPackage` option docs). Both units are now the ONLY
   # implementation module.nix has (the Python router/backend pair was
-  # retired), so a caller that never passes `craneLib` gets NO agent-mcp
+  # retired), so a caller that never passes `craneLib` gets NO conexus
   # deployment at all -- there is no Python fallback left.
   conexusPkgsForVm =
     if craneLib == null then null
@@ -188,7 +188,7 @@ in
   # `llm = "internal"` only. qwen3-embedding:0.6b ~620 MB — embeddings
   # used by the RAG indexer. qwen3:1.7b ~1.0 GB — chat model used by
   # the RAG completion abstraction
-  # (agent_mcp/external/completion_service.py).
+  # (conexus/external/completion_service.py).
   #
   # v5.0.44 added the chat model so RAG `ask_project_rag` works
   # self-contained on the VM (no OPENAI_API_KEY needed). First-boot
@@ -251,17 +251,16 @@ in
     # to journal+console so the failure is visible in the qemu
     # serial log without SSHing in.
     (lib.optionalAttrs (!internalLlm) {
-      agent-mcp-llm-endpoint-check = {
+      conexus-llm-endpoint-check = {
         description = "Probe host LLM + embedding endpoints (external LLM mode)";
         wantedBy = [ "multi-user.target" ];
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
-        before = [ "agent-mcp-router.service" "agent-mcp-backend.service" ];
         path = [ pkgs.curl pkgs.coreutils ];
         serviceConfig = {
           Type = "oneshot";
           # Stay "active" after success so units that `requires` it
-          # (including lazily spawned agent-mcp@ instances, which
+          # (including lazily spawned conexus@ instances, which
           # start long after boot) don't re-run the probe.
           RemainAfterExit = true;
           # Must exceed the probe's own worst case (2 endpoints x 20
@@ -292,13 +291,13 @@ in
             attempt=1
             while [ "$attempt" -le 20 ]; do
               if curl -fsS --max-time 5 -o /dev/null "$url"; then
-                echo "agent-mcp-llm-endpoint-check: OK   $label -> $url"
+                echo "conexus-llm-endpoint-check: OK   $label -> $url"
                 return 0
               fi
               attempt=$((attempt + 1))
               sleep 2
             done
-            echo "agent-mcp-llm-endpoint-check: FAIL $label -> $url" >&2
+            echo "conexus-llm-endpoint-check: FAIL $label -> $url" >&2
             rc=1
             return 1
           }
@@ -309,7 +308,7 @@ in
           if [ "$rc" -ne 0 ]; then
             echo "" >&2
             echo "============================================================" >&2
-            echo "!! agent-mcp: EXTERNAL LLM MODE — host endpoint unreachable" >&2
+            echo "!! conexus: EXTERNAL LLM MODE — host endpoint unreachable" >&2
             echo "!!   chat:       ${chatBaseUrl}" >&2
             echo "!!   embeddings: ${embeddingBaseUrl}" >&2
             echo "!!" >&2
@@ -319,7 +318,7 @@ in
             echo "!! rebuild this VM with llm = \"internal\" to run ollama" >&2
             echo "!! inside the guest (costs ~2 GB more guest RAM)." >&2
             echo "!!" >&2
-            echo "!! Refusing to start agent-mcp: a backend with dead" >&2
+            echo "!! Refusing to start conexus: a backend with dead" >&2
             echo "!! embeddings passes E2E while indexing silently fails." >&2
             echo "============================================================" >&2
           fi
@@ -352,7 +351,7 @@ in
     externalUrl = "http://localhost:5454";
     # /var/lib lives on the qcow2 disk, which the wrapper places in
     # the user's persist dir so it survives between runs.
-    stateDir = "/var/lib/agent-mcp";
+    stateDir = "/var/lib/conexus";
     # VM-only: qemu user-mode hostfwd needs a wildcard bind. Packets
     # arrive on the guest's primary IP, not loopback, so a loopback bind
     # would make the router unreachable on the host-forwarded port.
@@ -380,7 +379,7 @@ in
     # qcow2 is sparse, so this is a ceiling rather than an allocation
     # — but the ceiling can still bite as ENOSPC. Model blobs never
     # land here (they live on the 9p share), so external mode's 4096
-    # only has to cover /var/lib/agent-mcp: SQLite DBs plus project
+    # only has to cover /var/lib/conexus: SQLite DBs plus project
     # workspaces. The CI VM tests run at 2048.
     diskSize = if internalLlm then 8192 else 4096;
     graphics = false;

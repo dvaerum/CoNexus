@@ -13,7 +13,7 @@
 //! usage rather than introducing a second HTTP stack.
 //!
 //! **One connection per call, no pooling** -- matches Python's own
-//! `_proxy_to_backend` (`agent_mcp/router/app.py`), which constructs a
+//! `_proxy_to_backend` (`conexus/router/app.py`), which constructs a
 //! fresh `UnixConnector` + `ClientSession` PER PROXIED REQUEST (scoped
 //! inside the function, not a process-wide pool), not a simplification
 //! introduced here.

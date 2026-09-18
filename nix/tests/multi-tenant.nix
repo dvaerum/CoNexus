@@ -54,7 +54,7 @@ let
   };
 in
 pkgs.testers.nixosTest {
-  name = "agent-mcp-multi-tenant";
+  name = "conexus-multi-tenant";
 
   containers.machine = { config, pkgs, ... }: {
     imports = [ ./fake-openai.nix ];
@@ -185,7 +185,7 @@ pkgs.testers.nixosTest {
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
-          + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
+          + "--dashboard-dir ${packagedPkgs.conexusDashboard}/share/conexus-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400";
         Restart = "on-failure";
@@ -381,7 +381,7 @@ pkgs.testers.nixosTest {
     # `.txt` payloads the dashboard tree ships at their app-relative
     # serve URL so the regression's exact failure mode is exercised.
     txt_paths = machine.succeed(
-        "find ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
+        "find ${packagedPkgs.conexusDashboard}/share/conexus-dashboard "
         "-name '*.txt' -printf '%P\n'"
     ).split()
     rsc_urls = [f"/conexus/app/alpha/{p}" for p in txt_paths]

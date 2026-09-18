@@ -1,5 +1,5 @@
 //! `GET /conexus/api/router/sso/config` -- port of
-//! `agent_mcp/router/admin_sso_api.py` (120 LOC, Phase E2 PR23
+//! `conexus/router/admin_sso_api.py` (120 LOC, Phase E2 PR23
 //! step 10/10, `conexus-router-sso-admin-config`).
 //!
 //! Read-only: reports the SSO mode + operator-visible knobs so a

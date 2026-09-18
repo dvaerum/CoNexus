@@ -15,11 +15,11 @@ downloads/
 eggs/
 .eggs/
 # Python build directory — ignored everywhere except inside the dashboard,
-# whose TypeScript source lives under agent_mcp/dashboard/lib/. Without
+# whose TypeScript source lives under conexus/dashboard/lib/. Without
 # the negation, every PR touching dashboard/lib/ needs `git add -f`.
 lib/
-!agent_mcp/dashboard/lib/
-!agent_mcp/dashboard/lib/**
+!conexus/dashboard/lib/
+!conexus/dashboard/lib/**
 lib64/
 parts/
 sdist/
@@ -318,7 +318,7 @@ Thumbs.db
 ehthumbs.db
 Thumbs.db
 
-# Agent-MCP specific files
+# CoNexus specific files
 .agent/
 .agent-*/
 *.agent.log
@@ -349,11 +349,11 @@ docs/TERMINAL_UI.md
 
 # PR-W3 (ORM big-bang) ships scripts/generate_ts_types.py as the
 # deterministic TS-type generator that emits
-# agent_mcp/dashboard/lib/api-types.generated.ts from the Pydantic
-# mirrors in agent_mcp/db/pydantic_mirrors.py. The scripts/ folder
+# conexus/dashboard/lib/api-types.generated.ts from the Pydantic
+# mirrors in conexus/db/pydantic_mirrors.py. The scripts/ folder
 # is therefore tracked. Untracked junk inside it should be added
 # explicitly here.
-!agent_mcp/dashboard/scripts/
+!conexus/dashboard/scripts/
 
 # Development folder
 mcp_template_terminal_ui/
@@ -361,7 +361,7 @@ mcp_template_terminal_ui/
 # Claude memory file
 CLAUDE.md
 
-# Agent-MCP hook runtime files
+# CoNexus hook runtime files
 .agent-activity/
 .agent-locks/
 .claude/settings.json.backup.*
@@ -376,7 +376,7 @@ lighthouse-report.json
 bundle-analysis.json
 
 # Next.js static build output
-agent_mcp/static/
+conexus/static/
 
 # Claude specific files
 .claude/

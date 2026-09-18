@@ -1,5 +1,5 @@
 //! Runtime discovery of the chat model's context window + budget
-//! derivation. Port of `agent_mcp/external/context_window.py`.
+//! derivation. Port of `conexus/external/context_window.py`.
 //!
 //! Local inference servers (llama-cpp, Ollama) run a FIXED per-slot
 //! context window; overflowing it makes the completion call fail.

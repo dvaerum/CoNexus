@@ -1,5 +1,5 @@
 //! Per-IP rate limiting for the router's auth-sensitive surface. Port
-//! of `agent_mcp/router/rate_limit.py` (586 LOC, Phase E2 PR 13,
+//! of `conexus/router/rate_limit.py` (586 LOC, Phase E2 PR 13,
 //! `conexus-router-rate-limit`).
 //!
 //! Threat model (unchanged from Python): the login POST runs an

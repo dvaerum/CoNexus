@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/repositories/scheduled_directive_repository.py`.
+//! Port of `conexus/repositories/scheduled_directive_repository.py`.
 //!
 //! `scheduled_directive` is the recurring, self-scheduling sibling of
 //! `pending_directive` (the one-shot "poke"): rows carry `next_due_at`

@@ -1,5 +1,5 @@
 //! External mount / URL-prefix derivation (ADR-0020). Port of
-//! `agent_mcp/router/mount.py`.
+//! `conexus/router/mount.py`.
 //!
 //! The router's routes live under an INTERNAL namespace (`/conexus`),
 //! but the EXTERNAL mount prefix is owned by the reverse proxy and

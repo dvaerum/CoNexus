@@ -1,6 +1,6 @@
 //! Settings-schema registry — the single source of truth for every
 //! per-project `config_*` setting (ADR-0018). Faithful, verbatim port
-//! of `agent_mcp/core/settings_schema.py`'s `SETTINGS_SCHEMA` tuple.
+//! of `conexus/core/settings_schema.py`'s `SETTINGS_SCHEMA` tuple.
 //!
 //! Every registered setting is operator-tier: the `config_*` namespace
 //! is writable by any confirmed operator (`Capability::SystemConfigWrite`
@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn schema_has_exactly_29_entries() {
-        // Pinned count (matches agent_mcp/core/settings_schema.py's
+        // Pinned count (matches conexus/core/settings_schema.py's
         // real SETTINGS_SCHEMA tuple) -- a future addition/removal
         // should update this deliberately, not silently drift.
         assert_eq!(SETTINGS_SCHEMA.len(), 29);

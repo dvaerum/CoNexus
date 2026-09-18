@@ -62,7 +62,7 @@ let
   };
 in
 pkgs.testers.nixosTest {
-  name = "agent-mcp-no-auto-cleanup";
+  name = "conexus-no-auto-cleanup";
 
   containers.machine = { config, pkgs, ... }: {
     imports = [ ./fake-openai.nix ];
@@ -175,7 +175,7 @@ pkgs.testers.nixosTest {
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
-          + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
+          + "--dashboard-dir ${packagedPkgs.conexusDashboard}/share/conexus-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400";
         Restart = "on-failure";

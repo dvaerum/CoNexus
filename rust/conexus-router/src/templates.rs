@@ -1,6 +1,6 @@
 //! Minijinja rendering for the login/setup-wizard HTML surface. Port
-//! target: `agent_mcp/router/login.py`'s `_render`/`_jinja_env` +
-//! the real Jinja2 templates at `agent_mcp/router/templates/`
+//! target: `conexus/router/login.py`'s `_render`/`_jinja_env` +
+//! the real Jinja2 templates at `conexus/router/templates/`
 //! (Phase E2 PR23 step 4, `conexus-router-login-setup-templates`).
 //!
 //! Operator decision 2026-09-06 (`prancy-napping-pie`): minijinja
@@ -18,16 +18,16 @@
 //!
 //! `include_str!`'d from `rust/conexus-router/templates/` (Phase F
 //! deletion-prep step 1, `prancy-napping-pie`) -- a real COPY of
-//! `agent_mcp/router/templates/*.html`, not a cross-repo `include_str!`
+//! `conexus/router/templates/*.html`, not a cross-repo `include_str!`
 //! reach-out anymore. The two trees are temporarily duplicated: the
-//! Python originals under `agent_mcp/router/templates/` are still
+//! Python originals under `conexus/router/templates/` are still
 //! live (Python's own `login.py`/tests still read them) until the
-//! bulk Phase F Python deletion removes `agent_mcp/router/*.py`
+//! bulk Phase F Python deletion removes `conexus/router/*.py`
 //! entirely, at which point the Python-side copies are deleted and
 //! this becomes the single source of truth. This resolved a real,
 //! previously-undiagnosed problem: the OLD cross-repo
-//! `include_str!("../../../agent_mcp/router/templates/...")` broke
-//! `cargo build` outside a Nix sandbox unless the sibling `agent_mcp/`
+//! `include_str!("../../../conexus/router/templates/...")` broke
+//! `cargo build` outside a Nix sandbox unless the sibling `conexus/`
 //! tree happened to exist at that exact relative path -- PR #850/#925
 //! only patched the Nix-specific symptom (a `postUnpack` copy-in
 //! hook), not the underlying cross-crate-boundary reach-out itself.

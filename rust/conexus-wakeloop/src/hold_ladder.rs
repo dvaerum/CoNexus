@@ -1,5 +1,5 @@
 //! Adaptive hold ladder for the `wait_for_events` long-poll. Port of
-//! `agent_mcp/core/hold_ladder.py`.
+//! `conexus/core/hold_ladder.py`.
 //!
 //! A heartbeat-capable client (Claude Code / OpenCode, or any client that
 //! sends a `progressToken`) can have its connection parked open

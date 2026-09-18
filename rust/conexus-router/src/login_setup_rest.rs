@@ -1,6 +1,6 @@
 //! Real axum routes for the login / logout / setup-wizard HTML
-//! surface -- port target: `agent_mcp/router/login.py` (597 LOC) +
-//! `agent_mcp/router/setup_wizard.py` (256 LOC)'s HANDLER layer
+//! surface -- port target: `conexus/router/login.py` (597 LOC) +
+//! `conexus/router/setup_wizard.py` (256 LOC)'s HANDLER layer
 //! (Phase E2 PR23 step 4, `conexus-router-login-setup-templates`).
 //! The decision logic (`login.rs`) and the rendering layer
 //! (`templates.rs`, minijinja) already exist; this module is pure

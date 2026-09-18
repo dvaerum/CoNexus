@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/agent_tools.py` (Phase D5, PR 2) — the
+//! Port of `conexus/tools/agent_tools.py` (Phase D5, PR 2) — the
 //! single `get_system_prompt` tool. Gated on `Capability::McpConnect`,
 //! the fundamental "you can use the MCP wire" capability: every
 //! authenticated agent-bearer (worker or manager) carries it via

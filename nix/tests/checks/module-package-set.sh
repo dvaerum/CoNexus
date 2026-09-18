@@ -281,7 +281,7 @@ swapped_dashboard=$(jq -r '.swapped.dashboardOut' <<<"$module_eval")
 if [ "$unset_dashboard" = "$swapped_dashboard" ]; then
   echo "FAIL: swapping nodejs in the configured package set did not change " \
     "the dashboard's store path — services.conexus.pkgs stopped " \
-    "reaching agentMcpDashboard's buildNpmPackage call" >&2
+    "reaching conexusDashboard's buildNpmPackage call" >&2
   exit 1
 fi
 

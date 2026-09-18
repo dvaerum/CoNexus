@@ -1,0 +1,102 @@
+#!@bash@/bin/bash
+# conexus-daemon-agent-precompact-hook — Claude Code PreCompact hook
+# for daemon agents.
+#
+# Claude Code fires this hook with the in-progress conversation's
+# state on stdin (per Anthropic's hook spec). For a daemon agent we
+# want to persist a tiny resume-pointer to the project's
+# `project_context` table so a post-compact session — or a different
+# process that picks up after a restart — can continue from a known
+# point without replaying the entire backlog.
+#
+# What gets written: under the key
+# `agent_<agent_id>_compact_resume_state` we store a JSON envelope:
+#
+#   {
+#     "cursor": "<iso-ts>",     # last next_cursor the runner persisted
+#     "compacted_at": "<iso-ts>",
+#     "in_progress_task_ids": [...]   # optional, future use
+#   }
+#
+# Today the in_progress_task_ids list is empty — the runner doesn't
+# yet track which tasks it's actively working on. The hook still
+# captures the cursor + timestamp so the resume point is preserved.
+# Wire task tracking once a real Claude hand-off design exists.
+#
+# The hook MUST return 0 quickly so Claude Code proceeds with the
+# compaction. We swallow all errors (logged to stderr → journal)
+# rather than blocking compaction on a project_context write.
+#
+# Nix substitutions:
+#   @bash@   — pkgs.bash
+#   @curl@   — pkgs.curl (for the project_context REST write)
+#   @jq@     — pkgs.jq
+
+set -euo pipefail
+
+# Required env: set by Claude Code from the agent's environment.
+project="${CONEXUS_PROJECT:-}"
+agent_id="${CONEXUS_AGENT_ID:-}"
+bearer="${CONEXUS_BEARER:-}"
+mcp_url="${CONEXUS_MCP_URL:-}"
+
+# The runner persists cursor here; we re-read it so the hook value
+# matches whatever the runner last committed.
+cursor_file="${CONEXUS_CURSOR_FILE:-}"
+
+if [[ -z "$project" || -z "$agent_id" || -z "$bearer" || -z "$mcp_url" ]]; then
+  echo "precompact-hook: missing env (project/agent_id/bearer/mcp_url); skipping" >&2
+  exit 0
+fi
+
+cursor=""
+if [[ -n "$cursor_file" && -r "$cursor_file" ]]; then
+  cursor="$(< "$cursor_file")"
+fi
+
+now_iso="$(date -u +%Y-%m-%dT%H:%M:%S.%6NZ)"
+context_key="agent_${agent_id}_compact_resume_state"
+value_json=$(@jq@/bin/jq -nc \
+  --arg c "$cursor" --arg ts "$now_iso" \
+  '{cursor: $c, compacted_at: $ts, in_progress_task_ids: []}')
+
+# Project_context REST write: POST /api/project-context with the
+# admin/agent bearer. The exact REST shape matches what the dashboard
+# uses for Memories edits — admin-scoped writes accept this body.
+#
+# Worst case: a 4xx (e.g. worker bearer rejected on a config_-prefixed
+# write) — we log and continue. The key name above is NOT config_-
+# prefixed, so this writes as a normal context entry.
+payload=$(@jq@/bin/jq -nc \
+  --arg k "$context_key" --argjson v "$value_json" \
+  '{context_key: $k, context_value: $v, description: "Daemon agent PreCompact resume state"}')
+
+# Derive the REST API root from the MCP URL.
+#
+# Daemon wrapper builds CONEXUS_MCP_URL as
+#   <scheme>://<host>[:<port>]/conexus/mcp/<project>
+# (PR-D Shape-3 layout; the legacy /conexus/<project>/mcp shape was
+# retired in v5.0.0). The matching project_context REST resource lives
+# at
+#   <scheme>://<host>[:<port>]/conexus/api/projects/<project>/project-context
+#
+# Strip the trailing /mcp/<project> off the URL, then append the
+# /api/projects/<project> prefix. We get <project> from the URL's
+# last path segment rather than from $CONEXUS_PROJECT so this hook
+# stays resilient to env-var drift.
+project_name="${mcp_url##*/}"
+url_base="${mcp_url%/mcp/${project_name}}"
+api_root="${url_base}/api/projects/${project_name}"
+
+@curl@/bin/curl -sSf -X POST "${api_root}/project-context" \
+  -H "Authorization: Bearer $bearer" \
+  -H "Content-Type: application/json" \
+  -d "$payload" \
+  >/dev/null \
+  2>&1 || {
+    echo "precompact-hook: project_context write failed (continuing)" >&2
+    exit 0
+  }
+
+echo "precompact-hook: wrote $context_key (cursor=$cursor)" >&2
+exit 0

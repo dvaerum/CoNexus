@@ -127,7 +127,7 @@ percent-encoding = "2"
 # templates.rs (step 4, `conexus-router-login-setup-templates`) --
 # operator decision 2026-09-06: Jinja2-syntax-compatible over askama
 # (a different, Rust-native macro syntax that would mean REWRITING
-# the existing `agent_mcp/router/templates/*.html` files rather than
+# the existing `conexus/router/templates/*.html` files rather than
 # PORTING them) or hand-written `format!` HTML (autoescaping stays
 # structural instead of relying on every future editor remembering to
 # escape a new field). Same author as Jinja2 itself (Armin Ronacher).

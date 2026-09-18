@@ -1,5 +1,5 @@
 //! Security response headers for every router response. Port of
-//! `agent_mcp/router/security_headers.py` (302 LOC, Phase E2 PR 15,
+//! `conexus/router/security_headers.py` (302 LOC, Phase E2 PR 15,
 //! `conexus-router-headers-misc`).
 //!
 //! Framework-agnostic: [`security_headers`] enumerates the intended

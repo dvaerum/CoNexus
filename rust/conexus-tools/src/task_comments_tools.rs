@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/task_comments_tools.py` (Phase D5, PR 6):
+//! Port of `conexus/tools/task_comments_tools.py` (Phase D5, PR 6):
 //! the `task_comments` side table's three MCP tools — `add_task_comment`,
 //! `edit_task_comment`, `delete_task_comment`. Replaces the legacy
 //! `tasks.notes` JSON-list-in-TEXT pattern with per-comment

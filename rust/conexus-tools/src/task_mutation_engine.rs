@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/task_tools.py`'s shared task-mutation
+//! Port of `conexus/tools/task_tools.py`'s shared task-mutation
 //! engine (Phase D4, PR 5/8): `_update_single_task`,
 //! `_advance_dependents_after_completion`, `_worker_ownership_deny`/
 //! `_worker_ownership_deny_result`, and the post-commit wake tail

@@ -1,5 +1,5 @@
 //! The one entry point for decoding an untrusted `/api` REST request
-//! body. Port of `agent_mcp/utils/json_utils.py`'s
+//! body. Port of `conexus/utils/json_utils.py`'s
 //! `decode_untrusted_body` chokepoint -- eleven pentest findings
 //! across nine rounds (R3-F1, R4-F3, R4-F4, R5-F8, R5-F9, R13-F2,
 //! R14-F3, R15-F1, R15-F2, R16-F3, R20-F2) were all variations of

@@ -1,4 +1,4 @@
-//! `conexus-cli` -- the operator CLI Python's `agent_mcp.cli` module
+//! `conexus-cli` -- the operator CLI Python's `conexus.cli` module
 //! carries alongside the `server`/`router` leaf commands (both of
 //! which stay their own binaries, `conexus-backend`/`conexus-router`,
 //! per this migration's Target Architecture; this crate exists for

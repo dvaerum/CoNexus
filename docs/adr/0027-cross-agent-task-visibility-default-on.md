@@ -141,9 +141,9 @@ Three properties distinguish this widening from the general case ADR-
 
 ## Links
 
-- `agent_mcp/core/task_ownership.py` — `can_access_task`'s
+- `conexus/core/task_ownership.py` — `can_access_task`'s
   `include_foreign` parameter and `sql_fragment`'s equivalent.
-- `agent_mcp/core/settings_schema.py` —
+- `conexus/core/settings_schema.py` —
   `config_allow_worker_view_foreign_tasks` /
   `config_allow_worker_comment_foreign_tasks`.
 - `tests/test_task_ownership.py` — the `include_foreign` unit + SQL/dict

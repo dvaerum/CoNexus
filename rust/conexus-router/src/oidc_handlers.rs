@@ -1,6 +1,6 @@
 //! The two real OIDC authorization-code-flow routes: `GET /conexus/
 //! sso/login` (redirect to the IdP) and `GET /conexus/sso/callback`
-//! (mint the session). Port target: `agent_mcp/router/sso.py`'s
+//! (mint the session). Port target: `conexus/router/sso.py`'s
 //! `init_oidc_login_handler`/`handle_oidc_callback`/
 //! `_default_redirect_url`/`_resolve_redirect_url` (Phase E2 PR22
 //! step 7/8, `conexus-router-oidc-handlers`) -- the composition point

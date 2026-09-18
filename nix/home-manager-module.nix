@@ -5,7 +5,7 @@
 # This module ships in the dvaerum/CoNexus fork (Phase 2 of the
 # router-upstream plan, prancy-napping-pie). It mirrors the
 # multi-tenant deployment that previously lived in
-# nixos-developer-system/users/dennis/agent-mcp/default.nix verbatim,
+# nixos-developer-system/users/dennis/conexus/default.nix verbatim,
 # so the byte-shape of the resulting systemd unit files is identical
 # up to store-path hashes.
 #
@@ -304,7 +304,7 @@ in {
       defaultText = lib.literalMD
         "the `pkgs` this home-manager configuration was evaluated with";
       example = lib.literalExpression ''
-        import agent-mcp.inputs.nixpkgs {
+        import conexus.inputs.nixpkgs {
           inherit (pkgs.stdenv.hostPlatform) system;
         }
       '';
@@ -333,14 +333,14 @@ in {
         of the home-manager profile stays on the stable channel:
 
         ```nix
-        services.conexus.pkgs = import agent-mcp.inputs.nixpkgs {
+        services.conexus.pkgs = import conexus.inputs.nixpkgs {
           inherit (pkgs.stdenv.hostPlatform) system;
         };
         ```
 
         Note that conexus's own flake pin does NOT do this for you.
         The module builds from the *consumer's* package set by
-        construction, so dropping `inputs.agent-mcp.inputs.nixpkgs.follows`
+        construction, so dropping `inputs.conexus.inputs.nixpkgs.follows`
         in your flake changes only what `nix build` inside conexus's
         own flake produces — not your deployed closure. This option is
         the switch that does.
@@ -413,7 +413,7 @@ in {
 
       package = lib.mkOption {
         type = lib.types.package;
-        default = pkgs'.agentMcpDashboard;
+        default = pkgs'.conexusDashboard;
         defaultText = lib.literalMD
           "the dashboard built from `services.conexus.source` using `services.conexus.pkgs`";
         description = "Dashboard derivation (Next.js static export).";
@@ -494,7 +494,7 @@ in {
               };
               description = ''
                 Map IdP-supplied group claims to conexus groups.
-                Each entry is `oidc_group_name = agent_mcp_group_name`.
+                Each entry is `oidc_group_name = conexus_group_name`.
                 Unmapped claims are silently ignored.
 
                 Special: an entry with key `"*"` enables the wildcard
@@ -710,7 +710,7 @@ in {
     home.packages =
       lib.optional (daemonAgentWrapper != null) daemonAgentWrapper  # invoked by conexus-daemon-agent@.service via %i
       ++ [
-        pkgs'.agentMcpDaemonAgentPrecompactHook  # operator-installed PreCompact hook
+        pkgs'.conexusDaemonAgentPrecompactHook  # operator-installed PreCompact hook
       ];
 
     # ── Systemd services ───────────────────────────────────────────
@@ -897,7 +897,7 @@ in {
                 "--port ${toString cfg.router.port} "
                 + "--projects-file %h/.config/conexus/projects.local.json "
                 + "--sock-dir %t/conexus "
-                + "--dashboard-dir ${cfg.dashboard.package}/share/agent-mcp-dashboard "
+                + "--dashboard-dir ${cfg.dashboard.package}/share/conexus-dashboard "
                 + "--external-url ${lib.escapeShellArg cfg.router.externalUrl} "
                 + "--idle-sec ${toString cfg.router.idleSec}";
             in
@@ -930,7 +930,7 @@ in {
       # option.
       value = lib.mkIf (cfg.conexusDaemonAgentPackage != null) {
         Unit = {
-          Description = "Agent-MCP daemon agent — ${daemonAgentInstanceName a} (event-driven wait_for_events loop)";
+          Description = "CoNexus daemon agent — ${daemonAgentInstanceName a} (event-driven wait_for_events loop)";
           After = [ "conexus-router.service" ];
           Wants = [ "conexus-router.service" ];
           # StartLimit* live in [Unit] (per `man systemd.unit`), not

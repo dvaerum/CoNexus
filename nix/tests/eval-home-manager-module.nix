@@ -62,7 +62,7 @@ let
           source = src;
           router = {
             externalUrl = "https://example.invalid";
-            defaultWorkspaceParent = "/home/test/.local/share/agent-mcp/projects";
+            defaultWorkspaceParent = "/home/test/.local/share/conexus/projects";
           };
           # Stub packages (never built -- this harness is eval-only) so
           # every unit that's `lib.mkIf (cfg.conexusXPackage != null)`
@@ -82,7 +82,7 @@ let
             {
               project = "demo-proj";
               agentId = "worker-1";
-              tokenPath = "/home/test/.config/agent-mcp/tokens/demo-proj--worker-1.token";
+              tokenPath = "/home/test/.config/conexus/tokens/demo-proj--worker-1.token";
             }
           ];
         } // lib.optionalAttrs (modulePkgs != null) { pkgs = modulePkgs; };
@@ -124,7 +124,7 @@ in {
   };
 
   # The daemon-agent template's `After`/`Wants` used to be
-  # `router.impl`-aware (hardcoding `agent-mcp-router.service` unless
+  # `router.impl`-aware (hardcoding `conexus-router-legacy.service` unless
   # `impl == "rust"`) -- a live incident (2026-09-08) where every
   # daemon-agent activation unconditionally started the Python router
   # alongside an already-running `conexus-router`. Now that

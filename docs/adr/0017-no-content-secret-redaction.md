@@ -44,7 +44,7 @@ not **guessing content**.
 
 ## Decision
 
-agent-mcp does **not** detect-and-censor secrets in content — anywhere.
+conexus does **not** detect-and-censor secrets in content — anywhere.
 Scope is everywhere shared project content lives: **memory**
 (`project_context`), **task** descriptions/titles, **code** files, and
 **markdown** docs. All of it is indexed and returned **AS-IS**.

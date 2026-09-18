@@ -43,13 +43,13 @@ In your home-manager flake:
 
 ```nix
 {
-  inputs.agent-mcp.url = "github:dvaerum/CoNexus";
+  inputs.conexus.url = "github:dvaerum/CoNexus";
 
-  outputs = { self, nixpkgs, home-manager, agent-mcp, ... }: {
+  outputs = { self, nixpkgs, home-manager, conexus, ... }: {
     homeConfigurations."alice" = home-manager.lib.homeManagerConfiguration {
       pkgs = import nixpkgs { system = "x86_64-linux"; };
       modules = [
-        agent-mcp.homeModules.default
+        conexus.homeModules.default
         {
           home.username = "alice";
           home.homeDirectory = "/home/alice";
@@ -140,10 +140,10 @@ Each `daemonAgents` entry has:
 
 ## Building from a different nixpkgs
 
-The module builds agent-mcp from the **consumer's** package set — the
-`pkgs` your home-manager configuration was evaluated with. agent-mcp's
+The module builds conexus from the **consumer's** package set — the
+`pkgs` your home-manager configuration was evaluated with. conexus's
 own flake pin has no say in it, so adding or dropping
-`inputs.agent-mcp.inputs.nixpkgs.follows` in your flake changes only
+`inputs.conexus.inputs.nixpkgs.follows` in your flake changes only
 what `nix build` inside *this* repo produces, never your deployed
 closure.
 
@@ -155,12 +155,12 @@ release, advisories included, while unstable already ships the fix.
 from a set you choose, leaving the rest of the profile on stable:
 
 ```nix
-{ agent-mcp, pkgs, ... }:
+{ conexus, pkgs, ... }:
 
 {
-  imports = [ agent-mcp.homeModules.default ];
+  imports = [ conexus.homeModules.default ];
 
-  services.conexus.pkgs = import agent-mcp.inputs.nixpkgs {
+  services.conexus.pkgs = import conexus.inputs.nixpkgs {
     inherit (pkgs.stdenv.hostPlatform) system;
   };
 }

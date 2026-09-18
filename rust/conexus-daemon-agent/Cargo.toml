@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "CoNexus reference daemon-agent event loop (wait_for_events long-poll client). Port of nix/agent-mcp-daemon-agent-runner.py + agent-mcp-daemon-agent.sh.in -- see /home/dennis/.claude/plans/prancy-napping-pie.md, Phase F daemon-agent-runner scope."
+description = "CoNexus reference daemon-agent event loop (wait_for_events long-poll client). Port of nix/conexus-daemon-agent-runner.py + conexus-daemon-agent.sh.in -- see /home/dennis/.claude/plans/prancy-napping-pie.md, Phase F daemon-agent-runner scope."
 
 [[bin]]
 name = "conexus-daemon-agent"
@@ -13,7 +13,7 @@ path = "src/main.rs"
 [dependencies]
 # A pure MCP wire-protocol client -- deliberately depends on NONE of
 # this workspace's server-side crates (conexus-core/-db/-auth/-tools),
-# matching the Python original's own zero-agent_mcp-import shape: it
+# matching the Python original's own zero-conexus-import shape: it
 # only ever speaks HTTP/JSON-RPC to whatever backend is live, Python
 # or Rust, and needs no server-side type to do that.
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }

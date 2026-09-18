@@ -1,4 +1,4 @@
-//! `FileMap` — port of `agent_mcp/core/globals.py`'s `g.file_map`, the
+//! `FileMap` — port of `conexus/core/globals.py`'s `g.file_map`, the
 //! in-memory advisory file-claim map `file_management_tools.py`'s two
 //! tools (`check_file_status`/`update_file_status`) read and mutate.
 //! Process-wide, keyed on the resolved absolute filepath — no DB

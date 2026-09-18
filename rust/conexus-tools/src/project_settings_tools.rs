@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/project_settings_tools.py` — the
+//! Port of `conexus/tools/project_settings_tools.py` — the
 //! `project_settings` store's (ADR-0016) 3-tool surface. First real
 //! `Tool` impls in the CoNexus port (Phase D1's chosen first vertical
 //! slice: all 3 tools gate on the identical `system.config.write`

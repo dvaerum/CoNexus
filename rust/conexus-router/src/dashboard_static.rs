@@ -1,5 +1,5 @@
 //! Pure decision functions for the router's dashboard-serving surface
-//! -- port of `agent_mcp/router/app.py`'s `_MIME`/`_safe_dashboard_path`/
+//! -- port of `conexus/router/app.py`'s `_MIME`/`_safe_dashboard_path`/
 //! `_serve_dashboard_file`/`dashboard_handler`'s resolve-or-SPA-
 //! fallback chain/`_accept_prefers_html`/`_service_descriptor`. Phase
 //! E2, `conexus-router-dashboard-static` (PR23 step 8, PR 1/3).

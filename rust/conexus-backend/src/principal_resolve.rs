@@ -1,6 +1,6 @@
 //! Per-request [`Principal`] construction for the per-project backend.
 //!
-//! Port of `agent_mcp/app/main_app.py::_build_principal_from_request` +
+//! Port of `conexus/app/main_app.py::_build_principal_from_request` +
 //! `AuthHeaderMiddleware`'s `/mcp`-gating responsibility. Resolution
 //! order (identical to Python):
 //!

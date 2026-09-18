@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/repositories/project_context_repository.py`.
+//! Port of `conexus/repositories/project_context_repository.py`.
 //!
 //! A module of plain functions, not a struct/class with methods —
 //! matching the Python source's own deliberate design: unlike

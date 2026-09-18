@@ -1,5 +1,5 @@
 //! Provider-agnostic text-embedding HTTP client. Port of
-//! `agent_mcp/external/embedding_service.py`.
+//! `conexus/external/embedding_service.py`.
 //!
 //! Branches OpenAI-vs-Ollama on `OPENAI_API_KEY`, exactly like Python
 //! — the same switch [`crate::completion_client`] uses, so the two
@@ -218,7 +218,7 @@ mod tests {
     }
 
     #[test]
-    fn ollama_branch_honours_agent_mcp_llm_base_url_override() {
+    fn ollama_branch_honours_conexus_llm_base_url_override() {
         let client = resolve(env(&[("CONEXUS_LLM_BASE_URL", "http://gpu-box:11434/v1")]));
         assert_eq!(client.base_url, "http://gpu-box:11434/v1");
     }

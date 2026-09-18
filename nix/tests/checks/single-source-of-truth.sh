@@ -27,7 +27,7 @@
 # ----------------
 #
 # The Python implementation this guard was originally about — the whole
-# `agent_mcp/app`/`agent_mcp/router`/`agent_mcp/cli.py` tree —
+# `conexus/app`/`conexus/router`/`conexus/cli.py` tree —
 # was deleted wholesale once the Rust `rust/` workspace reached
 # functional completeness (packaged separately via `nix/conexus.nix`).
 # `nix/packages.nix` no longer calls `buildPythonApplication` at all

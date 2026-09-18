@@ -1,6 +1,6 @@
 # Tiny fake OpenAI-compatible embeddings server for VM tests.
 #
-# The agent-mcp backend hits OPENAI_BASE_URL/v1/embeddings on startup
+# The conexus backend hits OPENAI_BASE_URL/v1/embeddings on startup
 # (and any time the RAG indexer needs a vector). Ollama is overkill
 # for the VM-test smoke path — we don't care about embedding quality,
 # we only need the call to *succeed* so the backend keeps booting.
@@ -71,7 +71,7 @@ let
   '';
 in {
   systemd.services.fake-openai = {
-    description = "Tiny OpenAI-compatible embeddings stub for agent-mcp VM tests";
+    description = "Tiny OpenAI-compatible embeddings stub for conexus VM tests";
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";

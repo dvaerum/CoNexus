@@ -1,5 +1,5 @@
 //! OIDC group-claim -> conexus group mapping + de-provisioning
-//! reconciliation. Port target: `agent_mcp/router/sso.py`'s
+//! reconciliation. Port target: `conexus/router/sso.py`'s
 //! `apply_group_mapping`/`reconcile_oidc_group_membership` (Phase E2
 //! PR22 step 4/8, `conexus-router-oidc-group-mapping`).
 //!

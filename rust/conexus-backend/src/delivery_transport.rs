@@ -1,5 +1,5 @@
 //! Per-worker delivery-transport registry (ADR-0021). Port of
-//! `agent_mcp/features/delivery_transport.py`.
+//! `conexus/features/delivery_transport.py`.
 //!
 //! A runtime (e.g. the AoE bridge) opens one delivery stream per
 //! worker (`GET /api/delivery/stream`, worker-bearer authed) and
@@ -129,7 +129,7 @@ impl DeliveryTransportHub {
     /// Observability: one row per worker with a live stream and/or a
     /// reported status, agent_id-sorted (matching Python's `sorted`).
     /// Ported for parity even though Python's own `snapshot()` has no
-    /// real caller anywhere in `agent_mcp/` either (confirmed by grep)
+    /// real caller anywhere in `conexus/` either (confirmed by grep)
     /// -- no REST route exposes a delivery-transport status summary,
     /// unlike `operator_events`'s `GET /api/events/status`. Kept, not
     /// dropped, since a future observability route is a plausible,

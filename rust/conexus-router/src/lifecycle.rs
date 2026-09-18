@@ -1,7 +1,7 @@
 //! Pure decision/validation primitives for the router's project-
 //! lifecycle REST surface. Port of the non-handler-body half of
-//! `agent_mcp/router/admin_api.py` (1792 LOC) + the lifecycle-specific
-//! pieces of `agent_mcp/router/app.py` it calls into (`_error_envelope`/
+//! `conexus/router/admin_api.py` (1792 LOC) + the lifecycle-specific
+//! pieces of `conexus/router/app.py` it calls into (`_error_envelope`/
 //! `_success_envelope`, `_validate_name`/`_SLUG_RE`/`_RESERVED_NAMES`/
 //! `_NAME_MAX`, `_workspace_label`, `_is_within_default_workspace`).
 //! Phase E2 PR 16, `conexus-router-lifecycle-foundations` -- the

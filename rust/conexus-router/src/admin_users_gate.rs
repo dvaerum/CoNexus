@@ -1,6 +1,6 @@
 //! Shared vocabulary + security-invariant decision functions for the
 //! router's users/groups/project-memberships REST surface. Port of
-//! `agent_mcp/router/admin_users_api.py`'s module-level helpers (2413
+//! `conexus/router/admin_users_api.py`'s module-level helpers (2413
 //! LOC total; this PR covers the envelope/validation/gate layer every
 //! later create/edit/delete decision-function PR builds on). Phase
 //! E2, `conexus-router-admin-users-gate` -- dedicated background

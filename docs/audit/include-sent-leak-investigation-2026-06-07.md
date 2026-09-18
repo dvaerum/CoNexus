@@ -9,7 +9,7 @@ returned messages the calling agent had sent.
 ## Surfaces audited
 
 1. **MCP tool — `get_agent_messages_tool_impl`**
-   (`agent_mcp/tools/agent_communication_tools.py:292-422`)
+   (`conexus/tools/agent_communication_tools.py:292-422`)
 
    The branch at lines 326-336 routes filter combinations:
    ```
@@ -27,7 +27,7 @@ returned messages the calling agent had sent.
    could leak sent rows.
 
 2. **REST endpoint — `POST /api/messages/query`**
-   (`agent_mcp/app/routes.py:1922-2036`, `list_messages_api_route`)
+   (`conexus/app/routes.py:1922-2036`, `list_messages_api_route`)
 
    This endpoint does **not** expose `include_sent` / `include_received`.
    Its filter surface is `from`/`to`/`between`/`type`/`priority`/
@@ -38,7 +38,7 @@ returned messages the calling agent had sent.
 
 3. **Dashboard filter — `messages-dashboard.tsx`**
 
-   `grep -rn "include_sent\|includeSent" agent_mcp/dashboard/` returns
+   `grep -rn "include_sent\|includeSent" conexus/dashboard/` returns
    no matches. The dashboard does not interact with the
    `include_sent` concept at all — it builds REST queries with
    `from`/`to`.

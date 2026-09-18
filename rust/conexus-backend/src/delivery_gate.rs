@@ -1,5 +1,5 @@
 //! `/api/delivery/*` HTTP-layer identity gate. Port of
-//! `agent_mcp/app/routers/delivery.py::require_agent_bearer`.
+//! `conexus/app/routers/delivery.py::require_agent_bearer`.
 //!
 //! A THIRD `/api` admission shape, distinct from both `/mcp`'s
 //! `auth_gate` (admits any valid agent bearer OR forwarding header)

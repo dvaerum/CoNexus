@@ -1,8 +1,8 @@
 # vm-dev preload fixtures
 
 Captured **test-data bundles** for the `vm-dev` sandbox. Each
-`<name>.tar.zst` here is a raw tar of the agent-mcp state-dir subtree
-(`/var/lib/agent-mcp` — `router.db`, `projects.local.json`, and every
+`<name>.tar.zst` here is a raw tar of the conexus state-dir subtree
+(`/var/lib/conexus` — `router.db`, `projects.local.json`, and every
 `projects/<slug>/.agent/mcp_state.db`) taken from a seeded, quiesced VM.
 
 Restoring one lets `vm-dev` boot with real projects / agents / tasks

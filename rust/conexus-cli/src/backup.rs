@@ -1,4 +1,4 @@
-//! `conexus-cli backup` -- port of `agent_mcp/cli.py`'s `backup_cmd`.
+//! `conexus-cli backup` -- port of `conexus/cli.py`'s `backup_cmd`.
 //! Online SQLite backup via `sqlite3.Connection.backup()`'s Rust
 //! equivalent (`rusqlite::backup`) -- safe to run while the server is
 //! live under WAL mode; readers and writers keep going.

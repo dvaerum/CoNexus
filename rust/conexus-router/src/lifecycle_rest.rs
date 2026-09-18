@@ -1836,7 +1836,7 @@ mod handler_tests {
         let resp = task.await.unwrap();
         // Capability is left intact; only membership is stripped. Verified
         // against the real Python source
-        // (`agent_mcp/router/admin_api.py::_revalidate_capability_and_
+        // (`conexus/router/admin_api.py::_revalidate_capability_and_
         // membership_or_403`): it composes `revalidate_capability_or_403`
         // with `_deny_cross_tenant_project_read` -- the SAME function used
         // at entry time -- which returns the uniform 404 `unknown_project`

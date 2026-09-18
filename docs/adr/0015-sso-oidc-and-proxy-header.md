@@ -43,12 +43,12 @@ The two patterns aren't redundant — they cover different deployment
 shapes. OIDC is the right choice for a deploy that needs full
 authorization-code flow + token expiry + group provisioning; proxy
 trust is the right choice for a deploy that has already standardised
-on a forward-auth proxy and wants agent-mcp to "just trust the
+on a forward-auth proxy and wants conexus to "just trust the
 header".
 
 ## Decision
 
-agent-mcp ships **both** SSO front-ends in Phase 3 Wave 3, but with a
+conexus ships **both** SSO front-ends in Phase 3 Wave 3, but with a
 **single-provider-at-a-time** constraint: the OIDC config and the
 proxy-header config are mutually exclusive (enforced at startup via
 `SSOConfigError`, and at nix evaluation via an `assertions` entry).
@@ -58,8 +58,8 @@ Three modes:
 | Mode | Activator | Auth source |
 |---|---|---|
 | `builtin` (default) | none | Local `users.password_hash` |
-| `oidc` | `AGENT_MCP_SSO_OIDC_ISSUER` set | External OIDC IdP |
-| `proxy_header` | `AGENT_MCP_SSO_PROXY_HEADER` set | Trusted upstream proxy |
+| `oidc` | `CONEXUS_SSO_OIDC_ISSUER` set | External OIDC IdP |
+| `proxy_header` | `CONEXUS_SSO_PROXY_HEADER` set | Trusted upstream proxy |
 
 ### OIDC
 
@@ -68,9 +68,9 @@ Three modes:
   Discovery via `/.well-known/openid-configuration`. PKCE is mandatory
   (`code_challenge_method=S256`). id_token decode + signature
   validation via Authlib's JWS surface against the IdP's JWKS.
-* **Routes**: `GET /agent-mcp/sso/login` initiates the flow with a
+* **Routes**: `GET /conexus/sso/login` initiates the flow with a
   per-flow cookie binding the state + PKCE verifier to the browser;
-  `GET /agent-mcp/sso/callback` validates the cookie matches the
+  `GET /conexus/sso/callback` validates the cookie matches the
   `state` query param, exchanges the code, decodes claims, finds-or-
   creates the local user, and mints the standard session cookie.
 * **User matching algorithm** (superseded — see ADR-0024): match by
@@ -84,7 +84,7 @@ Three modes:
   escape): config maps `{oidc_group: amcp_group}`. Unmapped claims are
   silently ignored. A special `"*"` key turns on the wildcard JIT
   escape — every unmatched group claim auto-creates a sanitized
-  agent-mcp group and the user is added.
+  conexus group and the user is added.
 * **Single provider at a time**: option A from the locked grilling.
   Multi-provider OIDC would require per-provider redirect URIs +
   per-provider button labels + per-provider group-mapping namespaces;
@@ -93,7 +93,7 @@ Three modes:
 
 ### Proxy-header trust
 
-* **Activator**: `AGENT_MCP_SSO_PROXY_HEADER=<header-name>` (the
+* **Activator**: `CONEXUS_SSO_PROXY_HEADER=<header-name>` (the
   header to consult; nix submodule defaults to `Remote-User`).
 * **Trusted source enforcement**: the router only honours the
   trusted header when `request.remote` (the transport peer IP) is in
@@ -105,7 +105,7 @@ Three modes:
 * **JIT user creation**: same algorithm as OIDC's (superseded — see
   ADR-0024; the proxy path's stable subject is the raw trusted header
   value in its own `proxy:` namespace), with one extra
-  knob: `AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN` (default `false`).
+  knob: `CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN` (default `false`).
   When set true, every JIT-created user via the proxy-header path
   gets `is_sysadmin = TRUE`. Only safe when the upstream proxy is
   the sole, well-trusted auth boundary.
@@ -114,7 +114,7 @@ Three modes:
 
 The System overview gains a new **SSO** tab next to Users / Groups
 (matching the placement of the Wave 1b CRUD UIs). The tab fetches
-`GET /agent-mcp/api/router/sso/config` and renders the active mode
+`GET /conexus/api/router/sso/config` and renders the active mode
 plus the operator-visible knobs (the OIDC client secret is reported
 only as a presence boolean — the value never crosses the wire).
 Non-sysadmin operators see a "Sysadmin only" explanatory card
@@ -141,10 +141,10 @@ every existing row's hash verbatim.
 * Operators get OIDC sign-in with one nix-module option block; the
   PKCE flow is wired correctly and the id_token signature is
   validated against the IdP's JWKS — defaults are safe.
-* Operators who already run a forward-auth proxy can drop agent-mcp
-  in behind it with two env vars (`AGENT_MCP_SSO_PROXY_HEADER` +
-  `AGENT_MCP_SSO_PROXY_TRUSTED_IPS`).
-* Group-claim mapping lets a sysadmin pre-create groups in agent-mcp
+* Operators who already run a forward-auth proxy can drop conexus
+  in behind it with two env vars (`CONEXUS_SSO_PROXY_HEADER` +
+  `CONEXUS_SSO_PROXY_TRUSTED_IPS`).
+* Group-claim mapping lets a sysadmin pre-create groups in conexus
   and bind IdP roles to them without writing custom sync code.
 * The wildcard JIT escape gives a one-line "mirror every IdP group"
   option for deploys that don't need to curate the local namespace.
@@ -160,7 +160,7 @@ every existing row's hash verbatim.
 * **No SCIM provisioning.** Users are created lazily on first login,
   not pre-provisioned. Sysadmins who need a populated user list before
   first SSO logins land must seed via the CLI (Phase 1's
-  `agent-mcp router create-operator`).
+  `conexus router create-operator`).
 * **No 2FA at the router.** The IdP is expected to enforce it.
 * **No config writes from the dashboard.** Sysadmins can read the
   current config but must edit the host config (and restart the
@@ -190,7 +190,7 @@ every existing row's hash verbatim.
 
 * **Dashboard SSO writes**: a NixOS-friendly config-write surface
   that integrates with the home-manager module (e.g. a small
-  `agent-mcp-router-config.json` overlay that the module merges with
+  `conexus-router-config.json` overlay that the module merges with
   declared values).
 * **SCIM provisioning**: pre-seed users + groups from the IdP's SCIM
   endpoint so a fresh deploy comes up with the right namespace.

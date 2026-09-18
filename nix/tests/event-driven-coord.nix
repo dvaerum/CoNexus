@@ -45,7 +45,7 @@ let
   };
 in
 pkgs.testers.nixosTest {
-  name = "agent-mcp-event-driven-coord";
+  name = "conexus-event-driven-coord";
 
   containers.machine = { config, pkgs, ... }: {
     imports = [ ./fake-openai.nix ];
@@ -81,7 +81,7 @@ pkgs.testers.nixosTest {
           "CONEXUS_EVENT_WAIT_TIMEOUT=60"
           # Launcher / router share this for socket path discovery.
           # In the VM test we use the systemd RuntimeDirectory at
-          # /run/agent-mcp (created with 0700 perms below) instead
+          # /run/conexus (created with 0700 perms below) instead
           # of XDG_RUNTIME_DIR which testuser can't write to.
           "CONEXUS_SOCK_DIR=/run/conexus"
           # The launcher resolves the project workspace from this file.
@@ -161,7 +161,7 @@ pkgs.testers.nixosTest {
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
-          + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
+          + "--dashboard-dir ${packagedPkgs.conexusDashboard}/share/conexus-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400";
         Restart = "on-failure";

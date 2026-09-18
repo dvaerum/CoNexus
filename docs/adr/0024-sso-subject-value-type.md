@@ -16,7 +16,7 @@ claim → existing `users.email`, else JIT-create*. That rule is no longer
 what the code does, and hasn't been since the first pentest round that
 touched it. Email is mutable and IdP-asserted, so matching on it
 re-minted a user (and, under
-`AGENT_MCP_SSO_PROXY_DEFAULT_SYSADMIN`, a fresh sysadmin) on every
+`CONEXUS_SSO_PROXY_DEFAULT_SYSADMIN`, a fresh sysadmin) on every
 request, and let an IdP with unverified emails seize a local operator
 account. The reconciliation key became a stable `(iss, sub)` pair
 persisted in `users.sso_subject`, matched before email, with the email
@@ -56,7 +56,7 @@ itself is unsafe, not just this one bug" case.
 
 ## Decision
 
-**`agent_mcp/router/sso.py` grows a frozen `SsoSubject` value type, and
+**`conexus/router/sso.py` grows a frozen `SsoSubject` value type, and
 the four responsibilities become four members of it.** The f-string
 helpers (`_oidc_subject`, `_oidc_subject_legacy`,
 `_legacy_subject_is_ambiguous`, `_looks_like_canonical_int/_float`) are

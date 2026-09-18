@@ -4,10 +4,10 @@
 # Boots the same NixOS multi-tenant VM as `nix run .#` but forwards
 # the guest router port to host:18080 (by default) instead of
 # host:5454, and pre-seeds a sentinel operator (dev / dev) via the
-# env-var bootstrap (AGENT_MCP_BOOTSTRAP_USERNAME/_PASSWORD wired on
-# agent-mcp-router.service in nix/vm-dev.nix) so Firefox-MCP can hit
+# env-var bootstrap (CONEXUS_BOOTSTRAP_USERNAME/_PASSWORD wired on
+# conexus-router.service in nix/vm-dev.nix) so Firefox-MCP can hit
 # /login immediately and drive the dashboard at
-# http://localhost:18080/agent-mcp/ without first having to walk
+# http://localhost:18080/conexus/ without first having to walk
 # through /setup.
 #
 # Projects are NOT auto-created — the legacy bootstrap-via-/__create
@@ -23,7 +23,7 @@
 # A guest:22 → host:18222 forward (overridable via
 # CONEXUS_VM_DEV_SSH_PORT) gives the dev SSH access into the
 # running VM for live diagnostics — `systemctl status`,
-# `journalctl -u`, /run/agent-mcp/, /var/lib/agent-mcp/, etc.
+# `journalctl -u`, /run/conexus/, /var/lib/conexus/, etc.
 # The VM is configured with empty-password root login (loopback only,
 # DEV-MODE — see nix/vm-dev.nix).
 #
@@ -58,7 +58,7 @@ Boots the Path B interactive dashboard sandbox. Forwards the guest
 router port to host:${DEFAULT_HOST_PORT} by default. The dashboard
 is at:
 
-    http://localhost:\${HOST_PORT}/agent-mcp/
+    http://localhost:\${HOST_PORT}/conexus/
 
 where HOST_PORT is ${DEFAULT_HOST_PORT} unless overridden.
 
@@ -81,7 +81,7 @@ Environment:
                         (DEV-MODE: root + empty password — loopback only.)
   CONEXUS_VM_DEV_PRELOAD
                         Name(s) of preload fixture bundle(s) to restore
-                        into /var/lib/agent-mcp before the router starts,
+                        into /var/lib/conexus before the router starts,
                         so the VM comes up with projects/agents/tasks
                         already present instead of an empty first-boot
                         state. Comma-separate to stack several bundles.
@@ -90,7 +90,7 @@ Environment:
                         \`nix run .#capture-vm-dev-fixture\`). Passed to
                         the guest via the kernel cmdline (no rebuild).
                         Only applied on a FRESH disk — see the in-guest
-                        agent-mcp-vm-dev-preload.service. Default: none.
+                        conexus-vm-dev-preload.service. Default: none.
 
 Flags:
   --ephemeral           Use a tmpdir for VM state; nothing survives.
@@ -109,16 +109,16 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --ephemeral) ephemeral=1; shift ;;
     --persist)
-      [[ $# -ge 2 ]] || { echo "agent-mcp-vm-dev: --persist needs a DIR" >&2; exit 2; }
+      [[ $# -ge 2 ]] || { echo "conexus-vm-dev: --persist needs a DIR" >&2; exit 2; }
       persist_dir="$2"; shift 2 ;;
     --help|-h) print_usage; exit 0 ;;
     --) shift; break ;;
-    *) echo "agent-mcp-vm-dev: unknown flag: $1" >&2; print_usage >&2; exit 2 ;;
+    *) echo "conexus-vm-dev: unknown flag: $1" >&2; print_usage >&2; exit 2 ;;
   esac
 done
 
 if [[ "$ephemeral" == "1" && -n "$persist_dir" ]]; then
-  echo "agent-mcp-vm-dev: --ephemeral and --persist are mutually exclusive" >&2
+  echo "conexus-vm-dev: --ephemeral and --persist are mutually exclusive" >&2
   exit 2
 fi
 
@@ -127,18 +127,18 @@ fi
 # nix/vm-dev.nix; keep both ends in sync.
 host_port="${CONEXUS_VM_DEV_HOST_PORT:-$DEFAULT_HOST_PORT}"
 if ! [[ "$host_port" =~ ^[0-9]+$ ]] || (( host_port < 1 || host_port > 65535 )); then
-  echo "agent-mcp-vm-dev: CONEXUS_VM_DEV_HOST_PORT must be 1..65535 (got '$host_port')" >&2
+  echo "conexus-vm-dev: CONEXUS_VM_DEV_HOST_PORT must be 1..65535 (got '$host_port')" >&2
   exit 2
 fi
 
 ssh_port="${CONEXUS_VM_DEV_SSH_PORT:-$DEFAULT_SSH_PORT}"
 if ! [[ "$ssh_port" =~ ^[0-9]+$ ]] || (( ssh_port < 1 || ssh_port > 65535 )); then
-  echo "agent-mcp-vm-dev: CONEXUS_VM_DEV_SSH_PORT must be 1..65535 (got '$ssh_port')" >&2
+  echo "conexus-vm-dev: CONEXUS_VM_DEV_SSH_PORT must be 1..65535 (got '$ssh_port')" >&2
   exit 2
 fi
 
 if (( ssh_port == host_port )); then
-  echo "agent-mcp-vm-dev: CONEXUS_VM_DEV_SSH_PORT and CONEXUS_VM_DEV_HOST_PORT must differ (both = $ssh_port)" >&2
+  echo "conexus-vm-dev: CONEXUS_VM_DEV_SSH_PORT and CONEXUS_VM_DEV_HOST_PORT must differ (both = $ssh_port)" >&2
   exit 2
 fi
 
@@ -148,7 +148,7 @@ fi
 # fixtures/ in the guest). We hand the selection to the guest on the
 # kernel command line: the NixOS qemu-vm run-script appends
 # $QEMU_KERNEL_PARAMS to -append, and the in-guest
-# agent-mcp-vm-dev-preload.service reads the token from /proc/cmdline.
+# conexus-vm-dev-preload.service reads the token from /proc/cmdline.
 # This keeps bundle selection a pure runtime concern (same rationale as
 # the hostfwd port sentinels above) — no VM rebuild to switch datasets.
 preload="${CONEXUS_VM_DEV_PRELOAD:-}"
@@ -156,15 +156,15 @@ if [[ -n "$preload" ]]; then
   # Restrict to a safe token: bundle names are [A-Za-z0-9._-], comma-
   # separated. Anything else could smuggle extra kernel params.
   if ! [[ "$preload" =~ ^[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*$ ]]; then
-    echo "agent-mcp-vm-dev: CONEXUS_VM_DEV_PRELOAD must be comma-separated bundle names [A-Za-z0-9._-] (got '$preload')" >&2
+    echo "conexus-vm-dev: CONEXUS_VM_DEV_PRELOAD must be comma-separated bundle names [A-Za-z0-9._-] (got '$preload')" >&2
     exit 2
   fi
-  export QEMU_KERNEL_PARAMS="${QEMU_KERNEL_PARAMS:+$QEMU_KERNEL_PARAMS }agent_mcp_preload=${preload}"
+  export QEMU_KERNEL_PARAMS="${QEMU_KERNEL_PARAMS:+$QEMU_KERNEL_PARAMS }conexus_preload=${preload}"
 fi
 
 cleanup=""
 if [[ "$ephemeral" == "1" ]]; then
-  state_dir="$(mktemp -d --tmpdir agent-mcp-vm-dev.XXXXXXXX)"
+  state_dir="$(mktemp -d --tmpdir conexus-vm-dev.XXXXXXXX)"
   cleanup="$state_dir"
   trap 'rm -rf -- "$cleanup"' EXIT
 else
@@ -192,21 +192,21 @@ export USE_TMPDIR=1
 # override port(s) instead. We refuse to launch if a sentinel isn't
 # found — silently exec'ing the unrewritten store binary would bind
 # the wrong port and contradict the banner.
-vm_launcher="$VM_DEV/bin/run-agent-mcp-vm"
+vm_launcher="$VM_DEV/bin/run-conexus-vm"
 needs_rewrite=0
 [[ "$host_port" != "$DEFAULT_HOST_PORT" ]] && needs_rewrite=1
 [[ "$ssh_port"  != "$DEFAULT_SSH_PORT"  ]] && needs_rewrite=1
 
 if (( needs_rewrite == 1 )); then
-  rewritten="$state_dir/run-agent-mcp-vm"
+  rewritten="$state_dir/run-conexus-vm"
   cp -- "$vm_launcher" "$rewritten"
   chmod +w "$rewritten"
 
   rewrite_sentinel() {
     local sentinel="$1" replacement="$2" label="$3"
     if ! grep -q -F -- "$sentinel" "$rewritten"; then
-      echo "agent-mcp-vm-dev: cannot find $label hostfwd sentinel '$sentinel' in $vm_launcher" >&2
-      echo "agent-mcp-vm-dev: nix/vm-dev.nix and nix/run-vm-dev.sh have drifted; refusing to launch." >&2
+      echo "conexus-vm-dev: cannot find $label hostfwd sentinel '$sentinel' in $vm_launcher" >&2
+      echo "conexus-vm-dev: nix/vm-dev.nix and nix/run-vm-dev.sh have drifted; refusing to launch." >&2
       exit 1
     fi
     # In-place edit on the writable copy under state_dir.
@@ -231,21 +231,21 @@ if (( needs_rewrite == 1 )); then
 fi
 
 cat <<INFO
-agent-mcp-vm-dev: booting Path B interactive sandbox
-agent-mcp-vm-dev: dashboard      http://localhost:${host_port}/agent-mcp/
-agent-mcp-vm-dev: ssh access     ssh root@localhost -p ${ssh_port}  (no password — DEV-MODE)
-agent-mcp-vm-dev: operator       dev / dev  (seeded via env-var bootstrap)
-agent-mcp-vm-dev: llm mode       external — 2 GB guest, endpoints on the HOST:
-agent-mcp-vm-dev:                  chat       127.0.0.1:11435  (guest: 10.0.2.2)
-agent-mcp-vm-dev:                  embeddings 127.0.0.1:11434  (guest: 10.0.2.2)
-agent-mcp-vm-dev:                start them before booting — the guest's
-agent-mcp-vm-dev:                agent-mcp-llm-endpoint-check.service refuses
-agent-mcp-vm-dev:                to let the backend run against dead endpoints.
-agent-mcp-vm-dev: preload       ${preload:-none}$( [[ -n "$preload" ]] && echo "  (restored into /var/lib/agent-mcp on a fresh disk)" )
-agent-mcp-vm-dev: state dir      ${state_dir}
-agent-mcp-vm-dev: host port      ${host_port}$( [[ "$host_port" != "$DEFAULT_HOST_PORT" ]] && echo " (override via CONEXUS_VM_DEV_HOST_PORT)" )
-agent-mcp-vm-dev: ssh port       ${ssh_port}$( [[ "$ssh_port" != "$DEFAULT_SSH_PORT" ]] && echo " (override via CONEXUS_VM_DEV_SSH_PORT)" )
-agent-mcp-vm-dev: Ctrl-C to shut down
+conexus-vm-dev: booting Path B interactive sandbox
+conexus-vm-dev: dashboard      http://localhost:${host_port}/conexus/
+conexus-vm-dev: ssh access     ssh root@localhost -p ${ssh_port}  (no password — DEV-MODE)
+conexus-vm-dev: operator       dev / dev  (seeded via env-var bootstrap)
+conexus-vm-dev: llm mode       external — 2 GB guest, endpoints on the HOST:
+conexus-vm-dev:                  chat       127.0.0.1:11435  (guest: 10.0.2.2)
+conexus-vm-dev:                  embeddings 127.0.0.1:11434  (guest: 10.0.2.2)
+conexus-vm-dev:                start them before booting — the guest's
+conexus-vm-dev:                conexus-llm-endpoint-check.service refuses
+conexus-vm-dev:                to let the backend run against dead endpoints.
+conexus-vm-dev: preload       ${preload:-none}$( [[ -n "$preload" ]] && echo "  (restored into /var/lib/conexus on a fresh disk)" )
+conexus-vm-dev: state dir      ${state_dir}
+conexus-vm-dev: host port      ${host_port}$( [[ "$host_port" != "$DEFAULT_HOST_PORT" ]] && echo " (override via CONEXUS_VM_DEV_HOST_PORT)" )
+conexus-vm-dev: ssh port       ${ssh_port}$( [[ "$ssh_port" != "$DEFAULT_SSH_PORT" ]] && echo " (override via CONEXUS_VM_DEV_SSH_PORT)" )
+conexus-vm-dev: Ctrl-C to shut down
 INFO
 
 exec "$vm_launcher"

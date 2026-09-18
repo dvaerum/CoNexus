@@ -1,6 +1,6 @@
 //! MCP Prompt Book catalogue (Phase E1 PR B1).
 //!
-//! Port of `agent_mcp/prompts/*` -- the data + rendering half of the
+//! Port of `conexus/prompts/*` -- the data + rendering half of the
 //! `prompts/list`/`prompts/get` MCP surfaces (`main_app.py`'s
 //! `mcp_list_prompts_handler`/`mcp_get_prompt_handler` wire this into
 //! `rmcp`; that wiring lives in `conexus-backend::server`, not here,
@@ -9,9 +9,9 @@
 //!
 //! Embedded via `include_str!` from `rust/conexus-tools/prompts/
 //! catalog.json` (Phase F deletion-prep step 1) -- a real COPY of
-//! `agent_mcp/prompts/catalog.json`, not a cross-repo `include_str!`
+//! `conexus/prompts/catalog.json`, not a cross-repo `include_str!`
 //! reach-out anymore (that pattern broke `cargo build` outside a Nix
-//! sandbox unless the sibling `agent_mcp/` tree happened to exist at
+//! sandbox unless the sibling `conexus/` tree happened to exist at
 //! the exact relative path -- PR #850 only patched the Nix-specific
 //! symptom). The two trees are temporarily duplicated: the Python
 //! original is still live (Python's own `prompts/__init__.py`/tests
@@ -137,7 +137,7 @@ fn is_visible(visibility: PromptVisibility, role: CatalogRole) -> bool {
 
 static CATALOG: LazyLock<Vec<PromptEntry>> = LazyLock::new(|| {
     let raw: RawCatalog = serde_json::from_str(CATALOG_JSON)
-        .expect("embedded agent_mcp/prompts/catalog.json must be valid JSON");
+        .expect("embedded conexus/prompts/catalog.json must be valid JSON");
     raw.prompts
         .into_iter()
         .map(|p| {

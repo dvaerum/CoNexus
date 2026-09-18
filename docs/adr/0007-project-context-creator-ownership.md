@@ -9,7 +9,7 @@ creator-ownership + `config_*`-admin-only-exception rules this ADR
 established were preserved across that split, not revisited.
 
 **Provenance**: originally filed in the `home-manager-config` deploy
-repo's `common/user/agent-mcp/docs/adr/` (as
+repo's `common/user/conexus/docs/adr/` (as
 `0007-project-context-creator-ownership.md`). Moved here 2026-09-06 —
 see ADR-0003's own provenance note for why. The `prancy-napping-pie.md`
 plan-file citation below is to a different, now-deleted ephemeral plan

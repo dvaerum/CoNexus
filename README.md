@@ -53,7 +53,7 @@ Monitor every agent's status, assigned tasks, and recent activity. The system au
 This is a maintained fork ([dvaerum/CoNexus](https://github.com/dvaerum/CoNexus))
 with a Rust backend/router (`rust/` — the original Python
 implementation was retired once the rewrite reached functional
-completeness); the dashboard (`agent_mcp/dashboard/`) is Next.js/
+completeness); the dashboard (`conexus/dashboard/`) is Next.js/
 TypeScript and unaffected by that. See
 [`docs/operator/getting-started.md`](docs/operator/getting-started.md)
 for the full install-to-first-project walkthrough (Nix build, project
@@ -64,7 +64,7 @@ registration, router startup, operator login) and
 git clone https://github.com/dvaerum/CoNexus.git
 cd CoNexus
 
-nix build .#conexus-backend .#conexus-router .#agent-mcp-dashboard
+nix build .#conexus-backend .#conexus-router .#conexus-dashboard
 ```
 
 ### First-boot setup (operator login)
@@ -137,10 +137,10 @@ an explicit version-pinned `Accept` header — see
 Once a manager agent is connected, these MCP tools are the most
 common entry points. The dashboard's Tools tab is the canonical
 inventory (descriptions and arg schemas are generated from
-`agent_mcp/tools/*`).
+`conexus/tools/*`).
 
 **Agent management** — `register_agent` (mints a token + `.mcp.json`
-snippet to paste into the user's own claude — agent-mcp no longer
+snippet to paste into the user's own claude — conexus no longer
 spawns claude itself, see "Worker agents" below), `list_agents`,
 `terminate_agent` (revokes the token; does NOT stop the user's
 claude process).
@@ -274,10 +274,10 @@ See our [MCD Guide](./docs/mcd-example/mcd-guide.md) for detailed examples and t
 
 ### 3. Register Your Agent Team
 
-> **Wave 7 (2026-06-29): agent-mcp is the coordinator, not the spawner.**
-> agent-mcp mints agent identities (DB row + bearer token) and gives
+> **Wave 7 (2026-06-29): conexus is the coordinator, not the spawner.**
+> conexus mints agent identities (DB row + bearer token) and gives
 > the operator a ready-to-paste `.mcp.json` snippet. The user owns
-> their own claude session — agent-mcp never starts or stops
+> their own claude session — conexus never starts or stops
 > claude processes. Terminate in the dashboard revokes the token;
 > the user closes their own claude when they're done.
 
@@ -288,7 +288,7 @@ like:
 ```json
 {
   "mcpServers": {
-    "agent-mcp-<project>": {
+    "conexus-<project>": {
       "type": "http",
       "url": "https://<host>/conexus/mcp/<project>",
       "headers": {"Authorization": "Bearer <agent_token>"}
@@ -308,7 +308,7 @@ Suggested specializations:
 ### 4. Start Your Workers Locally
 
 Paste each agent's snippet into the **user's own `.mcp.json`** (one
-per worker — `agent-mcp-<project>` server keys are unique per
+per worker — `conexus-<project>` server keys are unique per
 project, but the `name` field of each agent is part of the same
 server entry so use one project's snippet at a time). Then start
 claude in the project directory:
@@ -637,7 +637,7 @@ For consistent development environment:
 ```bash
 # Using nvm (Node Version Manager) — the .nvmrc lives in the
 # dashboard directory, so cd there first
-(cd agent_mcp/dashboard && nvm use)  # Automatically uses Node v22.16.0 from .nvmrc
+(cd conexus/dashboard && nvm use)  # Automatically uses Node v22.16.0 from .nvmrc
 
 # Or manually check versions
 node --version    # Should be >=22.0.0

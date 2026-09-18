@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/file_metadata_tools.py` (Phase D5, PR 5).
+//! Port of `conexus/tools/file_metadata_tools.py` (Phase D5, PR 5).
 //! Two tools: `view_file_metadata` (agent-bearer + `files.use`,
 //! `Requirement::Predicate` — same load-bearing "keys on `agent_id`"
 //! rationale as `file_management_tools.rs`'s sibling read tool) and

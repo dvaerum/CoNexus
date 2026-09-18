@@ -166,7 +166,7 @@ mod tests {
 
     /// Regression pin: an earlier draft of this baseline added a FK
     /// from `mcp_sessions.agent_id` to `agents.agent_id`, following
-    /// `agent_mcp/db/models/mcp_session.py`'s own docstring claim
+    /// `conexus/db/models/mcp_session.py`'s own docstring claim
     /// ("FK to agents.agent_id (PR-G1 / migration 0008)"). Confirmed
     /// live against both real production databases
     /// (`PRAGMA foreign_key_list(mcp_sessions)` returns empty on

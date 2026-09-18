@@ -2,7 +2,7 @@
 //! greppable — see `conexus_auth::tool`'s module doc for why this is
 //! a flat `static` slice rather than a proc-macro/`inventory::submit!`
 //! auto-collection scheme. This is the same registration list Python
-//! builds by executing every `agent_mcp/tools/*.py`'s
+//! builds by executing every `conexus/tools/*.py`'s
 //! `register_*_tools()` call at import time; here it's a `const`
 //! array built at compile time instead.
 

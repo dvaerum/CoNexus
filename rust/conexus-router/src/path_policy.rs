@@ -1,5 +1,5 @@
 //! One canonical home for the router's request-classification facts
-//! (N3 Tier 2). Port of `agent_mcp/router/path_policy.py`.
+//! (N3 Tier 2). Port of `conexus/router/path_policy.py`.
 //!
 //! Three questions, each answered in exactly one place (see the
 //! Python module's own doc for why the two prefix tuples below are

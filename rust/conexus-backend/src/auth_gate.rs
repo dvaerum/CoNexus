@@ -1,4 +1,4 @@
-//! `/mcp` HTTP-layer identity gate. Port of `agent_mcp/app/main_app.py`'s
+//! `/mcp` HTTP-layer identity gate. Port of `conexus/app/main_app.py`'s
 //! `AuthHeaderMiddleware` responsibility #3 ("Gate `/mcp` at the HTTP
 //! layer... must carry either a per-agent bearer... OR a verified
 //! forwarding header") + responsibility #4 (stamp the resolved

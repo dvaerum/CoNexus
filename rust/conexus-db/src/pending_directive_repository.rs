@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/repositories/pending_directive_repository.py`.
+//! Port of `conexus/repositories/pending_directive_repository.py`.
 //!
 //! `pending_directive` is the one-shot, human-triggered "poke" queue:
 //! an operator pushes a single ad-hoc directive to one agent
@@ -19,7 +19,7 @@
 //! separate "opens its own connection" path, matching every other
 //! repository here. Unlike `group_capability_repository`, this table
 //! lives on the per-project AGENT database (confirmed via the ORM
-//! model, `agent_mcp/db/models/pending_directive.py`), not the router
+//! model, `conexus/db/models/pending_directive.py`), not the router
 //! DB — don't assume from a sibling repository's placement.
 //!
 //! `agent_id` has NO database-level foreign key to `agents.agent_id`

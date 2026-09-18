@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}First-boot setup — agent-mcp{% endblock %}
+{% block title %}First-boot setup — conexus{% endblock %}
 {% block body %}
   <h1>Create the first operator</h1>
   <p class="hint">
@@ -10,7 +10,7 @@
   {% if error %}
     <div class="error" role="alert">{{ error }}</div>
   {% endif %}
-  <form method="post" action="/agent-mcp/setup">
+  <form method="post" action="/conexus/setup">
     <label for="username">Username</label>
     <input id="username" name="username" type="text" autocomplete="username"
            autofocus required value="{{ username or '' }}">

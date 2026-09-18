@@ -1,5 +1,5 @@
 //! Router-level identity store -- users, sessions, project memberships.
-//! Port of `agent_mcp/router/identity.py` (976 LOC), grown across
+//! Port of `conexus/router/identity.py` (976 LOC), grown across
 //! several PRs (same discipline as splitting `task_tools.py`/
 //! `admin_tools.py` across several PRs): PR 3 shipped schema (see
 //! `conexus_db::schema::init_router_schema`), password hashing, the

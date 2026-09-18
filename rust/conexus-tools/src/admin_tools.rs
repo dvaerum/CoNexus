@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/admin_tools.py` (Phase D5, PR 9 -- the
+//! Port of `conexus/tools/admin_tools.py` (Phase D5, PR 9 -- the
 //! final Phase D5 module, 2627 LOC). 9 registered tools:
 //! `register_agent`, `view_status`, `terminate_agent`,
 //! `rotate_agent_token`, `restore_agent`, `edit_agent`, `purge_agent`,
@@ -10,8 +10,8 @@
 //! **Confirmed out of scope**: `disconnect_agent`/`reconnect_agent`/
 //! `disconnect_all_agents`/`reconnect_all_agents` are defined in
 //! Python's `admin_tools.py` but never `register_tool`'d as MCP
-//! tools -- their only callers are `agent_mcp/app/routers/agents.py`
-//! (REST). Phase E1 territory (`agent_mcp/app/*`), not this port.
+//! tools -- their only callers are `conexus/app/routers/agents.py`
+//! (REST). Phase E1 territory (`conexus/app/*`), not this port.
 //!
 //! ## PR1: pure helpers + new primitives
 //!

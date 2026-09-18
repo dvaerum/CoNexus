@@ -16,7 +16,7 @@ now-deleted Python files this was ported from.
 precedent this ADR's escape hatch copies), ADR-0017 (no content-based
 secret redaction — the reason token disclosure is gated by an
 *authorization* predicate rather than by scanning payloads).
-**Depends on**: `agent_mcp/app/forwarding_header.py`'s module docstring,
+**Depends on**: `conexus/app/forwarding_header.py`'s module docstring,
 specifically its "Why not just include a nonce" section — the scope of
 that section's threat argument is the load-bearing fact below.
 
@@ -26,7 +26,7 @@ Two mechanisms meet at one predicate, and it is easy to read the first
 as having settled the second.
 
 **The first mechanism** is the signed forwarding header
-(`agent_mcp/app/forwarding_header.py`). The always-on router terminates
+(`conexus/app/forwarding_header.py`). The always-on router terminates
 the operator's cookie session, resolves that operator's *real*
 per-project role from `project_membership`, and forwards the request to
 the per-project backend over a Unix-domain socket carrying
@@ -39,8 +39,8 @@ every verified header and handed a viewer-tier operator the full
 operator capability bundle.
 
 **The second mechanism** is the confirmed-operator-tier predicate
-(`agent_mcp/core/operator_tier.py`, adapted onto the REST door by
-`agent_mcp/app/routers/composition.py::is_confirmed_operator_tier`). It
+(`conexus/core/operator_tier.py`, adapted onto the REST door by
+`conexus/app/routers/composition.py::is_confirmed_operator_tier`). It
 answers a narrower question than "what may this caller do": *may this
 caller receive plaintext agent bearer tokens?* It gates
 `GET /api/tokens` and the bearer field of `GET /api/all-data`, and it
@@ -207,15 +207,15 @@ predicate".
 
 ## Links
 
-* `agent_mcp/app/routers/composition.py::is_confirmed_operator_tier` —
+* `conexus/app/routers/composition.py::is_confirmed_operator_tier` —
   the adapter; its "DELIBERATE SCOPE (Finding D, Phase 5)" paragraph
   points back here.
-* `agent_mcp/app/forwarding_header.py` — the signed header's format,
+* `conexus/app/forwarding_header.py` — the signed header's format,
   replay window, and the "Why not just include a nonce" section whose
   scope this ADR delimits; its docstring points back here.
-* `agent_mcp/core/operator_tier.py` — the shared predicate, and why the
+* `conexus/core/operator_tier.py` — the shared predicate, and why the
   REST and MCP surfaces feed one implementation instead of two.
-* `agent_mcp/app/rest_principal.py` — `RestPrincipal`, and
+* `conexus/app/rest_principal.py` — `RestPrincipal`, and
   `route_role()`, which still returns the forwarding caller's REAL
   signed role for authorization.
 * `tests/test_arch_forwarding_never_confirmed_tier.py` — the regression

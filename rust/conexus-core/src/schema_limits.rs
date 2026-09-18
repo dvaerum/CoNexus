@@ -1,6 +1,6 @@
 //! Shared string-length bounds for MCP tool-argument JSON schemas.
 //!
-//! Port of `agent_mcp/core/schema_limits.py` (R8-F1 — see that
+//! Port of `conexus/core/schema_limits.py` (R8-F1 — see that
 //! module's docstring for the full pentest-finding rationale: an
 //! unbounded string-typed schema property let a single request mint a
 //! 200,000-char `agent_id` / persist a 500,000-char task title, a

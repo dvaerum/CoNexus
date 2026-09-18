@@ -1,5 +1,5 @@
 //! CoNexus wake-loop support primitives (Phase D3). One module per
-//! `agent_mcp/core/{hold_ladder,client_hold_strategy,idle_reminder,
+//! `conexus/core/{hold_ladder,client_hold_strategy,idle_reminder,
 //! stream_gates}.py`, plus the per-agent waiter registry -- the pieces
 //! `wait_for_events` (a `conexus-tools` `Tool`) needs that don't belong
 //! in `conexus-core` (they hold real mutable process state, not pure

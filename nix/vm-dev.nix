@@ -14,7 +14,7 @@
 #      Firefox-MCP smoke script in the prancy-napping-pie plan can
 #      target the documented localhost:18080 URL verbatim.
 #
-#   2. AGENT_MCP_BOOTSTRAP_USERNAME / _PASSWORD are seeded on the
+#   2. CONEXUS_BOOTSTRAP_USERNAME / _PASSWORD are seeded on the
 #      router systemd unit so the first-boot identity store comes up
 #      with a known operator already created (username/password both
 #      `dev`). That short-circuits the Phase-1 empty-users redirect
@@ -31,7 +31,7 @@
 #      a host:18222 → guest:22 forward (sentinel rewritten at launch
 #      via CONEXUS_VM_DEV_SSH_PORT, same pattern as the dashboard
 #      port). This exists so we can read `systemctl status`,
-#      `journalctl -u …`, /run/agent-mcp/, /var/lib/agent-mcp/, and
+#      `journalctl -u …`, /run/conexus/, /var/lib/conexus/, and
 #      /var/log/journal/ inside the VM when a per-project backend
 #      misbehaves (cf. verify-all P006: backend UDS spawn timeout).
 #      This MUST NOT be copied into nix/vm.nix (the production VM).
@@ -53,7 +53,7 @@
 #      boot-time endpoint probe that hard-fails rather than letting
 #      a backend run with dead embeddings.
 #
-# Everything else (systemd shape, agent-mcp services) is inherited
+# Everything else (systemd shape, conexus services) is inherited
 # from the regular multi-tenant module. We import vm.nix directly and
 # patch the divergent attrs via lib.mkForce.
 
@@ -61,9 +61,9 @@ let
   # ── Preload fixtures (dev-only test-data seeding) ─────────────────
   # Auto-discover every nix/vm-dev/fixtures/<name>.tar.zst and bake it
   # into the image at /etc/conexus-vm-dev/fixtures/. Each is a raw tar
-  # of the agent-mcp state-dir subtree captured from a seeded VM
+  # of the conexus state-dir subtree captured from a seeded VM
   # (`nix run .#capture-vm-dev-fixture`); the in-guest
-  # agent-mcp-vm-dev-preload.service restores the one(s) named by
+  # conexus-vm-dev-preload.service restores the one(s) named by
   # CONEXUS_VM_DEV_PRELOAD (via the kernel cmdline) on a fresh disk.
   # readDir-based so an empty/absent fixtures dir is a clean no-op — the
   # feature adds nothing to the image until a fixture is captured.
@@ -76,14 +76,14 @@ let
     else { };
   etcFixtures = lib.mapAttrs'
     (name: _: lib.nameValuePair
-      "agent-mcp-vm-dev/fixtures/${name}"
+      "conexus-vm-dev/fixtures/${name}"
       { source = fixturesDir + "/${name}"; })
     fixtureEntries;
 
   # writeShellApplication (shellcheck + PATH inputs) per repo idiom; the
   # script body lives in a real file next to this module.
   preloadScript = pkgs.writeShellApplication {
-    name = "agent-mcp-vm-dev-preload";
+    name = "conexus-vm-dev-preload";
     runtimeInputs = [ pkgs.gnutar pkgs.zstd pkgs.coreutils ];
     text = builtins.readFile ./vm-dev-preload.sh;
   };
@@ -106,7 +106,7 @@ in
   # non-/login request to /setup until at least one operator exists.
   # Seed a sentinel operator (dev / dev) via the env-var bootstrap so
   # the developer can hit /login immediately. See
-  # agent_mcp/router/identity.py `init_router_db` for the contract:
+  # conexus/router/identity.py `init_router_db` for the contract:
   # both vars must be set, both are stripped from os.environ after
   # the bootstrap fires (whether or not it actually created a user),
   # and the bootstrap no-ops when the users table is already populated.
@@ -249,7 +249,7 @@ in
   # PRELOAD (opt-in, orthogonal to the above): a developer who WANTS a
   # pre-populated sandbox can restore a captured DB fixture instead of
   # re-walking the create-project/register-agent UI every run. That is
-  # the agent-mcp-vm-dev-preload.service below — a file-level restore of
+  # the conexus-vm-dev-preload.service below — a file-level restore of
   # the SQLite state dir, which needs no session cookie (the reason the
   # legacy HTTP seed couldn't work) and no LLM endpoint (unlike a
   # boot-time API seeder). Off by default; enabled per-launch via
@@ -259,21 +259,21 @@ in
   environment.etc = etcFixtures;
 
   # ── Preload restore unit ──────────────────────────────────────────
-  # Runs ONLY when the kernel cmdline carries `agent_mcp_preload=…`
+  # Runs ONLY when the kernel cmdline carries `conexus_preload=…`
   # (set by nix/run-vm-dev.sh from $CONEXUS_VM_DEV_PRELOAD), AFTER
   # systemd-tmpfiles created ${stateDir}, and BEFORE the router (and
-  # therefore before any lazily-spawned agent-mcp@ backend reads a
+  # therefore before any lazily-spawned conexus@ backend reads a
   # project DB). Not a `requires=` of the router: a missing-bundle
   # failure should be loud (red unit + console) without bricking the
   # VM — the dev still gets an empty-state sandbox to work in.
   systemd.services.conexus-vm-dev-preload = {
-    description = "Restore a preload DB fixture into the agent-mcp state dir (vm-dev, fresh disk only)";
+    description = "Restore a preload DB fixture into the conexus state dir (vm-dev, fresh disk only)";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-tmpfiles-setup.service" "local-fs.target" ];
-    before = [ "agent-mcp-router.service" ];
+    before = [ "conexus-router.service" ];
     # Only fire when a preload was actually requested. Matches both the
     # bare word and `word=value` forms of the cmdline option.
-    unitConfig.ConditionKernelCommandLine = "agent_mcp_preload";
+    unitConfig.ConditionKernelCommandLine = "conexus_preload";
     environment = {
       CONEXUS_STATE_DIR = config.services.conexus.stateDir;
       CONEXUS_FIXTURES_DIR = "/etc/conexus-vm-dev/fixtures";
@@ -281,8 +281,8 @@ in
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      # Root so tar --same-owner restores the archived agent-mcp uid.
-      ExecStart = "${preloadScript}/bin/agent-mcp-vm-dev-preload";
+      # Root so tar --same-owner restores the archived conexus uid.
+      ExecStart = "${preloadScript}/bin/conexus-vm-dev-preload";
       StandardOutput = "journal+console";
       StandardError = "journal+console";
     };

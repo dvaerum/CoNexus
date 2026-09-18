@@ -1,5 +1,5 @@
 //! Shared bounded-read clamp for `/api` list endpoints. Port of
-//! `agent_mcp/app/routers/_read_limits.py` -- single source of truth
+//! `conexus/app/routers/_read_limits.py` -- single source of truth
 //! for the `?limit` query param so every list-style REST read
 //! (`/api/tasks`, `/api/agents`, `/api/context-data`, `/api/all-data`)
 //! shares one default + upper bound and can't drift (pentest R3-F3).

@@ -1,6 +1,6 @@
 //! `Principal` — the typed identity of "who is making this call".
 //!
-//! Faithful port of `agent_mcp/core/principal.py`. Built once at the
+//! Faithful port of `conexus/core/principal.py`. Built once at the
 //! outermost auth seam and threaded through every downstream decision
 //! point; read-only by design. `capabilities` uses [`crate::capability::
 //! Capabilities`] (the sysadmin-wildcard-or-explicit-set sum type)
@@ -111,7 +111,7 @@ impl Principal {
 
 /// True iff `principal` is an operator-tier caller.
 ///
-/// Faithful port of `agent_mcp/core/principal_builder.py::
+/// Faithful port of `conexus/core/principal_builder.py::
 /// is_operator_tier` — the single definition, collapsing two that had
 /// drifted in the Python source's history. Operator-tier = a caller
 /// carrying the per-project operator write marker
@@ -128,7 +128,7 @@ pub fn is_operator_tier(principal: &Principal) -> bool {
 /// surface (`tools/list`, `prompts/list`+`prompts/get`,
 /// `resources/list`+`resources/read`) filters visibility on.
 ///
-/// Faithful port of `agent_mcp/core/principal_builder.py::CatalogRole`
+/// Faithful port of `conexus/core/principal_builder.py::CatalogRole`
 /// and `catalog_role()`. Before that Python function existed, the
 /// three surfaces each re-derived "is this caller an admin"
 /// differently and disagreed (a viewer-tier forwarding-header caller
@@ -179,7 +179,7 @@ pub fn catalog_role(principal: Option<&Principal>) -> CatalogRole {
 /// a caller may receive plaintext agent bearer tokens / project
 /// secrets, or must have them masked.
 ///
-/// Faithful port of `agent_mcp/core/operator_tier.py::
+/// Faithful port of `conexus/core/operator_tier.py::
 /// is_confirmed_operator_tier`, narrowed to the identity shapes this
 /// crate's `Principal` can actually represent. Python's version also
 /// accepts a REST-side `"operator_bearer"` kind and an `"admin"`

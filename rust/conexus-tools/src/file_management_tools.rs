@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/file_management_tools.py` (Phase D5, PR 4)
+//! Port of `conexus/tools/file_management_tools.py` (Phase D5, PR 4)
 //! — the two file-claim / file-status tools (`check_file_status`,
 //! `update_file_status`). No DB interaction: both manage the
 //! process-wide in-memory advisory file map (`g.file_map` in Python,

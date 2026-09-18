@@ -1,5 +1,5 @@
 //! Per-client connection-hold strategy for `wait_for_events`. Port of
-//! `agent_mcp/core/client_hold_strategy.py`.
+//! `conexus/core/client_hold_strategy.py`.
 //!
 //! The event-loop long-hold feature holds a single `wait_for_events`
 //! connection open far longer than the legacy ~60s so an agent burns

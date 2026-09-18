@@ -1,5 +1,5 @@
 //! One rule for "does this requester own this task" (port of
-//! `agent_mcp/core/task_ownership.py`).
+//! `conexus/core/task_ownership.py`).
 //!
 //! Python's module doc explains WHY this got consolidated: before it
 //! existed, the rule was reimplemented independently at 5+ call sites
