@@ -1,9 +1,9 @@
-//! agent-mcp delivery bridge — an Agent of Empires plugin worker.
+//! conexus delivery bridge — an Agent of Empires plugin worker.
 //!
 //! The bridge is the runtime side of ADR-0021's per-worker "delivery" fallback
-//! channel. agent-mcp owns the *policy* (when to nudge a session that isn't
+//! channel. conexus owns the *policy* (when to nudge a session that isn't
 //! polling `wait_for_events`); this worker owns *delivery* — it reaches OUT to
-//! agent-mcp, subscribes to each covered session's delivery SSE stream, reports
+//! conexus, subscribes to each covered session's delivery SSE stream, reports
 //! that session's transport-status back up, and injects the skinny frames it
 //! receives into the AoE-run session via AoE's localhost REST.
 //!

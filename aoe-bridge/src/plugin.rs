@@ -279,7 +279,7 @@ fn handle_notification(
 }
 
 /// The bare command id from a fully-qualified `plugin.<plugin-id>.<command>`.
-/// Plugin ids contain dots (`dev.dvaerum.agent-mcp-delivery`), so only the
+/// Plugin ids contain dots (`dev.dvaerum.conexus-delivery`), so only the
 /// trailing segment is the command.
 fn command_id(fqid: &str) -> &str {
     fqid.rsplit('.').next().unwrap_or(fqid)
@@ -295,7 +295,7 @@ fn dispatch_command(method: &str) -> std::result::Result<Value, (i64, String)> {
     match command_id(method) {
         "status" => Ok(json!({
             "ok": true,
-            "message": "agent-mcp delivery bridge running",
+            "message": "conexus delivery bridge running",
         })),
         _ => Err((
             codes::METHOD_NOT_FOUND,
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn command_id_takes_the_trailing_segment_of_a_dotted_plugin_id() {
         assert_eq!(
-            command_id("plugin.dev.dvaerum.agent-mcp-delivery.status"),
+            command_id("plugin.dev.dvaerum.conexus-delivery.status"),
             "status"
         );
         assert_eq!(command_id("status"), "status");
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn status_command_dispatches_on_trailing_segment() {
-        let r = dispatch_command("plugin.dev.dvaerum.agent-mcp-delivery.status").unwrap();
+        let r = dispatch_command("plugin.dev.dvaerum.conexus-delivery.status").unwrap();
         assert_eq!(r["ok"], json!(true));
     }
 
@@ -349,7 +349,7 @@ mod tests {
             &tx,
             "plugin.command.invoke",
             &json!({
-                "command": "plugin.dev.dvaerum.agent-mcp-delivery.status",
+                "command": "plugin.dev.dvaerum.conexus-delivery.status",
                 "session_id": "sid-1",
             }),
         );

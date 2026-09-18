@@ -46,14 +46,14 @@ knowledge of AoE; the dependency points from the runtime into conexus.
 ## The session → route mapping
 
 **One base, everything derived.** There is exactly one conexus URL to
-configure — `agent_mcp_base`, the **bare** router address you reach it at (on the
+configure — `conexus_base`, the **bare** router address you reach it at (on the
 same host `http://127.0.0.1:1337`, no `/conexus` — that prefix is a
 reverse-proxy concern, per ADR-0020, not part of this base). Every per-session
 URL is derived from it plus the row's `project`:
 
 ```text
-delivery = <agent_mcp_base>/api/<project>   (SSE /delivery/stream + status POST)
-mcp      = <agent_mcp_base>/mcp/<project>   (injected per-session MCP server)
+delivery = <conexus_base>/api/<project>   (SSE /delivery/stream + status POST)
+mcp      = <conexus_base>/mcp/<project>   (injected per-session MCP server)
 ```
 
 So a covered-session row carries **only identity** — never a URL. The **one
@@ -72,11 +72,11 @@ session:
 |---|---|
 | `session_id` | **(required)** AoE session id (matches `sessions.list[].id`; stable across respawn). |
 | `token` | **(required)** The session's conexus bearer. Authenticates both the delivery stream and the injected MCP server. |
-| `project` | **(required)** The conexus project this session acts as. Appended to `agent_mcp_base` for both its `/api/<project>` (delivery) and `/mcp/<project>` (MCP) URLs. |
+| `project` | **(required)** The conexus project this session acts as. Appended to `conexus_base` for both its `/api/<project>` (delivery) and `/mcp/<project>` (MCP) URLs. |
 | `expose_mcp` | Also inject conexus's tools into this session (default `true`). Delivery fires regardless; this gates only the MCP-tools half. First enable respawns the session once (transcript-preserving) to load the set. |
 | `mode` | `auto` \| `terminal` \| `structured`. |
 
-Global settings: `agent_mcp_base` (the one above), `aoe_base` (the **AoE-side**
+Global settings: `conexus_base` (the one above), `aoe_base` (the **AoE-side**
 REST the bridge injects into — a *different* service), `aoe_token` (only if AoE
 runs with auth), `status_interval_secs`, `enabled`. See `aoe-plugin.toml`.
 
@@ -90,7 +90,7 @@ provisioned.
 - **`session_id` == `sessions.list[].id`.** The bridge only opens a stream for a
   configured session while it is present in `sessions.list`; a configured
   session that has left the list is reported `dead` and its stream dropped.
-- **`agent_mcp_base` is the bare router address** (no reverse-proxy prefix). The
+- **`conexus_base` is the bare router address** (no reverse-proxy prefix). The
   bridge appends `/api/<project>` (+ `/delivery/stream|status`) and
   `/mcp/<project>`.
 - **`token`** authenticates both the SSE subscribe and the status POST; it is

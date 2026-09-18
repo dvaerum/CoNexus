@@ -270,7 +270,7 @@ pub async fn run_bridge(
         {
             let mut snap = state.lock().unwrap();
             snap.enabled = settings.enabled;
-            snap.configured = !settings.agent_mcp_base.trim().is_empty();
+            snap.configured = !settings.conexus_base.trim().is_empty();
             snap.configured_rows = settings.sessions.len();
             snap.last_reconcile_at = Some(now_secs());
         }
@@ -356,7 +356,7 @@ pub async fn run_bridge(
                     report_status(&ctx, &route, status).await;
 
                     // Ensure this session's per-session MCP layer matches config:
-                    // set agent-mcp's tools when `expose_mcp` yields a url, or
+                    // set conexus's tools when `expose_mcp` yields a url, or
                     // clear our entry when it was on and is now off.
                     ensure_session_mcp(&ctx, &mut mcp_set, &route).await;
 
@@ -534,7 +534,7 @@ pub async fn run_publisher(
         }
         if status_command {
             let _ = conn
-                .ui_notify("info", "agent-mcp Delivery Bridge", Some(&summary))
+                .ui_notify("info", "CoNexus Delivery Bridge", Some(&summary))
                 .await;
         }
     }
@@ -575,7 +575,7 @@ async fn fetch_liveness(
 }
 
 /// Reconcile one live session's per-session MCP layer with its resolved route.
-/// - `mcp_url = Some`: assert agent-mcp's tools are set (skipping the RPC when
+/// - `mcp_url = Some`: assert conexus's tools are set (skipping the RPC when
 ///   unchanged since we last set them; the host makes an unchanged set a no-op
 ///   anyway, so a bridge restart re-asserts harmlessly).
 /// - `mcp_url = None` but we had set it: clear our entry (the row's `expose_mcp`
@@ -593,7 +593,7 @@ async fn ensure_session_mcp(ctx: &BridgeCtx, guard: &mut HashMap<String, String>
                 Ok(_) => {
                     guard.insert(route.session_id.clone(), fingerprint);
                     observe::info(&format!(
-                        "agent-mcp tools injected into session {}",
+                        "conexus tools injected into session {}",
                         route.session_id
                     ));
                     ctx.observe(&route.session_id, &route.project, |o| o.mcp_asserted = true);
@@ -617,7 +617,7 @@ async fn ensure_session_mcp(ctx: &BridgeCtx, guard: &mut HashMap<String, String>
                 let params = json!({ "session_id": route.session_id, "servers": [] });
                 match ctx.conn.session_mcp_set(params).await {
                     Ok(_) => observe::info(&format!(
-                        "agent-mcp tools cleared from session {}",
+                        "conexus tools cleared from session {}",
                         route.session_id
                     )),
                     Err(e) => {
@@ -997,13 +997,13 @@ async fn announce(ctx: &BridgeCtx, route: &Route, notice: Notice, outcome: &Inje
             "danger",
             format!("Delivery inject failed: {}", route.session_id),
             format!(
-                "agent-mcp nudges are being dropped for this session ({}). {}",
+                "conexus nudges are being dropped for this session ({}). {}",
                 match outcome.http {
                     Some(code) => format!("HTTP {code}"),
                     None => "no response".to_string(),
                 },
                 if outcome.detail.is_empty() {
-                    "See the agent-mcp Delivery settings page.".to_string()
+                    "See the CoNexus Delivery settings page.".to_string()
                 } else {
                     outcome.detail.clone()
                 }

@@ -46,17 +46,17 @@ pub fn delivery_url(endpoint: &str, path: &str) -> String {
     format!("{}/{}", trim_end(endpoint), path.trim_start_matches('/'))
 }
 
-/// The fixed server name for the injected agent-mcp entry in a session's
+/// The fixed server name for the injected conexus entry in a session's
 /// per-session MCP layer. The bridge owns this one entry (a full-replace set),
 /// so the name is stable.
-pub const MCP_SERVER_NAME: &str = "agent-mcp";
+pub const MCP_SERVER_NAME: &str = "conexus";
 
-/// Build the `session.mcp.set` params that inject agent-mcp's tools into a
+/// Build the `session.mcp.set` params that inject conexus's tools into a
 /// session as a single http MCP server. `servers` is the COMPLETE per-session
 /// layer, so we send exactly our one entry (the bridge owns this layer).
 ///
-/// An empty `token` omits the `Authorization` header entirely — for an
-/// agent-mcp reachable without auth (e.g. a `--auth=none` deploy). The AoE
+/// An empty `token` omits the `Authorization` header entirely — for a
+/// conexus reachable without auth (e.g. a `--auth=none` deploy). The AoE
 /// host DTO uses `deny_unknown_fields`, so we emit only the four recognised
 /// keys (`name`/`transport`/`url`/`headers`) and drop `headers` when empty.
 pub fn build_mcp_set_params(session_id: &str, mcp_url: &str, token: &str) -> Value {
@@ -124,12 +124,12 @@ mod tests {
 
     #[test]
     fn mcp_set_params_with_token_carry_bearer_header() {
-        let p = build_mcp_set_params("sid-1", "https://host/agent-mcp/mcp/proj", "tok123");
+        let p = build_mcp_set_params("sid-1", "https://host/conexus/mcp/proj", "tok123");
         assert_eq!(p["session_id"], json!("sid-1"));
         let server = &p["servers"][0];
-        assert_eq!(server["name"], json!("agent-mcp"));
+        assert_eq!(server["name"], json!("conexus"));
         assert_eq!(server["transport"], json!("http"));
-        assert_eq!(server["url"], json!("https://host/agent-mcp/mcp/proj"));
+        assert_eq!(server["url"], json!("https://host/conexus/mcp/proj"));
         assert_eq!(server["headers"]["Authorization"], json!("Bearer tok123"));
         // Only the four recognised keys (deny_unknown_fields on the host).
         let keys: Vec<&String> = server.as_object().unwrap().keys().collect();

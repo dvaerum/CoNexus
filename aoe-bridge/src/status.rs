@@ -28,10 +28,10 @@
 //!   with no HTTP endpoint and no UI reader — invisible to an operator.
 //! - **The `[[status]]` manifest contribution.** Static metadata with zero
 //!   consumers in the host.
-//! - **Folding inject health into agent-mcp's `/delivery/status`.** That channel
+//! - **Folding inject health into conexus's `/delivery/status`.** That channel
 //!   reports the *session's* transport-status over a closed four-value vocabulary
 //!   (`working|idle|dormant|dead`, `delivery_transport.VALID_STATUSES`), and
-//!   agent-mcp's delivery policy stops nudging a `dead` worker. Reporting a
+//!   conexus's delivery policy stops nudging a `dead` worker. Reporting a
 //!   failing inject as `dead` would silence the very deliveries the operator is
 //!   trying to repair, and any new value needs a cross-repo protocol change. The
 //!   channel stays what it is; inject health is a *bridge* concern and belongs
@@ -44,7 +44,7 @@
 //!
 //! ## What is never rendered here
 //!
-//! Tokens and message bodies. The page carries session ids, the agent-mcp
+//! Tokens and message bodies. The page carries session ids, the conexus
 //! project name, counters, timestamps, HTTP status codes, and the delivery
 //! frame's `reason` (a fixed enum: `unread_messages` / `unfinished_tasks` /
 //! `unassigned_tasks`). It carries **no** message subjects, no senders, no task
@@ -165,11 +165,11 @@ pub struct SessionObs {
     pub project: String,
     /// Present in AoE's session list this reconcile.
     pub live: bool,
-    /// The `transport-status` last reported to agent-mcp.
+    /// The `transport-status` last reported to conexus.
     pub transport_status: String,
     /// The resolved injection route (`terminal` / `structured`).
     pub mode: String,
-    /// Whether the row asked for agent-mcp's tools to be injected.
+    /// Whether the row asked for conexus's tools to be injected.
     pub expose_mcp: bool,
     /// Whether `session.mcp.set` has succeeded for the current url+token.
     pub mcp_asserted: bool,
@@ -306,7 +306,7 @@ pub fn decide_notice(consecutive_failures: u32, last_notified_at: Option<u64>, n
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     pub enabled: bool,
-    /// Whether `agent_mcp_base` is set — without it the bridge covers nothing,
+    /// Whether `conexus_base` is set — without it the bridge covers nothing,
     /// which is otherwise indistinguishable from "no sessions configured".
     pub configured: bool,
     pub started_at: u64,
@@ -411,8 +411,8 @@ fn verdict(snap: &Snapshot, health: Health) -> (String, String) {
             "The 'Enable delivery bridge' setting is off: no streams are held and no status is reported.".to_string(),
         ),
         Health::Unconfigured => (
-            "No agent-mcp base URL".to_string(),
-            "Set 'agent-mcp base URL' in this plugin's settings. Until it is set the bridge covers nothing.".to_string(),
+            "No CoNexus base URL".to_string(),
+            "Set 'CoNexus base URL' in this plugin's settings. Until it is set the bridge covers nothing.".to_string(),
         ),
         Health::Idle => (
             "No sessions covered".to_string(),
@@ -488,7 +488,7 @@ pub fn render_page(snap: &Snapshot, now: u64, log_path: Option<&str>, level: Lev
     }));
 
     json!({
-        "title": "agent-mcp Delivery",
+        "title": "CoNexus Delivery",
         "icon": "radio-tower",
         "blocks": blocks,
     })
@@ -537,7 +537,7 @@ fn session_section(s: &SessionObs, now: u64) -> Value {
     }
     if s.expose_mcp {
         rows.push(row(
-            "agent-mcp tools",
+            "conexus tools",
             if s.mcp_asserted {
                 "injected"
             } else {
@@ -681,7 +681,7 @@ pub fn compact_error(body: &str) -> String {
 pub fn summary_line(snap: &Snapshot) -> String {
     match classify_health(snap) {
         Health::Disabled => "Delivery bridge is disabled.".to_string(),
-        Health::Unconfigured => "No agent-mcp base URL configured.".to_string(),
+        Health::Unconfigured => "No CoNexus base URL configured.".to_string(),
         Health::Idle => format!(
             "{} row(s) configured, no live covered session.",
             snap.configured_rows
@@ -1139,7 +1139,7 @@ mod tests {
         let mut s = snap_with(vec![]);
         s.configured = false;
         let rendered = render_page(&s, 2_000, None, Level::Info).to_string();
-        assert!(rendered.contains("agent-mcp base URL"), "{rendered}");
+        assert!(rendered.contains("CoNexus base URL"), "{rendered}");
     }
 
     // ---- helpers ----------------------------------------------------------

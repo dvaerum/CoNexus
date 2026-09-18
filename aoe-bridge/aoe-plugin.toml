@@ -1,4 +1,4 @@
-# agent-mcp delivery bridge — Agent of Empires plugin manifest.
+# CoNexus delivery bridge — Agent of Empires plugin manifest.
 #
 # Schema reference: aoe-plugin-api (PluginManifest), docs/plugin-api.md.
 # api_version 14 is required for the `sessions` dynamic_select option source (the
@@ -8,18 +8,18 @@
 # field-type niceties. A pre-14 host emits an "upgrade aoe" message rather than
 # an "unknown variant" error.
 
-id = "dev.dvaerum.agent-mcp-delivery"
-name = "agent-mcp Delivery Bridge"
+id = "dev.dvaerum.conexus-delivery"
+name = "CoNexus Delivery Bridge"
 version = "0.1.0"
 api_version = 14
-description = "Injects agent-mcp delivery notifications into AoE-run sessions that don't poll wait_for_events (ADR-0021): subscribes to each covered session's delivery SSE stream, reports transport-status up, injects skinny (id/subject/status only) nudges via AoE's /send and /acp/prompt routes, and (optionally) wires agent-mcp's tools into each covered session as a per-session MCP server."
+description = "Injects CoNexus delivery notifications into AoE-run sessions that don't poll wait_for_events (ADR-0021): subscribes to each covered session's delivery SSE stream, reports transport-status up, injects skinny (id/subject/status only) nudges via AoE's /send and /acp/prompt routes, and (optionally) wires conexus's tools into each covered session as a per-session MCP server."
 
 # runtime.worker: run the worker at all, plus the config.get and ui.state.*
 #                 host RPCs (ui.state.set is gated on runtime.worker + the
 #                 `[[ui]]` declaration below, NOT on a capability of its own).
 # session.read:   sessions.list, to enumerate live sessions + their status.
-# session.mcp:    session.mcp.set, to inject agent-mcp's tools per session.
-# net:            outbound HTTP/SSE to agent-mcp and AoE's localhost REST.
+# session.mcp:    session.mcp.set, to inject conexus's tools per session.
+# net:            outbound HTTP/SSE to conexus and AoE's localhost REST.
 # notifications:  ui.notify, to surface bridge errors to the operator.
 #
 # UNCHANGED by the observability surface: the settings page needs only
@@ -52,7 +52,7 @@ id = "main"
 # toasts a one-line summary.
 [[commands]]
 id = "status"
-title = "agent-mcp Delivery: status"
+title = "CoNexus Delivery: status"
 description = "Refresh the delivery bridge's status page and toast a one-line summary."
 
 # ---------------------------------------------------------------------------
@@ -66,22 +66,22 @@ description = "Master switch. When off, the worker holds no streams and reports 
 type = "boolean"
 default = true
 
-# ── agent-mcp side ──────────────────────────────────────────────────────────
-# The ONE agent-mcp URL to configure. Every per-session URL is derived from it:
-#   delivery = <agent_mcp_base>/api/<project>   (SSE stream + status POST)
-#   mcp      = <agent_mcp_base>/mcp/<project>   (injected per-session MCP server)
+# ── conexus side ──────────────────────────────────────────────────────────
+# The ONE conexus URL to configure. Every per-session URL is derived from it:
+#   delivery = <conexus_base>/api/<project>   (SSE stream + status POST)
+#   mcp      = <conexus_base>/mcp/<project>   (injected per-session MCP server)
 [[settings]]
-key = "agent_mcp_base"
-label = "agent-mcp base URL"
-description = "The agent-mcp router's base URL. Use the BARE address you reach it at — on the same host that's http://127.0.0.1:1337, with NO /agent-mcp. The /agent-mcp prefix is a reverse-proxy concern (a front door may serve the router under it externally); it does not belong in this base. The bridge derives each covered session's delivery URL (<base>/api/<project>) and MCP URL (<base>/mcp/<project>) from this plus the row's project. Blank ⇒ the bridge covers nothing."
+key = "conexus_base"
+label = "CoNexus base URL"
+description = "The conexus router's base URL. Use the BARE address you reach it at — on the same host that's http://127.0.0.1:1337, with NO /conexus. The /conexus prefix is a reverse-proxy concern (a front door may serve the router under it externally); it does not belong in this base. The bridge derives each covered session's delivery URL (<base>/api/<project>) and MCP URL (<base>/mcp/<project>) from this plus the row's project. Blank ⇒ the bridge covers nothing."
 type = "string"
 default = ""
 
-# ── AoE side (the injection target — a DIFFERENT service from agent-mcp) ─────
+# ── AoE side (the injection target — a DIFFERENT service from conexus) ─────
 [[settings]]
 key = "aoe_base"
 label = "AoE serve base URL (injection target)"
-description = "Base URL of THIS AoE serve instance's REST API — where the bridge POSTs a nudge to inject it into a session (/api/sessions/<id>/send or /acp/prompt). This is the AoE side, not agent-mcp."
+description = "Base URL of THIS AoE serve instance's REST API — where the bridge POSTs a nudge to inject it into a session (/api/sessions/<id>/send or /acp/prompt). This is the AoE side, not conexus."
 type = "string"
 default = "http://127.0.0.1:8080"
 
@@ -106,17 +106,17 @@ advanced = true
 [[settings]]
 key = "ensure_acp"
 label = "Switch covered sessions to ACP mode"
-description = "On (default): every covered session that gets agent-mcp's tools injected (expose_mcp on) is also switched to ACP mode, so AoE's per-session MCP actually reaches the agent. Terminal claude/opencode sessions never load per-session MCP; ACP delivers it agent-agnostically. This is a one-time terminal→ACP view swap per session (transcript-preserving), applied only to sessions whose agent is ACP-capable. Off: sessions are left in their current mode and per-session MCP may not apply to terminal agents."
+description = "On (default): every covered session that gets conexus's tools injected (expose_mcp on) is also switched to ACP mode, so AoE's per-session MCP actually reaches the agent. Terminal claude/opencode sessions never load per-session MCP; ACP delivers it agent-agnostically. This is a one-time terminal→ACP view swap per session (transcript-preserving), applied only to sessions whose agent is ACP-capable. Off: sessions are left in their current mode and per-session MCP may not apply to terminal agents."
 type = "boolean"
 default = true
 
 # ── Covered sessions ────────────────────────────────────────────────────────
 # One row per session the bridge covers. A row is just identity — session_id,
-# token, project — no URL (those derive from agent_mcp_base above).
+# token, project — no URL (those derive from conexus_base above).
 [[settings]]
 key = "sessions"
 label = "Covered sessions"
-description = "Sessions the bridge covers. Each row is an AoE session id + the agent-mcp token and project it acts as. The delivery and MCP URLs are derived from 'agent-mcp base URL' + project, so there's no URL to enter here."
+description = "Sessions the bridge covers. Each row is an AoE session id + the conexus token and project it acts as. The delivery and MCP URLs are derived from 'CoNexus base URL' + project, so there's no URL to enter here."
 type = "object_list"
 max_items = 200
 
@@ -130,22 +130,22 @@ required = true
 
 [[settings.fields]]
 key = "token"
-label = "agent-mcp token"
-description = "The session's agent-mcp bearer (mint one via agent-mcp's Register Agent). Authenticates BOTH the delivery stream and the injected MCP tools. Masked in the UI."
+label = "CoNexus token"
+description = "The session's conexus bearer (mint one via conexus's Register Agent). Authenticates BOTH the delivery stream and the injected MCP tools. Masked in the UI."
 type = "password"
 required = true
 
 [[settings.fields]]
 key = "project"
-label = "agent-mcp project"
-description = "The agent-mcp project this session acts as. Appended to the global agent-mcp base for both its delivery (/api/<project>) and MCP (/mcp/<project>) URLs."
+label = "CoNexus project"
+description = "The conexus project this session acts as. Appended to the global conexus base for both its delivery (/api/<project>) and MCP (/mcp/<project>) URLs."
 type = "string"
 required = true
 
 [[settings.fields]]
 key = "expose_mcp"
-label = "Also inject agent-mcp tools (MCP)"
-description = "On: also wire agent-mcp's tools into this session as a per-session MCP server. Off: delivery-push only. First enable respawns the session once (transcript-preserving) to load the tools."
+label = "Also inject CoNexus tools (MCP)"
+description = "On: also wire conexus's tools into this session as a per-session MCP server. Off: delivery-push only. First enable respawns the session once (transcript-preserving) to load the tools."
 type = "boolean"
 default = true
 
