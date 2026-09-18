@@ -172,43 +172,57 @@ async fn main() -> Result<()> {
                 shared.clone(),
                 auth_gate::require_identity,
             ));
-    // `/api` mount (Phase E1, prancy-napping-pie), split into two
-    // sub-routers so a handful of confirmed no-auth-by-design
-    // endpoints (Python's own docstrings: "the router-level gate is
-    // deferred to a follow-up PR" -- GET /agents, /tasks,
-    // /prompts/catalog) can bypass `rest_gate` WITHOUT weakening the
-    // default for every other route. `api_authenticated`'s fallback
-    // makes "require auth" the default for anything not explicitly
-    // listed on `api_public` -- a route added to the wrong router is a
-    // 401 to fix, never a silent open door.
-    //
-    // An explicit `.fallback()` is required on `api_authenticated`,
-    // not cosmetic: an otherwise-empty `Router` contributes NO
-    // matchable path at all when `.nest()`ed, so unmatched `/api/*`
-    // requests would fall through to the OUTER router's fallback
-    // instead -- which `Router::merge` had already set to
-    // `mcp_router`'s own auth_gate-wrapped one in PR 1, silently
-    // routing every `/api/*` request through `/mcp`'s (wrong, wider)
-    // door. Caught live during PR 1: an unauthenticated `/api/*` probe
-    // returned `/mcp`'s JSON-RPC error shape, and a WORKER bearer
-    // (rejected by `rest_gate`, admitted by `auth_gate`) was let
-    // through -- both pointed at the same root cause before this
-    // fallback was added.
+    let api_router = build_api_router(shared.clone());
+    let app = Router::new()
+        .merge(mcp_router)
+        .nest("/api", api_router)
+        .with_state(shared.clone());
+
+    uds::serve_router_unix(&cli.uds, app)
+        .await
+        .with_context(|| format!("serve {}", cli.uds.display()))
+}
+
+/// Builds the `/api` sub-router: three tiers (`api_public`,
+/// `api_authenticated`, `api_delivery`) merged together. Factored out of
+/// `main()` so `mod tests` below can bind the SAME route-to-tier
+/// assignment production actually serves, over a real UDS + auth
+/// middleware, rather than a hand-copied mirror of this table that could
+/// silently drift from it (a route moved to the wrong tier here would go
+/// unnoticed by a test built against yesterday's copy).
+///
+/// Split into `api_public`/`api_authenticated` so a small, explicit set
+/// of genuinely-safe-to-be-anonymous endpoints can bypass `rest_gate`
+/// WITHOUT weakening the default for every other route.
+/// `GET /prompts/catalog` is the only route left there: it serves a
+/// static, non-per-tenant prompt catalog with no project data in it.
+/// `GET /tasks` and `GET /agents` used to live here too (ported
+/// verbatim from a legacy Python docstring admitting "the router-level
+/// gate is deferred to a follow-up PR") -- confirmed by a pentest pass
+/// to leak real task free-text (title/description/notes, commonly
+/// containing credentials and internal URLs) and agent-fleet metadata
+/// to anonymous callers, and to work as a project-name existence oracle
+/// via 404-vs-200. Moved to `api_authenticated`; this was the follow-up
+/// PR. `api_authenticated`'s fallback makes "require auth" the default
+/// for anything not explicitly listed on `api_public` -- a route added
+/// to the wrong router is a 401 to fix, never a silent open door.
+///
+/// An explicit `.fallback()` is required on `api_authenticated`, not
+/// cosmetic: an otherwise-empty `Router` contributes NO matchable path
+/// at all when `.nest()`ed, so unmatched `/api/*` requests would fall
+/// through to the OUTER router's fallback instead -- which
+/// `Router::merge` had already set to `mcp_router`'s own
+/// auth_gate-wrapped one in PR 1, silently routing every `/api/*`
+/// request through `/mcp`'s (wrong, wider) door. Caught live during PR
+/// 1: an unauthenticated `/api/*` probe returned `/mcp`'s JSON-RPC
+/// error shape, and a WORKER bearer (rejected by `rest_gate`, admitted
+/// by `auth_gate`) was let through -- both pointed at the same root
+/// cause before this fallback was added.
+fn build_api_router(shared: Arc<SharedState>) -> Router<Arc<SharedState>> {
     async fn api_not_found() -> axum::http::StatusCode {
         axum::http::StatusCode::NOT_FOUND
     }
-    // GET /api/tasks is a confirmed no-auth-by-design endpoint (Python's
-    // own docstring: "the router-level gate is deferred to a follow-up
-    // PR"); every other /api/tasks method is operator-tier. Mounted as
-    // its own single-method route on `api_public` rather than
-    // `.route("/tasks", get(...))` merged with `api_authenticated`'s
-    // `post(...)` on the identical path -- keeps the auth split
-    // unambiguous rather than relying on axum's cross-router
-    // same-path-different-method merge semantics.
-    let api_public = Router::new()
-        .route("/prompts/catalog", get(rest_handlers::prompts_catalog))
-        .route("/tasks", get(rest_handlers::list_tasks))
-        .route("/agents", get(rest_handlers::list_agents_dashboard));
+    let api_public = Router::new().route("/prompts/catalog", get(rest_handlers::prompts_catalog));
     let api_authenticated = Router::new()
         .route("/settings-schema", get(rest_handlers::settings_schema))
         .route("/memories", post(rest_handlers::create_memory))
@@ -224,7 +238,10 @@ async fn main() -> Result<()> {
             "/schedules/{directive_id}",
             put(rest_handlers::update_schedule).delete(rest_handlers::delete_schedule),
         )
-        .route("/tasks", post(rest_handlers::create_task))
+        .route(
+            "/tasks",
+            get(rest_handlers::list_tasks).post(rest_handlers::create_task),
+        )
         .route(
             "/tasks/{task_id}/delete-preview",
             get(rest_handlers::task_delete_preview),
@@ -273,6 +290,7 @@ async fn main() -> Result<()> {
             "/messages/{message_id}",
             patch(rest_handlers::patch_message).delete(rest_handlers::delete_message),
         )
+        .route("/agents", get(rest_handlers::list_agents_dashboard))
         .route(
             "/agents/register",
             post(rest_handlers::register_agent_dashboard),
@@ -336,16 +354,158 @@ async fn main() -> Result<()> {
             shared.clone(),
             delivery_gate::require_delivery_agent_bearer,
         ));
-    let api_router = Router::new()
+    Router::new()
         .merge(api_public)
         .merge(api_authenticated)
-        .merge(api_delivery);
-    let app = Router::new()
-        .merge(mcp_router)
-        .nest("/api", api_router)
-        .with_state(shared.clone());
+        .merge(api_delivery)
+}
 
-    uds::serve_router_unix(&cli.uds, app)
-        .await
-        .with_context(|| format!("serve {}", cli.uds.display()))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Same tempdir-backed, dual-connection (`rusqlite` + sea-orm, same
+    /// file) `SharedState` construction every other test module in this
+    /// crate duplicates rather than shares (see e.g. `rest_gate::tests::
+    /// test_shared_state`) -- kept independent so no test module takes on
+    /// a cross-module test-only dependency.
+    async fn test_shared_state() -> Arc<SharedState> {
+        let dir = tempfile::tempdir().unwrap().keep();
+        let conn = rusqlite::Connection::open(dir.join("test.db")).unwrap();
+        conexus_db::schema::init_schema(&conn).unwrap();
+        let sea_orm_db =
+            sea_orm::Database::connect(format!("sqlite://{}", dir.join("test.db").display()))
+                .await
+                .unwrap();
+        Arc::new(SharedState {
+            conn: tokio::sync::Mutex::new(conn),
+            forwarding_hmac_key: None,
+            waiter_registry: conexus_wakeloop::waiter_registry::WaiterRegistry::new(),
+            file_map: conexus_wakeloop::file_map::FileMap::new(),
+            project_dir: std::env::temp_dir(),
+            operator_events: operator_events::OperatorEventsHub::new(),
+            delivery_transport: delivery_transport::DeliveryTransportHub::new(),
+            sea_orm_db,
+        })
+    }
+
+    /// Binds `build_api_router`'s REAL output -- the exact router
+    /// `main()` serves -- on a temp UDS, mirroring `rest_gate::tests::
+    /// spawn_test_app`'s own real-socket approach (a handler called
+    /// directly, bypassing `Router::merge`/`.nest()`/middleware entirely,
+    /// would prove nothing about which tier a route actually landed on).
+    async fn spawn_api_router(shared: Arc<SharedState>) -> (tempfile::TempDir, std::path::PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let socket_path = dir.path().join("api-router-test.sock");
+        let app = build_api_router(shared.clone()).with_state(shared);
+        let path_for_server = socket_path.clone();
+        tokio::spawn(async move {
+            let _ = uds::serve_router_unix(&path_for_server, app).await;
+        });
+        for _ in 0..50 {
+            if socket_path.exists() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        (dir, socket_path)
+    }
+
+    /// Drive one real HTTP request over the UDS via hyper's client (same
+    /// connect-and-handshake shape as `rest_gate::tests::request_status`)
+    /// and return just the status code -- every test here only needs
+    /// that.
+    async fn request(
+        socket_path: &std::path::Path,
+        method: &str,
+        uri: &str,
+        header: Option<(&str, &str)>,
+    ) -> u16 {
+        let stream = tokio::net::UnixStream::connect(socket_path).await.unwrap();
+        let io = hyper_util::rt::TokioIo::new(stream);
+        let (mut sender, connection) = hyper::client::conn::http1::handshake(io).await.unwrap();
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        let mut builder = hyper::Request::builder().method(method).uri(uri);
+        if let Some((name, value)) = header {
+            builder = builder.header(name, value);
+        }
+        let request = builder.body(axum::body::Body::empty()).unwrap();
+        let response = sender.send_request(request).await.unwrap();
+        response.status().as_u16()
+    }
+
+    #[tokio::test]
+    async fn unauthenticated_tasks_list_is_rejected_with_401() {
+        let shared = test_shared_state().await;
+        let (_dir, socket_path) = spawn_api_router(shared).await;
+        assert_eq!(request(&socket_path, "GET", "/tasks", None).await, 401);
+    }
+
+    #[tokio::test]
+    async fn unauthenticated_agents_list_is_rejected_with_401() {
+        let shared = test_shared_state().await;
+        let (_dir, socket_path) = spawn_api_router(shared).await;
+        assert_eq!(request(&socket_path, "GET", "/agents", None).await, 401);
+    }
+
+    /// The public tier is not collateral damage: `/prompts/catalog`
+    /// (confirmed-safe, static, non-per-tenant -- out of scope for this
+    /// fix) must stay reachable with no auth at all.
+    #[tokio::test]
+    async fn unauthenticated_prompts_catalog_still_returns_200() {
+        let shared = test_shared_state().await;
+        let (_dir, socket_path) = spawn_api_router(shared).await;
+        assert_eq!(
+            request(&socket_path, "GET", "/prompts/catalog", None).await,
+            200
+        );
+    }
+
+    async fn insert_manager_agent(shared: &Arc<SharedState>) {
+        let guard = shared.conn.lock().await;
+        guard
+            .execute(
+                "INSERT INTO agents (token, agent_id, created_at, status, \
+                 working_directory, agent_role) VALUES \
+                 ('mgr-tok', 'manager', '2026-01-01T00:00:00Z', 'active', '/tmp', 'manager')",
+                [],
+            )
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn authenticated_operator_bearer_can_list_tasks() {
+        let shared = test_shared_state().await;
+        insert_manager_agent(&shared).await;
+        let (_dir, socket_path) = spawn_api_router(shared).await;
+        assert_eq!(
+            request(
+                &socket_path,
+                "GET",
+                "/tasks",
+                Some(("Authorization", "Bearer mgr-tok")),
+            )
+            .await,
+            200
+        );
+    }
+
+    #[tokio::test]
+    async fn authenticated_operator_bearer_can_list_agents() {
+        let shared = test_shared_state().await;
+        insert_manager_agent(&shared).await;
+        let (_dir, socket_path) = spawn_api_router(shared).await;
+        assert_eq!(
+            request(
+                &socket_path,
+                "GET",
+                "/agents",
+                Some(("Authorization", "Bearer mgr-tok")),
+            )
+            .await,
+            200
+        );
+    }
 }
