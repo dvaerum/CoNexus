@@ -61,6 +61,17 @@ let
   # assertions in testScript below actually exercise it — not just a
   # copy hand-typed into this test file.
   hardening = import ../hardening.nix;
+  # Bootstrap password sentinel for the router's env-var bootstrap (see
+  # the CONEXUS_BOOTSTRAP_* comment on the router unit below). Class-
+  # swept pentest fix: passing this via `environment=` bakes the
+  # plaintext into the rendered, world-readable systemd unit file under
+  # /nix/store/... (444 perms by design). Written to a 0600 runtime-
+  # only file instead, referenced via `EnvironmentFile=` — mirrors
+  # nix/module.nix's `forwarding_hmac` key-file pattern (search that
+  # file for "F015 v4"), except this value is a fixed, publicly-known
+  # CI sentinel rather than `/dev/urandom` output.
+  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env"
+    "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
 in
 pkgs.testers.nixosTest {
   name = "conexus-single-tenant";
@@ -150,10 +161,35 @@ pkgs.testers.nixosTest {
     # that the Python one (`agent-mcp-router`) was retired. See
     # multi-tenant.nix's own comment on its `conexus-router` unit for
     # the flag-vs-env-var split rationale.
+    # EnvironmentFile= is loaded by systemd ONCE per unit activation,
+    # before ANY of that unit's own exec steps run (including its own
+    # ExecStartPre=) — so a same-unit ExecStartPre can never create the
+    # file in time; systemd already tried to load it and fails closed
+    # ("Failed to load environment files: No such file or directory").
+    # The file must be written by an EARLIER, SEPARATE unit that fully
+    # completes before conexus-router.service's own activation begins.
+    systemd.services.conexus-router-bootstrap-seed = {
+      description = "Write CoNexus test sentinel operator password to a private runtime file";
+      before = [ "conexus-router.service" ];
+      requiredBy = [ "conexus-router.service" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        # A dedicated runtime dir, deliberately NOT shared with
+        # conexus-router's own RuntimeDirectory="conexus" (which has
+        # its own RuntimeDirectoryPreserve=yes contract, above, tied to
+        # per-project backend sockets) -- avoids any coupling between
+        # this one-off seed file's lifecycle and that one.
+        RuntimeDirectory = "conexus-bootstrap-seed";
+        RuntimeDirectoryMode = "0700";
+        ExecStart = "${pkgs.coreutils}/bin/install -m 0600 ${bootstrapPasswordEnvFile} /run/conexus-bootstrap-seed/bootstrap.env";
+      };
+    };
+
     systemd.services.conexus-router = {
       description = "CoNexus router (single-tenant test)";
       wantedBy = [ "multi-user.target" ];
-      after = [ "fake-openai.service" "network.target" ];
+      after = [ "fake-openai.service" "network.target" "conexus-router-bootstrap-seed.service" ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
         CONEXUS_ROUTER_DB = "/home/testuser/.config/conexus/router.db";
@@ -162,7 +198,9 @@ pkgs.testers.nixosTest {
         # — this VM test asserts routing/URL behaviour that predates
         # auth and shouldn't be wedged behind the first-boot wizard.
         CONEXUS_BOOTSTRAP_USERNAME = "ci-sentinel";
-        CONEXUS_BOOTSTRAP_PASSWORD = "ci-sentinel-pw";
+        # CONEXUS_BOOTSTRAP_PASSWORD is intentionally NOT set here — see
+        # the EnvironmentFile= / ExecStartPre wiring in serviceConfig
+        # below.
         CONEXUS_ROUTER_HOST = "0.0.0.0";
         # Single-tenant mode disables operator-session auth, so the
         # internet-hardening startup guard refuses a non-loopback bind
@@ -210,6 +248,9 @@ pkgs.testers.nixosTest {
           # isn't an inline ``echo`` one-liner.
           "${pkgs.coreutils}/bin/install -m 0644 ${projectsSeedFile} /home/testuser/.config/conexus/projects.local.json"
         ];
+        # Written by the conexus-router-bootstrap-seed unit above,
+        # BEFORE this unit's own activation begins.
+        EnvironmentFile = "/run/conexus-bootstrap-seed/bootstrap.env";
         ExecStart =
           "${conexusPkgs.conexusRouterWrapper}/bin/conexus-router "
           + "--port ${toString ports.routerPort} "

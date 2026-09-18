@@ -24,7 +24,10 @@
 #      `/__create` form-encoded endpoint, and its REST replacement
 #      `POST /api/router/projects` requires a session cookie that a
 #      systemd oneshot can't have. Operator seeding via env vars is
-#      the only post-Phase-1+2 path that works at boot.
+#      the only post-Phase-1+2 path that works at boot. The password
+#      value itself is sourced via `EnvironmentFile=` from a 0600
+#      runtime-only file, not a literal `environment=` entry — see
+#      the "First-boot operator seed" comment below.
 #
 #   3. **DEV-MODE SSH IS WIDE OPEN.** OpenSSH is enabled with root
 #      login, empty passwords, and password auth all permitted, plus
@@ -87,6 +90,40 @@ let
     runtimeInputs = [ pkgs.gnutar pkgs.zstd pkgs.coreutils ];
     text = builtins.readFile ./vm-dev-preload.sh;
   };
+
+  # ── First-boot operator seed: bootstrap password file ──────────────
+  # Class-swept pentest fix: passing CONEXUS_BOOTSTRAP_PASSWORD via
+  # `environment=` bakes the plaintext into the rendered, world-
+  # readable systemd unit file under /nix/store/... (444 perms by
+  # design — an unprivileged local user can read it straight out of
+  # the store, and `systemctl cat`/`journalctl` show it too). Written
+  # to a 0600 runtime-only file instead, referenced via
+  # `EnvironmentFile=`, which systemd never renders into the unit file
+  # itself — only the *path* appears there.
+  #
+  # This value is a fixed, publicly-known dev sentinel (committed in
+  # this very file, so a developer can actually log in with it) rather
+  # than `/dev/urandom` output like nix/module.nix's `forwarding_hmac`
+  # key file — the residual exposure via reading this source file (or
+  # any nix-store copy of it) is accepted for this dev-only sandbox;
+  # what this fix closes is the much lower bar of a LOCAL UNPRIVILEGED
+  # USER reading it straight out of the rendered unit file or routine
+  # `systemctl cat`/`journalctl` output without needing repo access at
+  # all — the exact live repro this pentest finding confirmed.
+  #
+  # `EnvironmentFile=` is loaded by systemd ONCE per unit activation,
+  # before ANY of that unit's own exec steps run (including its own
+  # `ExecStartPre=`) — so a same-unit `ExecStartPre` can never create
+  # the file in time; systemd already tried to load it and fails
+  # closed ("Failed to load environment files: No such file or
+  # directory"). The file must be written by an EARLIER, SEPARATE unit
+  # that fully completes before conexus-router.service's own
+  # activation begins — see the dedicated seed unit below.
+  bootstrapPassword = "dev-sandbox-password";
+  bootstrapPasswordEnvFile = pkgs.writeText "conexus-vm-dev-bootstrap.env"
+    "CONEXUS_BOOTSTRAP_PASSWORD=${bootstrapPassword}\n";
+  bootstrapPasswordRuntimeDir = "conexus-vm-dev-bootstrap";
+  bootstrapPasswordRuntimePath = "/run/${bootstrapPasswordRuntimeDir}/bootstrap.env";
 in
 {
   imports = [
@@ -116,9 +153,39 @@ in
   # the unit instead of seeding anything. Safe for dev-mode only — the
   # loopback-only port + open SSH + empty-password warnings on this VM
   # already mark it as untrusted.
-  systemd.services.conexus-router.environment = {
-    CONEXUS_BOOTSTRAP_USERNAME = "dev";
-    CONEXUS_BOOTSTRAP_PASSWORD = "dev-sandbox-password";
+  #
+  # The password is NOT passed via `environment=` (a confirmed pentest
+  # finding: Nix bakes the plaintext into the rendered, world-readable
+  # unit file under /nix/store/…, 444 perms by design — any local user
+  # can read it straight out of the store, and `systemctl cat` or
+  # `journalctl` show it too). Instead a dedicated, EARLIER seed unit
+  # writes it to a 0600 runtime-only file before conexus-router.service
+  # ever starts, which then references it via `EnvironmentFile=` —
+  # systemd never renders that referenced file's *contents* into the
+  # unit file, only the path. See bootstrapPasswordEnvFile's own
+  # comment above for why this needs a separate prerequisite unit
+  # rather than an ExecStartPre on conexus-router.service itself.
+  systemd.services.conexus-vm-dev-bootstrap-seed = {
+    description = "Write CoNexus vm-dev's sentinel operator password to a private runtime file";
+    before = [ "conexus-router.service" ];
+    requiredBy = [ "conexus-router.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      RuntimeDirectory = bootstrapPasswordRuntimeDir;
+      RuntimeDirectoryMode = "0700";
+      ExecStart = "${pkgs.coreutils}/bin/install -m 0600 ${bootstrapPasswordEnvFile} ${bootstrapPasswordRuntimePath}";
+    };
+  };
+
+  systemd.services.conexus-router = {
+    after = [ "conexus-vm-dev-bootstrap-seed.service" ];
+    environment = {
+      CONEXUS_BOOTSTRAP_USERNAME = "dev";
+    };
+    serviceConfig = {
+      EnvironmentFile = bootstrapPasswordRuntimePath;
+    };
   };
 
   # Override the host-side port forwarding so the dev sandbox lives at
@@ -261,6 +328,13 @@ in
 
   # Bake every captured fixture into the image (no-op when none exist).
   environment.etc = etcFixtures;
+
+  # Exposes the bootstrap-password env-file derivation for
+  # nix/tests/checks/vm-dev-router-boots.sh's password-strength
+  # regression check (via `builtins.readFile`) without needing a live
+  # VM boot — the value itself no longer lives on `environment.
+  # CONEXUS_BOOTSTRAP_PASSWORD` for that check to read directly.
+  system.build.conexusVmDevBootstrapEnvFile = bootstrapPasswordEnvFile;
 
   # ── Preload restore unit ──────────────────────────────────────────
   # Runs ONLY when the kernel cmdline carries `conexus_preload=…`

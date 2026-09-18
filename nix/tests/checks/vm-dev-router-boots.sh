@@ -35,6 +35,15 @@
 # Both are pinned here via a real evaluation of the SAME nixosSystem
 # construction `flake.nix` performs for `packages.<system>.vm-dev`, rather
 # than re-deriving an independent expectation.
+#
+# Update (2026-09-18, pentest class-sweep): CONEXUS_BOOTSTRAP_PASSWORD moved
+# off `environment=` onto a 0600 runtime-only file referenced via
+# `EnvironmentFile=` (see nix/tests/checks/bootstrap-password-not-inlined.sh
+# for that fix's own regression guard). The password value is no longer
+# readable at `router.environment.CONEXUS_BOOTSTRAP_PASSWORD`, so the
+# strength check below reads it from `system.build.
+# conexusVmDevBootstrapEnvFile` instead -- the same writeText derivation
+# nix/vm-dev.nix's ExecStartPre installs into the runtime file.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -60,9 +69,12 @@ let
     modules = [ $REPO_ROOT/nix/vm-dev.nix ];
   }).config;
   router = cfg.systemd.services.conexus-router;
+  bootstrapEnvFileText = builtins.readFile cfg.system.build.conexusVmDevBootstrapEnvFile;
+  bootstrapPassword = lib.removeSuffix "\n"
+    (lib.removePrefix "CONEXUS_BOOTSTRAP_PASSWORD=" bootstrapEnvFileText);
 in {
   execStart = router.serviceConfig.ExecStart or "";
-  bootstrapPasswordLength = builtins.stringLength (router.environment.CONEXUS_BOOTSTRAP_PASSWORD or "");
+  bootstrapPasswordLength = builtins.stringLength bootstrapPassword;
 }
 EOF
 )
