@@ -344,6 +344,11 @@ pub async fn delete_project_handler(
     if let Some(resp) = project_teardown::active_sessions_recheck(&state.runtime, &name) {
         return resp.into_response();
     }
+    match project_teardown::project_existence_recheck(&state.registry, &name) {
+        Ok(Some(resp)) => return resp.into_response(),
+        Ok(None) => {}
+        Err(e) => return HandlerResponse::from(e).into_response(),
+    }
 
     // Delete ignores the systemctl-stop RESULT entirely (unlike stop
     // below) -- the unregister/purge proceeds unconditionally, even if
@@ -472,6 +477,11 @@ pub async fn stop_project_handler(
         };
     if let Some(resp) = project_teardown::active_sessions_recheck(&state.runtime, &name) {
         return resp.into_response();
+    }
+    match project_teardown::project_existence_recheck(&state.registry, &name) {
+        Ok(Some(resp)) => return resp.into_response(),
+        Ok(None) => {}
+        Err(e) => return HandlerResponse::from(e).into_response(),
     }
 
     let is_active_awaitable = systemctl_is_active(&state, &name);
@@ -1670,6 +1680,126 @@ mod handler_tests {
         let resp = task.await.unwrap();
         assert_eq!(resp.status(), 409, "{:?}", json_body(resp).await);
         assert!(state.registry.get("racer-stop").unwrap().is_some());
+    }
+
+    // -- Confirmed pentest finding (MEDIUM, business-logic/lifecycle-
+    // parity): unlike rename_project_handler (which re-checks existence
+    // via project_rename::rename_toctou_recheck immediately in-lock),
+    // delete_project_handler/stop_project_handler used to proceed
+    // straight to their destructive step once the lock was acquired and
+    // active_sessions_recheck passed -- never re-confirming the project
+    // still existed UNDER THAT NAME. A concurrent rename that wins the
+    // race for the SAME shared per-(project_name, "backend") lock
+    // leaves the project fully intact under its new name, but delete/
+    // stop still reported a false-positive 200 success against the old
+    // name. These races prove the fix: acquiring the lock while a
+    // rename is in flight, letting that rename "win" (simulated here by
+    // directly renaming the registry entry while delete/stop is
+    // blocked acquiring the lock the in-flight rename would itself be
+    // holding), then asserting delete/stop gets a clean 404
+    // not_registered instead of a false 200. -----------------------------
+
+    #[tokio::test]
+    async fn delete_project_handler_toctou_race_rename_wins_gets_404_not_registered() {
+        let (dir, state) = test_state().await;
+        let uid = seed_real_sysadmin(&state, "root").await;
+        register(
+            &state,
+            "racer-del-vs-rename",
+            &dir.path().join("workspaces").join("racer-del-vs-rename"),
+        );
+        let identity = identity_for(&uid, true, HashSet::new());
+
+        let lock = state.runtime.ensure_lock("racer-del-vs-rename", "backend");
+        let held = lock.lock_owned().await;
+
+        let state2 = state.clone();
+        let task = tokio::spawn(async move {
+            delete_project_handler(
+                State(state2),
+                Some(Extension(identity)),
+                Path("racer-del-vs-rename".to_string()),
+                Query(HashMap::new()),
+                HeaderMap::new(),
+            )
+            .await
+        });
+        let_spawned_task_reach_its_lock_wait().await;
+
+        // Simulate a concurrent rename winning the race for the SAME
+        // lock while delete was blocked acquiring it -- by the time
+        // delete gets the lock, "racer-del-vs-rename" no longer
+        // resolves to a registered project.
+        state
+            .registry
+            .rename(
+                "racer-del-vs-rename",
+                "racer-del-vs-rename-2",
+                30,
+                Utc::now(),
+            )
+            .unwrap();
+        drop(held);
+
+        let resp = task.await.unwrap();
+        assert_eq!(resp.status(), 404, "{:?}", json_body(resp).await);
+        assert!(
+            state
+                .registry
+                .get("racer-del-vs-rename-2")
+                .unwrap()
+                .is_some(),
+            "the renamed project must survive fully intact under its new name"
+        );
+    }
+
+    #[tokio::test]
+    async fn stop_project_handler_toctou_race_rename_wins_gets_404_not_registered() {
+        let (dir, state) = test_state().await;
+        let uid = seed_real_sysadmin(&state, "root").await;
+        register(
+            &state,
+            "racer-stop-vs-rename",
+            &dir.path().join("workspaces").join("racer-stop-vs-rename"),
+        );
+        let identity = identity_for(&uid, true, HashSet::new());
+
+        let lock = state.runtime.ensure_lock("racer-stop-vs-rename", "backend");
+        let held = lock.lock_owned().await;
+
+        let state2 = state.clone();
+        let task = tokio::spawn(async move {
+            stop_project_handler(
+                State(state2),
+                Extension(identity),
+                Path("racer-stop-vs-rename".to_string()),
+                HeaderMap::new(),
+            )
+            .await
+        });
+        let_spawned_task_reach_its_lock_wait().await;
+
+        state
+            .registry
+            .rename(
+                "racer-stop-vs-rename",
+                "racer-stop-vs-rename-2",
+                30,
+                Utc::now(),
+            )
+            .unwrap();
+        drop(held);
+
+        let resp = task.await.unwrap();
+        assert_eq!(resp.status(), 404, "{:?}", json_body(resp).await);
+        assert!(
+            state
+                .registry
+                .get("racer-stop-vs-rename-2")
+                .unwrap()
+                .is_some(),
+            "the renamed project must survive fully intact under its new name"
+        );
     }
 
     // -- test_sec_r7f1_project_lifecycle_toctou.py Tests E/F: a caller

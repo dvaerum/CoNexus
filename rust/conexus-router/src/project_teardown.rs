@@ -74,6 +74,33 @@ pub fn active_sessions_recheck(store: &RuntimeStore, name: &str) -> Option<Handl
     active_sessions_response(store, name)
 }
 
+/// The IN-LOCK existence re-check `delete_project_handler`/
+/// `stop_project_handler` must run immediately after
+/// [`active_sessions_recheck`], before either proceeds to its
+/// destructive step. Mirrors `project_rename::rename_toctou_recheck`'s
+/// own existence guard (same `NotRegistered` error shape) -- a
+/// concurrent RENAME that wins the race for the shared per-
+/// `(project_name, "backend")` ensure-lock while delete/stop was
+/// blocked acquiring it leaves `name` no longer resolving to a
+/// registered project by the time delete/stop gets the lock. Without
+/// this re-check, `finish_delete_project`/`finish_stop_project` ran
+/// unconditionally against a name that had already moved, reporting a
+/// false-positive 200 success while the project survived fully intact
+/// under its new name.
+pub fn project_existence_recheck(
+    registry: &ProjectRegistry,
+    name: &str,
+) -> Result<Option<HandlerResponse>, GateError> {
+    if registry.get(name)?.is_none() {
+        return Ok(Some(lifecycle::error_envelope(
+            LifecycleError::NotRegistered,
+            &format!("unknown project: {name:?}"),
+            None,
+        )));
+    }
+    Ok(None)
+}
+
 #[derive(Debug)]
 pub enum MutationPrecheck {
     Proceed,
@@ -439,6 +466,58 @@ mod tests {
         };
         assert_eq!(body["error"], "active_sessions");
         assert_eq!(body["active_connections"], 3);
+    }
+
+    // -- project_existence_recheck ---------------------------------------
+
+    #[test]
+    fn existence_recheck_proceeds_when_the_project_still_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let registry = registry_with(dir.path(), "proj-a");
+        assert!(project_existence_recheck(&registry, "proj-a")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn existence_recheck_denies_if_the_project_vanished_mid_flight() {
+        // Mirrors project_rename::toctou_recheck_denies_if_the_project_
+        // vanished_mid_flight -- the same shape, for delete/stop's own
+        // in-lock existence guard.
+        let dir = tempfile::tempdir().unwrap();
+        let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
+        let resp = project_existence_recheck(&registry, "proj-a")
+            .unwrap()
+            .expect("expected Some(resp)");
+        assert_eq!(resp.status, 404);
+        let HandlerBody::Json(body) = resp.body else {
+            panic!("expected JSON");
+        };
+        assert_eq!(body["error"], "not_registered");
+    }
+
+    #[tokio::test]
+    async fn existence_recheck_denies_when_the_project_was_renamed_away() {
+        // Direct analogue of the confirmed live repro: the project
+        // still exists in the registry, but no longer under its OLD
+        // name -- a rename that won the race for the shared lock, not
+        // just a plain unregister.
+        let (_db_dir, c, db) = conn_with_sea_orm().await;
+        let dir = tempfile::tempdir().unwrap();
+        let registry = registry_with(dir.path(), "proj-a");
+        let _uid = seed_operator_member(&db, &c, "proj-a", "operator").await;
+        registry
+            .rename("proj-a", "proj-a-renamed", 30, now_dt())
+            .unwrap();
+
+        let resp = project_existence_recheck(&registry, "proj-a")
+            .unwrap()
+            .expect("expected Some(resp)");
+        assert_eq!(resp.status, 404);
+        assert!(
+            registry.get("proj-a-renamed").unwrap().is_some(),
+            "the renamed project must still exist under its new name"
+        );
     }
 
     fn registry_with(dir: &std::path::Path, name: &str) -> ProjectRegistry {
