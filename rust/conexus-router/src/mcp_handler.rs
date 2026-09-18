@@ -38,6 +38,18 @@
 //! project names by response latency. [`floored_unauthorized`] is the
 //! one function every pre-auth-401 path in [`backend_mcp_handler`]
 //! funnels through.
+//!
+//! [`backend_api_handler`] closes the SAME class on `/api` (found in a
+//! later pentest round: it used to resolve the project name FIRST and
+//! return an immediate, distinguishable 404 before any auth check ever
+//! ran). It can't reuse [`floored_unauthorized`] itself -- `/api`'s
+//! genuine 401 body is the backend's own `login_required` envelope,
+//! which the dashboard's `ApiClient` depends on verbatim (see
+//! [`floor_response`]'s doc) -- so it floors both the synthetic
+//! unknown-project envelope ([`api_login_required_response`]) and the
+//! real backend's proxied 401 through [`floor_response`] instead,
+//! converging both on the same wall-clock target without collapsing
+//! either body to a fixed shape.
 
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
@@ -195,15 +207,67 @@ fn unauthorized_response() -> HandlerResponse {
     }
 }
 
-/// Port of `_floored_unauthorized` -- sleeps out the remainder of
-/// `cfg.preauth_401_floor` measured from `t0` before returning the
-/// canonical 401. See the module doc for why this matters.
-pub async fn floored_unauthorized(cfg: &McpHandlerConfig, t0: Instant) -> HandlerResponse {
+/// Sleep out whatever's left of `cfg.preauth_401_floor` measured from
+/// `t0` -- the shared timing primitive [`floored_unauthorized`]
+/// (`/mcp`'s canonical envelope) and [`floor_response`] (`/api`'s
+/// caller-supplied envelope) both build on, so the two surfaces'
+/// floors can never drift out of step with each other.
+async fn sleep_out_floor(cfg: &McpHandlerConfig, t0: Instant) {
     let elapsed = t0.elapsed();
     if elapsed < cfg.preauth_401_floor {
         tokio::time::sleep(cfg.preauth_401_floor - elapsed).await;
     }
+}
+
+/// Port of `_floored_unauthorized` -- sleeps out the remainder of
+/// `cfg.preauth_401_floor` measured from `t0` before returning the
+/// canonical 401. See the module doc for why this matters.
+pub async fn floored_unauthorized(cfg: &McpHandlerConfig, t0: Instant) -> HandlerResponse {
+    sleep_out_floor(cfg, t0).await;
     unauthorized_response()
+}
+
+/// SEC: unauthenticated project-existence oracle (`/api` sibling of
+/// [`floored_unauthorized`]). Floors an ALREADY-BUILT response to the
+/// same wall-clock target `floored_unauthorized` uses, without
+/// touching its status/body/headers -- unlike `/mcp`, `/api`'s pre-auth
+/// 401 body can't be collapsed onto one fixed envelope: the dashboard's
+/// `ApiClient` (`conexus/dashboard/lib/api/client.ts`) keys off the
+/// REAL backend's own `{"error":"login_required",...}` shape to decide
+/// when to force a re-login, so a known project's genuine backend 401
+/// must keep its own body verbatim. Flooring both the genuine case
+/// (via this function, from [`backend_api_handler`]'s proxied-401 arm)
+/// and the synthetic unknown-project case (via
+/// [`api_login_required_response`]) to the SAME floor is what makes an
+/// unknown project's near-instant local rejection and a known
+/// project's real UDS round-trip converge on the same wall-clock
+/// target instead of differing by an order of magnitude.
+async fn floor_response(
+    cfg: &McpHandlerConfig,
+    t0: Instant,
+    resp: HandlerResponse,
+) -> HandlerResponse {
+    sleep_out_floor(cfg, t0).await;
+    resp
+}
+
+/// The exact `{"error":"login_required","message":...}` envelope a
+/// real project's backend (`conexus-backend::rest_principal::
+/// resolve_rest_principal`) returns for a caller with NEITHER a bearer
+/// NOR a forwarding header -- ported verbatim (see that function's
+/// no-bearer-token-and-no-forwarding-header branch) so an unknown
+/// project's synthetic 401 is body-for-body indistinguishable from a
+/// real, existing project's genuine one for the exact same caller
+/// shape (a fully unauthenticated GET).
+fn api_login_required_response() -> HandlerResponse {
+    HandlerResponse {
+        status: 401,
+        headers: vec![],
+        body: HandlerBody::Json(serde_json::json!({
+            "error": "login_required",
+            "message": "Unauthorized: signed forwarding header or operator-tier bearer required.",
+        })),
+    }
 }
 
 /// Port of `_maybe_single_tenant_redirect`/`_w1_redirect`. `path` is
@@ -555,6 +619,7 @@ pub async fn backend_api_handler(
     rest: &str,
     req: HandlerRequest,
 ) -> HandlerResponse {
+    let t0 = Instant::now();
     let accept = req
         .headers
         .get(hyper::header::ACCEPT)
@@ -579,12 +644,15 @@ pub async fn backend_api_handler(
 
     let (real_name, alias) = match resolve::resolve(registry, &req.project_name, now) {
         Ok(r) => r,
+        // SEC: unauthenticated project-existence oracle -- an unknown
+        // project must be indistinguishable (status, body shape, AND
+        // latency) from a real project rejecting the same fully
+        // unauthenticated caller. Floored through the SAME wall-clock
+        // target as the real-project 401 arm below, via the SAME
+        // login_required envelope a real backend would return for this
+        // exact caller shape (see `api_login_required_response`'s doc).
         Err(ResolveError::UnknownProject) => {
-            return HandlerResponse {
-                status: 404,
-                headers: vec![],
-                body: HandlerBody::Text("unknown project".to_string()),
-            }
+            return floor_response(cfg, t0, api_login_required_response()).await
         }
         Err(ResolveError::Registry(e)) => {
             return HandlerResponse {
@@ -674,6 +742,16 @@ pub async fn backend_api_handler(
     )
     .await
     {
+        // SEC: unauthenticated project-existence oracle -- a real
+        // project's genuine 401 (the backend's own `login_required`
+        // envelope, body preserved verbatim for the dashboard's
+        // `ApiClient` -- see `floor_response`'s doc) is floored to the
+        // SAME wall-clock target the unknown-project arm above uses, so
+        // a slow real UDS round-trip and a fast synthetic rejection
+        // converge instead of differing by an order of magnitude.
+        Ok(resp) if resp.status == 401 => {
+            floor_response(cfg, t0, HandlerResponse::proxied(resp)).await
+        }
         Ok(resp) => HandlerResponse::proxied(resp),
         Err(e) => proxy_error_response(e),
     }
@@ -1403,20 +1481,36 @@ mod tests {
         );
     }
 
+    /// A fully unauthenticated `/api` request: an Accept header
+    /// specifying the API media type (so it clears the version gate)
+    /// and NO `Authorization`/cookie at all -- the exact caller shape
+    /// the confirmed pentest repro used.
+    fn unauthenticated_api_req(project_name: &str, path: &str) -> HandlerRequest {
+        let mut req = base_req(project_name, path);
+        req.headers = HeaderMap::new();
+        req.headers.insert(
+            hyper::header::ACCEPT,
+            HeaderValue::from_static(API_MEDIA_TYPE),
+        );
+        req.method = Method::GET;
+        req
+    }
+
     #[tokio::test]
-    async fn backend_api_handler_returns_a_real_404_for_an_unknown_project() {
+    async fn backend_api_handler_floors_an_unknown_project_to_a_login_required_401() {
+        // SEC: unauthenticated project-existence oracle. An unknown
+        // project used to return an immediate, distinguishable 404
+        // ("unknown project") before any auth check ran at all -- it
+        // must now be indistinguishable in status AND body shape from a
+        // real project's genuine `login_required` 401 for the same
+        // fully-unauthenticated caller.
         let dir = tempfile::tempdir().unwrap();
         let sock_dir = dir.path().join("sockets");
         let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
         let store = RuntimeStore::new();
         let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
 
-        let mut req = base_req("nope", "/conexus/__api/nope/agents");
-        req.method = Method::GET;
-        req.headers.insert(
-            hyper::header::ACCEPT,
-            HeaderValue::from_static(API_MEDIA_TYPE),
-        );
+        let req = unauthenticated_api_req("nope", "/conexus/__api/nope/agents");
 
         let resp = backend_api_handler(
             &store,
@@ -1431,9 +1525,118 @@ mod tests {
             req,
         )
         .await;
-        assert_eq!(
-            resp.status, 404,
-            "unlike the MCP handler, the API handler has no pre-auth floor/collapse discipline in Python either"
+        assert_eq!(resp.status, 401);
+        match &resp.body {
+            HandlerBody::Json(v) => {
+                assert_eq!(v["error"], "login_required");
+                assert_eq!(
+                    v["message"],
+                    "Unauthorized: signed forwarding header or operator-tier bearer required."
+                );
+            }
+            other => panic!("expected a login_required JSON body, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn backend_api_handler_floors_a_known_projects_real_401_to_the_same_latency() {
+        // Finding's other half: a KNOWN project's genuine backend 401
+        // (a full UDS round-trip) must ALSO be floored to the SAME
+        // wall-clock target the unknown-project arm above is held to --
+        // otherwise an unknown project (always >= the floor) and a
+        // known one (its real, much-faster round-trip) stay trivially
+        // distinguishable by latency even once their status codes
+        // match. The backend's own body/reason is preserved verbatim
+        // (not replaced by a canonical envelope) -- the dashboard's
+        // `ApiClient` depends on exactly this shape.
+        let dir = tempfile::tempdir().unwrap();
+        let sock_dir = dir.path().join("sockets");
+        std::fs::create_dir_all(sock_dir.join("proj-a")).unwrap();
+        spawn_backend(sock_dir.join("proj-a").join("backend.sock"), |_req| {
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(Full::new(Bytes::from_static(
+                    b"{\"error\":\"login_required\",\"message\":\"Unauthorized: signed forwarding header or operator-tier bearer required.\"}",
+                )))
+                .unwrap()
+        })
+        .await;
+
+        let registry = registry_with(dir.path(), "proj-a", "python");
+        let store = RuntimeStore::new();
+        let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
+        let cfg = McpHandlerConfig {
+            preauth_401_floor: Duration::from_millis(80),
+            ..fast_cfg()
+        };
+
+        let t0 = Instant::now();
+        let req = unauthenticated_api_req("proj-a", "/conexus/__api/proj-a/agents");
+        let resp = backend_api_handler(
+            &store,
+            &stream_caps,
+            &registry,
+            &sock_dir,
+            &fast_ensure_cfg(),
+            &cfg,
+            None,
+            test_now(),
+            "agents",
+            req,
+        )
+        .await;
+        let elapsed = t0.elapsed();
+        assert_eq!(resp.status, 401);
+        match &resp.body {
+            HandlerBody::Proxied(ProxyResponseBody::Buffered(b)) => {
+                let parsed: serde_json::Value = serde_json::from_slice(b).unwrap();
+                assert_eq!(parsed["error"], "login_required");
+            }
+            other => panic!("expected the backend's own proxied body, got {other:?}"),
+        }
+        assert!(
+            elapsed >= Duration::from_millis(75),
+            "a known project's real backend 401 must ALSO be floored to ~the \
+             configured latency, got {elapsed:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn backend_api_handler_unknown_project_401_is_floored_to_the_same_latency() {
+        // The unknown-project sibling of the timing assertion above --
+        // together they prove both arms converge on the SAME wall-clock
+        // floor (`preauth_401_floor`), not just the same status/body.
+        let dir = tempfile::tempdir().unwrap();
+        let sock_dir = dir.path().join("sockets");
+        let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
+        let store = RuntimeStore::new();
+        let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
+        let cfg = McpHandlerConfig {
+            preauth_401_floor: Duration::from_millis(80),
+            ..fast_cfg()
+        };
+
+        let t0 = Instant::now();
+        let req = unauthenticated_api_req("nope", "/conexus/__api/nope/agents");
+        let resp = backend_api_handler(
+            &store,
+            &stream_caps,
+            &registry,
+            &sock_dir,
+            &fast_ensure_cfg(),
+            &cfg,
+            None,
+            test_now(),
+            "agents",
+            req,
+        )
+        .await;
+        let elapsed = t0.elapsed();
+        assert_eq!(resp.status, 401);
+        assert!(
+            elapsed >= Duration::from_millis(75),
+            "an unknown project's synthetic 401 must be floored to ~the \
+             configured latency, got {elapsed:?}"
         );
     }
 
