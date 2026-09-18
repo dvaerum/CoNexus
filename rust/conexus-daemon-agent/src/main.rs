@@ -47,6 +47,16 @@ const INTER_ITER_SLEEP: Duration = Duration::from_millis(500);
 const RECONNECT_BACKOFF_INITIAL: Duration = Duration::from_secs(2);
 const RECONNECT_BACKOFF_MAX: Duration = Duration::from_secs(60);
 
+/// Cap on any single HTTP response body this client will buffer, shared by
+/// all 3 response-reading call sites (`initialize`, `notifications/
+/// initialized`, `wait_for_events`). A live pentest exploit proved a
+/// structurally-valid ~1GB `wait_for_events` response (crafted via a
+/// 6,000,000-entry `events` array) drove full in-memory buffering to a
+/// 5.2GB RSS, swap-I/O stall, and a SIGTERM-deaf process -- these MCP
+/// JSON-RPC envelopes are tiny by design (two handshake acks and a bounded
+/// event batch), so 4 MiB is generous headroom, not a real limit.
+const MAX_RESPONSE_BODY_BYTES: usize = 4 * 1024 * 1024;
+
 #[derive(Parser, Debug)]
 #[command(
     name = "conexus-daemon-agent",
@@ -243,9 +253,35 @@ enum DaemonError {
     Transport(#[from] reqwest::Error),
     #[error("HTTP {status}: {body}")]
     HttpStatus { status: u16, body: String },
+    #[error("response body exceeded {limit}-byte cap")]
+    BodyTooLarge { limit: usize },
 }
 
 const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
+
+/// Reads a response body up to `cap` bytes, accumulating chunks as they
+/// stream in and aborting -- WITHOUT buffering the rest -- the instant the
+/// cap is exceeded. ONE shared helper for all 3 HTTP-response-reading call
+/// sites in this client so the cap can't silently regress at only one of
+/// them (the point of the pentest class-sweep this fixes). `cap` is a
+/// parameter rather than baked in so tests can exercise the boundary with a
+/// small body instead of transferring `MAX_RESPONSE_BODY_BYTES` worth of
+/// bytes just to prove the same logic.
+///
+/// Decodes as UTF-8 with lossy replacement, matching `Response::text()`'s
+/// own behavior with this crate's feature set (no `charset` feature
+/// enabled here, so `text()` is itself just `String::from_utf8_lossy` under
+/// the hood) -- this preserves prior parsing behavior for in-cap bodies.
+async fn read_bounded_body(mut resp: reqwest::Response, cap: usize) -> Result<String, DaemonError> {
+    let mut buf: Vec<u8> = Vec::new();
+    while let Some(chunk) = resp.chunk().await? {
+        buf.extend_from_slice(&chunk);
+        if buf.len() > cap {
+            return Err(DaemonError::BodyTooLarge { limit: cap });
+        }
+    }
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
 
 /// Performs the real MCP session handshake (`initialize` then
 /// `notifications/initialized`), returning the server-issued session
@@ -282,7 +318,7 @@ async fn establish_session(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    let body_text = resp.text().await?;
+    let body_text = read_bounded_body(resp, MAX_RESPONSE_BODY_BYTES).await?;
     if !status.is_success() {
         return Err(DaemonError::HttpStatus {
             status: status.as_u16(),
@@ -303,7 +339,7 @@ async fn establish_session(
         .send()
         .await?;
     let notif_status = notif_resp.status();
-    let notif_body = notif_resp.text().await?;
+    let notif_body = read_bounded_body(notif_resp, MAX_RESPONSE_BODY_BYTES).await?;
     if !notif_status.is_success() {
         return Err(DaemonError::HttpStatus {
             status: notif_status.as_u16(),
@@ -342,7 +378,7 @@ async fn wait_for_events(
     }
     let resp = req.json(&body).send().await?;
     let status = resp.status();
-    let raw = resp.text().await?;
+    let raw = read_bounded_body(resp, MAX_RESPONSE_BODY_BYTES).await?;
     if !status.is_success() {
         return Err(DaemonError::HttpStatus {
             status: status.as_u16(),
@@ -725,6 +761,132 @@ mod tests {
         // one yet (issued BY that response), so exactly 1 request
         // carries it.
         assert_eq!(notif_seen.load(Ordering::SeqCst), 1);
+    }
+
+    /// Builds a `wrap_envelope`-shaped body whose serialized size is at
+    /// least `target_len` bytes, via a single padded event field -- mirrors
+    /// the real exploit's shape (a structurally-valid envelope, not
+    /// malformed garbage) without needing millions of events or GB-scale
+    /// memory to prove the same cap logic.
+    fn oversized_envelope_body(target_len: usize) -> String {
+        wrap_envelope(
+            &serde_json::json!({
+                "events": [{"type": "x", "data": "a".repeat(target_len)}],
+                "next_cursor": "c1",
+            })
+            .to_string(),
+        )
+    }
+
+    #[tokio::test]
+    async fn read_bounded_body_accepts_a_response_at_or_under_the_cap() {
+        let (base_url, _handle) = spawn_mock_backend(|_req| {
+            Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from("a".repeat(200))))
+                .unwrap()
+        })
+        .await;
+        let client = reqwest::Client::new();
+        let resp = client.get(&base_url).send().await.unwrap();
+        let body = read_bounded_body(resp, 200).await.unwrap();
+        assert_eq!(body.len(), 200);
+    }
+
+    #[tokio::test]
+    async fn read_bounded_body_rejects_a_response_over_the_cap() {
+        let (base_url, _handle) = spawn_mock_backend(|_req| {
+            Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from("a".repeat(201))))
+                .unwrap()
+        })
+        .await;
+        let client = reqwest::Client::new();
+        let resp = client.get(&base_url).send().await.unwrap();
+        let err = read_bounded_body(resp, 200).await.unwrap_err();
+        assert!(matches!(err, DaemonError::BodyTooLarge { limit: 200 }));
+    }
+
+    #[tokio::test]
+    async fn wait_for_events_rejects_a_response_over_the_size_cap_before_full_buffering() {
+        let body = oversized_envelope_body(MAX_RESPONSE_BODY_BYTES + (1024 * 1024));
+        let (base_url, _handle) = spawn_mock_backend(move |_req| {
+            Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from(body.clone())))
+                .unwrap()
+        })
+        .await;
+        let cfg = DaemonConfig {
+            mcp_url: base_url,
+            project: "proj".to_string(),
+            agent_id: "agent".to_string(),
+            bearer: "tok".to_string(),
+            cursor_file: PathBuf::from("/dev/null"),
+        };
+        let client = reqwest::Client::new();
+        let err = wait_for_events(&client, &cfg, "", "").await.unwrap_err();
+        assert!(matches!(
+            err,
+            DaemonError::BodyTooLarge {
+                limit: MAX_RESPONSE_BODY_BYTES
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn wait_for_events_still_parses_a_response_just_under_the_size_cap() {
+        // Boundary check just inside the cap, not just "any small body" --
+        // proves the cap doesn't clip legitimate near-limit responses.
+        let padding_len = MAX_RESPONSE_BODY_BYTES - 4096;
+        let body = oversized_envelope_body(padding_len);
+        assert!(body.len() < MAX_RESPONSE_BODY_BYTES);
+        let (base_url, _handle) = spawn_mock_backend(move |_req| {
+            Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from(body.clone())))
+                .unwrap()
+        })
+        .await;
+        let cfg = DaemonConfig {
+            mcp_url: base_url,
+            project: "proj".to_string(),
+            agent_id: "agent".to_string(),
+            bearer: "tok".to_string(),
+            cursor_file: PathBuf::from("/dev/null"),
+        };
+        let client = reqwest::Client::new();
+        let env = wait_for_events(&client, &cfg, "", "").await.unwrap();
+        assert_eq!(env.next_cursor.as_deref(), Some("c1"));
+        assert_eq!(env.events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn establish_session_rejects_an_oversized_initialize_response() {
+        let body = "a".repeat(MAX_RESPONSE_BODY_BYTES + (1024 * 1024));
+        let (base_url, _handle) = spawn_mock_backend(move |_req| {
+            Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from(body.clone())))
+                .unwrap()
+        })
+        .await;
+        let cfg = DaemonConfig {
+            mcp_url: base_url,
+            project: "proj".to_string(),
+            agent_id: "agent".to_string(),
+            bearer: "tok".to_string(),
+            cursor_file: PathBuf::from("/dev/null"),
+        };
+        let client = reqwest::Client::new();
+        let err = establish_session(&client, &cfg).await.unwrap_err();
+        assert!(matches!(
+            err,
+            DaemonError::BodyTooLarge {
+                limit: MAX_RESPONSE_BODY_BYTES
+            }
+        ));
     }
 
     #[tokio::test]
