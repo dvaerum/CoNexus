@@ -130,13 +130,16 @@ let
   llmEndpointCheckUnit = "conexus-llm-endpoint-check.service";
 
   # CoNexus Rust backend (Phase D1 step 5) — `null` when the caller
-  # doesn't pass `craneLib` (e.g. nix/vm-dev.nix's plain-function call
-  # site), which just means the `conexus@<name>.service` / `conexus-router`
-  # units are omitted (see module.nix's `conexusLauncherPackage`/
-  # `conexusRouterPackage` option docs). Both units are now the ONLY
-  # implementation module.nix has (the Python router/backend pair was
-  # retired), so a caller that never passes `craneLib` gets NO conexus
-  # deployment at all -- there is no Python fallback left.
+  # doesn't pass `craneLib`, which just means the `conexus@<name>.service` /
+  # `conexus-router` units are omitted (see module.nix's
+  # `conexusLauncherPackage`/`conexusRouterPackage` option docs). Both units
+  # are now the ONLY implementation module.nix has (the Python router/backend
+  # pair was retired), so a caller that never passes `craneLib` gets NO
+  # conexus deployment at all -- there is no Python fallback left. Every real
+  # caller (flake.nix's vmMulti/vmDev nixosSystem specialArgs) passes
+  # `craneLib` for this reason; a caller that silently omits it (as
+  # flake.nix's vmDev once did) produces a VM with no working router at all,
+  # not a degraded-but-functional one.
   conexusPkgsForVm =
     if craneLib == null then null
     else import ./conexus.nix { inherit pkgs lib craneLib; src = src; };

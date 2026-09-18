@@ -104,6 +104,7 @@
         inherit system;
         specialArgs = {
           src = self;
+          craneLib = crane.mkLib pkgs;
         };
         modules = [ ./nix/vm-dev.nix ];
       }).config.system.build.vm;

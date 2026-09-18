@@ -1,4 +1,4 @@
-{ config, lib, pkgs, modulesPath, src ? null, ... }:
+{ config, lib, pkgs, modulesPath, src ? null, craneLib ? null, ... }:
 # Path B interactive sandbox VM — boots the multi-tenant stack like
 # nix/vm.nix but with three differences tailored for dashboard E2E
 # work and live in-VM diagnostics:
@@ -91,7 +91,7 @@ in
 {
   imports = [
     (import ./vm.nix {
-      inherit config lib pkgs modulesPath src;
+      inherit config lib pkgs modulesPath src craneLib;
       mode = "multi";
       # See header note 4. Retarget host/ports/models here (llmHost,
       # llmChatPort, llmEmbeddingPort, llmChatModel,
@@ -104,17 +104,21 @@ in
   # ── First-boot operator seed ──────────────────────────────────────
   # The Phase-1 empty-users middleware redirects every non-/setup,
   # non-/login request to /setup until at least one operator exists.
-  # Seed a sentinel operator (dev / dev) via the env-var bootstrap so
-  # the developer can hit /login immediately. See
-  # conexus/router/identity.py `init_router_db` for the contract:
-  # both vars must be set, both are stripped from os.environ after
-  # the bootstrap fires (whether or not it actually created a user),
-  # and the bootstrap no-ops when the users table is already populated.
-  # Safe for dev-mode only — the loopback-only port + open SSH +
-  # empty-password warnings on this VM already mark it as untrusted.
+  # Seed a sentinel operator via the env-var bootstrap so the developer
+  # can hit /login immediately. See
+  # rust/conexus-router/src/boot.rs `bootstrap_operator_from_env` for
+  # the contract: both vars must be set, both are stripped from the
+  # process environment after the bootstrap fires (whether or not it
+  # actually created a user), and the bootstrap no-ops when the users
+  # table is already populated. Password is >=12 chars to satisfy
+  # `identity::validate_password_strength` (PASSWORD_MIN_LENGTH) — a
+  # shorter sentinel here fails that check at startup and crash-loops
+  # the unit instead of seeding anything. Safe for dev-mode only — the
+  # loopback-only port + open SSH + empty-password warnings on this VM
+  # already mark it as untrusted.
   systemd.services.conexus-router.environment = {
     CONEXUS_BOOTSTRAP_USERNAME = "dev";
-    CONEXUS_BOOTSTRAP_PASSWORD = "dev";
+    CONEXUS_BOOTSTRAP_PASSWORD = "dev-sandbox-password";
   };
 
   # Override the host-side port forwarding so the dev sandbox lives at

@@ -80,7 +80,7 @@ done
 # ── Seed via the real REST API (default demo dataset) ──────────────
 echo "capture-vm-dev-fixture: seeding demo dataset..."
 curl -fsS -c "$cj" -X POST "$base/conexus/login" \
-  --data-urlencode username=dev --data-urlencode password=dev -o /dev/null
+  --data-urlencode username=dev --data-urlencode password=dev-sandbox-password -o /dev/null
 api() { curl -fsS -b "$cj" -H "$V" -H "$CT" "$@"; }
 
 slug="demo"
