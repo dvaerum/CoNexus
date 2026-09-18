@@ -1,4 +1,4 @@
-# Agent-MCP Tool-by-Tool Logic Comparison & Misalignment Analysis
+# CoNexus Tool-by-Tool Logic Comparison & Misalignment Analysis
 
 > **Historical snapshot.** This document predates the
 > `retire-system-token` waves (PRs #208–#211, 2026-06). It uses
@@ -13,7 +13,7 @@
 
 ## Executive Summary
 
-This document provides a granular, tool-by-tool comparison of Agent-MCP implementations, identifying specific logic misalignments that could cause behavioral differences between Python and Node.js versions. Each tool is analyzed for parameter validation, business logic, response formatting, and error handling consistency.
+This document provides a granular, tool-by-tool comparison of CoNexus implementations, identifying specific logic misalignments that could cause behavioral differences between Python and Node.js versions. Each tool is analyzed for parameter validation, business logic, response formatting, and error handling consistency.
 
 ---
 
@@ -22,7 +22,7 @@ This document provides a granular, tool-by-tool comparison of Agent-MCP implemen
 ### 1.1 create_agent Tool
 
 #### Python Implementation Logic
-**File:** `agent_mcp/tools/admin_tools.py` (lines 67-200+)
+**File:** `conexus/tools/admin_tools.py` (lines 67-200+)
 
 **Key Parameters:**
 ```python
@@ -54,7 +54,7 @@ if not task_ids:  # Allows empty list
 ```
 
 #### Node.js Implementation Logic  
-**File:** `agent-mcp-node/src/tools/agent.ts` (lines 84-200+)
+**File:** `conexus-node/src/tools/agent.ts` (lines 84-200+)
 
 **Key Parameters:**
 ```typescript
@@ -203,7 +203,7 @@ registerTool('terminate_agent', ..., async (args, context) => {
 ### 2.1 assign_task Tool
 
 #### Python Implementation
-**File:** `agent_mcp/tools/task_tools.py` (162KB file - extensive logic)
+**File:** `conexus/tools/task_tools.py` (162KB file - extensive logic)
 
 **Key Logic:**
 ```python
@@ -221,7 +221,7 @@ async def assign_task_tool_impl(arguments: Dict[str, Any]) -> List[mcp_types.Tex
 ```
 
 #### Node.js Implementation
-**File:** `agent-mcp-node/src/tools/tasks/creation.ts`
+**File:** `conexus-node/src/tools/tasks/creation.ts`
 
 **Key Logic:**
 ```typescript
@@ -250,7 +250,7 @@ registerTool('assign_task', ..., async (args, context) => {
 ### 3.1 ask_project_rag Tool
 
 #### Python Implementation
-**File:** `agent_mcp/tools/rag_tools.py`
+**File:** `conexus/tools/rag_tools.py`
 
 ```python
 async def ask_project_rag_tool_impl(arguments: Dict[str, Any]) -> List[mcp_types.TextContent]:
@@ -262,7 +262,7 @@ async def ask_project_rag_tool_impl(arguments: Dict[str, Any]) -> List[mcp_types
 ```
 
 #### Node.js Implementation  
-**File:** `agent-mcp-node/src/tools/rag.ts`
+**File:** `conexus-node/src/tools/rag.ts`
 
 ```typescript
 registerTool('ask_project_rag', ..., async (args, context) => {

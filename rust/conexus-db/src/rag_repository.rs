@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/repositories/rag_repository.py`.
+//! Port of `conexus/repositories/rag_repository.py`.
 //!
 //! A module of plain functions — Python's version is a class, but its
 //! own docstring states instances are stateless and deliberately hold

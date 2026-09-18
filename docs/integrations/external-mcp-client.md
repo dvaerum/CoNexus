@@ -86,7 +86,7 @@ capabilities a `worker`- vs `manager`-role bearer carries).
    ```json
    {
      "mcpServers": {
-       "agent-mcp-<project>": {
+       "conexus-<project>": {
          "url": "http://<host>:1337/conexus/mcp/<project>",
          "headers": {
            "Authorization": "Bearer <per-agent-token>"

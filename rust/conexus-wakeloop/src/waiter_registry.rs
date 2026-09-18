@@ -1,5 +1,5 @@
 //! The per-agent `wait_for_events` waiter registry. Port of the waiter
-//! half of `agent_mcp/core/state.py` (`register_waiter`/
+//! half of `conexus/core/state.py` (`register_waiter`/
 //! `unregister_waiter`/`supersede_prior_waiters`/`notify_waiters`/
 //! `dispatch_synthetic_event`).
 //!

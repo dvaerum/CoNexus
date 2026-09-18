@@ -1,6 +1,6 @@
 //! Capability-based authorization vocabulary.
 //!
-//! Faithful port of `agent_mcp/core/capabilities.py`, with one
+//! Faithful port of `conexus/core/capabilities.py`, with one
 //! deliberate improvement the migration plan's exploration flagged:
 //! capability strings are stringly-typed in Python (a `frozenset[str]`
 //! validated only by a regex convention + a smoke test); here they're a
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn known_capabilities_has_exactly_29_entries() {
-        // Matches agent_mcp/core/capabilities.py's KNOWN_CAPABILITIES —
+        // Matches conexus/core/capabilities.py's KNOWN_CAPABILITIES —
         // locked by Wave 9 grilling; adding/removing one is a design
         // change, not a mechanical edit.
         assert_eq!(Capability::ALL.len(), 29);

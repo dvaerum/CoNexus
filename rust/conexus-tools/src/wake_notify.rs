@@ -1,7 +1,7 @@
 //! Classifies which post-write "wake" a `project_context`/
 //! `project_settings` write on a given `context_key` requires.
 //!
-//! Port of `agent_mcp/tools/project_context_tools.py::
+//! Port of `conexus/tools/project_context_tools.py::
 //! emit_context_write_wakes` (`_is_worker_policy_toggle`/
 //! `_is_loop_toggle` classification, plus real delivery for the half
 //! that's now buildable).

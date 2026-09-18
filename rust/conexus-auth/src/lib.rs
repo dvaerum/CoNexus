@@ -4,7 +4,7 @@
 //! group-capability overlay that `conexus_core::capability`'s own
 //! module doc deferred here), the `Tool`/`Requirement`/`dispatch()`
 //! machinery in [`requirement`]/[`tool`] (porting
-//! `agent_mcp/core/authorize.py` — the registration LIST itself,
+//! `conexus/core/authorize.py` — the registration LIST itself,
 //! Python's `all_tools()`/`register_tool(...)` call sites, lives one
 //! layer up in `conexus-tools`, not here), and [`forwarding_header`]
 //! (the signed `X-Conexus-Forwarded-Operator` header the router

@@ -4,7 +4,7 @@
 
 Accepted (2026-06-03).
 
-Amended by ADR-0020 (2026-07-31): the `/agent-mcp` mount prefix in the
+Amended by ADR-0020 (2026-07-31): the `/conexus` mount prefix in the
 URL examples below moves out of the application and into the reverse
 proxy (`X-Forwarded-Prefix`). This ADR's goal that a build artefact
 "works at any prefix" (below) is *completed* there — the prefix becomes
@@ -13,16 +13,16 @@ multi-tenant URL-parity decision itself is unchanged.
 
 ## Context
 
-Forks of agent-mcp can run in two modes:
+Forks of conexus can run in two modes:
 
 - **Multi-tenant**: router-fronted, many projects per machine, dashboard and
-  backends mounted under `/agent-mcp/__dashboard/<project>/...` and
-  `/agent-mcp/<project>/...`.
+  backends mounted under `/conexus/__dashboard/<project>/...` and
+  `/conexus/<project>/...`.
 - **Single-tenant**: one project per machine.
 
 The original Phase 0 plan was to make single-tenant skip the router entirely:
 the backend would bind directly to the public socket, the dashboard would be
-served at `/dashboard/` with no project prefix, and the `services.agent-mcp.router.enable`
+served at `/dashboard/` with no project prefix, and the `services.conexus.router.enable`
 home-manager toggle would gate which mode you were in.
 
 A grilling session on 2026-06-03 surfaced a stronger preference for URL
@@ -32,11 +32,11 @@ of whether the host has one project or many.
 ## Decision
 
 Single-tenant runs the router with N=1. Same absolute URLs as multi-tenant
-(`/agent-mcp/__dashboard/<name>/...` for the dashboard,
-`/agent-mcp/<name>/...` for the backend).
+(`/conexus/__dashboard/<name>/...` for the dashboard,
+`/conexus/<name>/...` for the backend).
 
-The previously-proposed `services.agent-mcp.router.enable` toggle is
-**replaced** by `services.agent-mcp.multiTenant : bool`. That option is
+The previously-proposed `services.conexus.router.enable` toggle is
+**replaced** by `services.conexus.multiTenant : bool`. That option is
 UI-only: it controls
 
 - whether the project picker is greyed out (single-tenant: greyed, only one

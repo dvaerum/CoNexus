@@ -1,4 +1,4 @@
-//! `conexus-cli router create-operator` -- port of `agent_mcp/cli.py`'s
+//! `conexus-cli router create-operator` -- port of `conexus/cli.py`'s
 //! `router_create_operator_cmd`. Same code path the env-var bootstrap
 //! and the setup wizard use (`conexus_router::identity::create_user`),
 //! so all bootstrap routes share argon2 hashing + retroactive

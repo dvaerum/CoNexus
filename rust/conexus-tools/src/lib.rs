@@ -1,5 +1,5 @@
 //! CoNexus MCP tool catalogue (Phase D). One module per
-//! `agent_mcp/tools/*.py`; [`registry::all_tools`] is the single,
+//! `conexus/tools/*.py`; [`registry::all_tools`] is the single,
 //! hand-maintained registration list (see `conexus_auth::tool`'s doc
 //! for why it lives HERE and not in `conexus-auth` — `conexus-tools`
 //! is the crate that actually knows tool implementations exist).

@@ -23,7 +23,7 @@ case programmatically.
 Two reasons:
 
 1. **Explicit opt-in.** When v2 ships under
-   `application/vnd.agent-mcp.v2+json`, the v1 wire contract keeps
+   `application/vnd.conexus.v2+json`, the v1 wire contract keeps
    working unchanged for callers that asked for v1. A client that
    sent `Accept: application/json` would have no way to tell which
    version it got — fragile.
@@ -40,7 +40,7 @@ Two reasons:
 ```json
 {
   "error": "version_required",
-  "message": "agent-mcp REST endpoints require an Accept header specifying the API version. Resend with: Accept: application/vnd.conexus.v1+json",
+  "message": "conexus REST endpoints require an Accept header specifying the API version. Resend with: Accept: application/vnd.conexus.v1+json",
   "supported_versions": ["v1"],
   "current_default": "v1",
   "docs": "https://github.com/dvaerum/CoNexus/blob/main/docs/integrations/api-versioning.md"
@@ -90,7 +90,7 @@ operator consumes):
 
 ```json
 {
-  "service": "agent-mcp",
+  "service": "conexus",
   "mode": "multi-tenant",
   "endpoints": {
     "api": "/conexus/api",
@@ -125,7 +125,7 @@ operation.
 ## Versioning policy
 
 - A new version ships as a new media-type subtype:
-  `application/vnd.agent-mcp.v2+json`.
+  `application/vnd.conexus.v2+json`.
 - The router accepts ALL supported versions in parallel; the response
   shape matches the requested version.
 - `supported_versions` in the 406 error body always lists what the

@@ -1,4 +1,4 @@
-//! Full port of `agent_mcp/repositories/message_repository.py`,
+//! Full port of `conexus/repositories/message_repository.py`,
 //! landed in 3 PRs per the migration plan's progress log (core CRUD,
 //! then pagination, then this — threading + admin/maintenance).
 //!

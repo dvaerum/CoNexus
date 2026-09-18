@@ -20,7 +20,7 @@ The backend/router implementation (`rust/` — `conexus-backend`,
 `conexus-router`, `conexus-tools`, `conexus-db`, `conexus-auth`,
 `conexus-core`, `conexus-wakeloop`, `conexus-cli`,
 `conexus-daemon-agent`, `conexus-vec`) is Rust. The dashboard
-(`agent_mcp/dashboard/`) is a Next.js/TypeScript frontend, unrelated
+(`conexus/dashboard/`) is a Next.js/TypeScript frontend, unrelated
 to that migration — it was never Python and didn't need to move. Both
 implementations were originally Python; the full migration record
 lives in this repo's own commit history — `git log --grep=Phase` (or
@@ -52,8 +52,8 @@ cargo fmt --all --check
 cargo audit
 cd ..
 
-# Dashboard (agent_mcp/dashboard/)
-cd agent_mcp/dashboard
+# Dashboard (conexus/dashboard/)
+cd conexus/dashboard
 npm ci
 npm test          # vitest — source-grep regression guards, no jsdom
 npm run lint
@@ -115,7 +115,7 @@ temp-file-backed SQLite connection (`rusqlite`/`sea-orm` both point at
 the same file when a test needs both), a real bound TCP listener for
 an HTTP dependency, a real subprocess for a CLI/systemd contract —
 this project's own established discipline, not a stylistic preference.
-Dashboard tests live in `agent_mcp/dashboard/tests/` (vitest) — mostly
+Dashboard tests live in `conexus/dashboard/tests/` (vitest) — mostly
 source-text regression guards (no jsdom/RTL setup in this repo), since
 most of what they pin is a property of the source, not runtime
 behaviour. Nix/home-manager regression checks live at
@@ -166,7 +166,7 @@ Upstream is still Python; this fork's backend/router is now Rust
 (`rust/`). A `git cherry-pick` of a backend/router fix genuinely
 applies only if upstream's equivalent Python code still exists in
 the same shape — check before assuming it applies. Dashboard fixes
-(`agent_mcp/dashboard/`) are unaffected by the language split and
+(`conexus/dashboard/`) are unaffected by the language split and
 cherry-pick the same way they always did.
 
 When a fix is general (i.e. anyone running upstream could use it,
@@ -191,7 +191,7 @@ This repo's backend/router implementation lives in `rust/` (the
 `conexus-*` crates, Rust — what the NixOS deployment runs; the
 original Python implementation was deleted wholesale once the Rust
 rewrite reached functional completeness). The dashboard lives in
-`agent_mcp/dashboard/` (Next.js/TypeScript, unrelated to that
+`conexus/dashboard/` (Next.js/TypeScript, unrelated to that
 migration — it predates it and was never Python). PRs target
 whichever of the two the change actually touches; CI gates both
 independently (see "CI must pass" above), plus a Nix/home-manager

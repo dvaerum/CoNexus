@@ -1,4 +1,4 @@
-//! Full port of `agent_mcp/repositories/task_repository.py`, landed
+//! Full port of `conexus/repositories/task_repository.py`, landed
 //! in 2 PRs per the migration plan's progress log (core CRUD, then
 //! this — `bulk_update_fields` + the `terminal_task_guard` DB-trigger
 //! detection). This is the LAST of the 8 repositories — Phase B is

@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/core/principal_builder.py::_resolve_can_wake_loop`
+//! Port of `conexus/core/principal_builder.py::_resolve_can_wake_loop`
 //! (Phase E1 PR A) — the DB-backed check gating
 //! `Principal::can_wake_loop`, which in turn gates the wake-loop
 //! bootstrap `initialize` instructions (`conexus-backend::instructions`)

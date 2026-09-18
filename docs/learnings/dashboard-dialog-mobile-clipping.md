@@ -7,7 +7,7 @@ with its bottom fields (`Interval (seconds)`, `Max runs`, `Until`) and
 its Save/Cancel buttons cut off behind the mobile browser's own address
 bar / tab bar, with no way to scroll down to reach them.
 
-Root cause: `agent_mcp/dashboard/components/dashboard/schedules-dashboard.tsx`
+Root cause: `conexus/dashboard/components/dashboard/schedules-dashboard.tsx`
 never adopted the shared `<FormDialog>` shell
 (`components/dashboard/shared/form-dialog.tsx`) that tasks, groups, and
 messages already use — it was a hand-rolled `<Dialog>`/`<DialogContent>`
@@ -51,7 +51,7 @@ touched since it was first written.
 
 ## The permanent guard
 
-`agent_mcp/dashboard/tests/polish-mobile-pass.test.ts` — describe
+`conexus/dashboard/tests/polish-mobile-pass.test.ts` — describe
 block `"CC-14 companion: DialogContent mobile height cap"`, test
 `"every <DialogContent> caps height with a dvh unit"` — globs every
 `<DialogContent>` in the tree and asserts a `dvh`-based

@@ -9,7 +9,7 @@ specific `insertmanyvalues` lesson doesn't mechanically generalize —
 kept as a record of the original bug, not current guidance.
 
 Found while renaming `task_notes` → `task_comments`
-(`agent_mcp/db/models/task_comment.py`, migration
+(`conexus/db/models/task_comment.py`, migration
 `0026_rename_task_notes_to_task_comments.py`). `TaskComment.note_id` is
 declared `Integer, primary_key=True, autoincrement=True, nullable=True`
 — the `nullable=True` exists only to byte-match migration

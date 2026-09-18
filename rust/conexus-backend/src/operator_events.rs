@@ -1,5 +1,5 @@
 //! In-process pub/sub hub for operator dashboard SSE subscribers.
-//! Port of `agent_mcp/features/operator_events.py`.
+//! Port of `conexus/features/operator_events.py`.
 //!
 //! Operators are NOT agents -- the agent-scoped `WaiterRegistry`/
 //! `session_registry` machinery keys on `agent_id`, which a dashboard

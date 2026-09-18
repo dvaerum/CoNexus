@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/router/sso.py`'s proxy-header mode. Phase E2,
+//! Port of `conexus/router/sso.py`'s proxy-header mode. Phase E2,
 //! `conexus-router-sso-proxy-header` (PR21 of the 24-PR breakdown) --
 //! dedicated background research pass (real source reads: the full
 //! 1759-LOC file, the real proxy-header test files, cross-checked

@@ -1,6 +1,6 @@
 //! `ToolResult` — the typed return shape of a tool implementation.
 //!
-//! Faithful port of `agent_mcp/core/tool_result.py` (the migration plan's
+//! Faithful port of `conexus/core/tool_result.py` (the migration plan's
 //! own pick for "the single most Rust-native pattern already in the
 //! codebase" — a Python `Union` of frozen dataclasses, matched via
 //! `isinstance()` in three separate renderers, becomes a native `enum`

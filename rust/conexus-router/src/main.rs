@@ -1,5 +1,5 @@
 //! CoNexus always-on URL-keyed router. Ported from the deleted Python
-//! `agent_mcp/cli.py::router_cmd` + `agent_mcp/router/app.py`.
+//! `conexus/cli.py::router_cmd` + `conexus/router/app.py`.
 //!
 //! Full app-wiring is done: `RouterState` construction, the
 //! fail-closed `boot::assert_startup_safe` guard, the router DB boot
@@ -73,8 +73,8 @@ use axum::routing::get;
 use axum::Router;
 use clap::Parser;
 
-/// `agent-mcp router`'s real flag surface (`router_cmd` in
-/// `agent_mcp/cli.py`). `--host`/router-DB-path/single-tenant-safety
+/// `conexus router`'s real flag surface (`router_cmd` in
+/// `conexus/cli.py`). `--host`/router-DB-path/single-tenant-safety
 /// knobs have NO CLI flag in Python either (env-var-only:
 /// `CONEXUS_ROUTER_HOST`/`CONEXUS_ROUTER_DB`/
 /// `CONEXUS_ALLOW_INSECURE_BIND`/`CONEXUS_REQUIRE_SECURE_COOKIES`)

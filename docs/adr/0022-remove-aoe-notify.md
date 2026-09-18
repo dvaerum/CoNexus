@@ -28,14 +28,14 @@ the operator-writable `config_*` namespace.
 
 Two things made it dead weight:
 
-1. **Its premise died with Wave 7.** agent-mcp no longer owns or spawns
+1. **Its premise died with Wave 7.** conexus no longer owns or spawns
    the recipient's Claude session, so there is no tmux pane for it to
    poke. `send_agent_message` already stores every message for pickup
    via `wait_for_events` / `get_agent_messages`.
 2. **ADR-0021 superseded it with the right shape.** The delivery
    transport is a per-worker, bearer-authed SSE channel the runtime
-   (the AoE bridge) opens *to* agent-mcp; the dependency points the
-   correct way (the runtime reaches into agent-mcp, not the reverse),
+   (the AoE bridge) opens *to* conexus; the dependency points the
+   correct way (the runtime reaches into conexus, not the reverse),
    it is skinny-by-default (never ships the body), and it is driven by a
    tunable per-project policy. That channel is deployed and consumed.
 
@@ -77,7 +77,7 @@ redaction automatically.
 
 **Positive**
 - Removes an outbound HTTP dependency and the title→session-id
-  heuristic; agent-mcp no longer reaches out to AoE at all.
+  heuristic; conexus no longer reaches out to AoE at all.
 - **Permanently retires the R8-F1 / R9-F2 webhook-SSRF class**: there is
   no operator-settable outbound URL on the message path any more, so the
   bespoke sysadmin gate that guarded it is no longer needed.

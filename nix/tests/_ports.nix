@@ -1,4 +1,4 @@
-# Shared port assignments for the agent-mcp VM tests.
+# Shared port assignments for the conexus VM tests.
 #
 # Held in one place so the multi-tenant + single-tenant scaffolds
 # don't drift apart and so the fake-openai sidecar's hardcoded

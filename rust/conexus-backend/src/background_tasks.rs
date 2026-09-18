@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use crate::server::SharedState;
 
-/// Port of `agent_mcp/features/message_retention.py`. The
+/// Port of `conexus/features/message_retention.py`. The
 /// `agent_messages` table grows unbounded (rows are only ever flipped
 /// to `read=1`, never deleted) -- this prunes read rows older than a
 /// per-project `config_message_retention_days` knob (absent/0 =
@@ -97,7 +97,7 @@ mod message_retention {
     }
 }
 
-/// Port of `agent_mcp/features/subject_backfill.py`. A root message
+/// Port of `conexus/features/subject_backfill.py`. A root message
 /// sent without an explicit subject stores `subject = NULL`; this
 /// sweep titles the backlog LATER (batched, so the local model is
 /// loaded once per sweep and amortised) rather than blocking the
@@ -196,7 +196,7 @@ mod subject_backfill {
     }
 }
 
-/// Port of `agent_mcp/features/claude_session_monitor.py`. Watches
+/// Port of `conexus/features/claude_session_monitor.py`. Watches
 /// `.agent/registry.json` (the git-agentmcp hook's own multi-agent
 /// coordination file) for Claude Code process activity and mirrors it
 /// into the `claude_code_sessions` table.
@@ -361,7 +361,7 @@ mod claude_session_monitor {
     }
 }
 
-/// Port of `agent_mcp/features/rag/indexing.py::run_rag_indexing_
+/// Port of `conexus/features/rag/indexing.py::run_rag_indexing_
 /// periodically` (recovered from git history -- deleted in PR #1010's
 /// bulk Python deletion, before this Rust replacement existed; see
 /// `conexus_tools::rag_chunking`'s own module doc for the recovery

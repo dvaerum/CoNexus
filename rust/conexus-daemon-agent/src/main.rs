@@ -1,7 +1,7 @@
 //! CoNexus reference daemon-agent event loop.
 //!
-//! Faithful Rust port of `nix/agent-mcp-daemon-agent-runner.py` +
-//! `nix/agent-mcp-daemon-agent.sh.in`, folded into ONE binary (no
+//! Faithful Rust port of `nix/conexus-daemon-agent-runner.py` +
+//! `nix/conexus-daemon-agent.sh.in`, folded into ONE binary (no
 //! separate bash wrapper substituting `@python@`/`@runner@` paths --
 //! the token/URL/cursor-path resolution the wrapper did is done
 //! directly in Rust instead, since there's no interpreter boundary

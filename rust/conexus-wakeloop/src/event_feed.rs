@@ -1,5 +1,5 @@
 //! The `wait_for_events`/`fetch_events_since` event-feed pipeline. Port
-//! of the pure/stateless half of `agent_mcp/tools/agent_communication_
+//! of the pure/stateless half of `conexus/tools/agent_communication_
 //! tools.py`'s helpers feeding `assemble_event_feed` (the DB-reading
 //! collectors and the full pipeline assembly land in later PRs, per the
 //! Phase D3 research report's suggested 3-PR sequence).

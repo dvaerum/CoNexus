@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/features/task_queries.py`'s `TaskQueryEngine`
+//! Port of `conexus/features/task_queries.py`'s `TaskQueryEngine`
 //! (Phase D4, PR 2/8) — the acknowledged genuinely-new-design slice
 //! of the `task_tools.py` port (flagged in the Phase D4 research
 //! pass), needed by exactly one tool (`view_tasks`, PR 3).

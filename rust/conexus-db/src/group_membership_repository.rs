@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/router/group_resolver.py` (Phase E2 PR 4,
+//! Port of `conexus/router/group_resolver.py` (Phase E2 PR 4,
 //! `conexus-router-group-graph`) -- the graph layer on top of
 //! `group_membership`: transitive resolution (up AND down), insert-time
 //! cycle detection, sysadmin inheritance, project-role resolution, and

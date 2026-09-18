@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/agent_roster_tools.py` (Phase D5, PR 3) —
+//! Port of `conexus/tools/agent_roster_tools.py` (Phase D5, PR 3) —
 //! the single `view_agents` peer-roster tool. Any authenticated agent
 //! (worker/manager) or operator tier can list every live agent's
 //! public identity + self-authored profile, answering "who do I

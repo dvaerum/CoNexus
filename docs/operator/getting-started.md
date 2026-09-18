@@ -30,7 +30,7 @@ Welcome to CoNexus! This guide will take you from installation to your first suc
 ## ⚡ Quick Install
 
 The original Python implementation's standalone single-process mode
-(`uv run -m agent_mcp.cli`) doesn't have a direct Rust equivalent —
+(`uv run -m conexus.cli`) doesn't have a direct Rust equivalent —
 `conexus-backend` is deliberately UDS-only and reachable through
 `conexus-router`'s proxy in every real deployment, matching the
 architecture the production Nix/home-manager module actually runs.
@@ -45,7 +45,7 @@ cd CoNexus
 
 nix build .#conexus-backend -o result-backend      # the per-project backend binary
 nix build .#conexus-router -o result-router        # the always-on router binary
-nix build .#agent-mcp-dashboard -o result-dashboard  # the dashboard static export
+nix build .#conexus-dashboard -o result-dashboard  # the dashboard static export
 ```
 
 `conexus-cli` (used below for `migrate`) has no Nix flake output —
@@ -55,8 +55,8 @@ binaries alone (`conexus-backend`/`conexus-router`/`conexus-cli`, and
 any of the other `rust/` workspace crates) can likewise be built with
 `cargo build --release` for local development without Nix — but
 `cargo` cannot build the dashboard; that's always the separate `npm
-run build` step in `agent_mcp/dashboard/` (or the `nix build
-.#agent-mcp-dashboard` above). See
+run build` step in `conexus/dashboard/` (or the `nix build
+.#conexus-dashboard` above). See
 [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full build/test loop.
 
 ### 2. Register a project and start the router
@@ -71,8 +71,8 @@ rust/target/release/conexus-cli migrate /path/to/your/project
 ./result-router/bin/conexus-router \
   --port 5454 \
   --projects-file projects.json \
-  --sock-dir /tmp/agent-mcp-sockets \
-  --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
+  --sock-dir /tmp/conexus-sockets \
+  --dashboard-dir ./result-dashboard/share/conexus-dashboard
 ```
 
 The router lazily starts `conexus-backend` for a project on its first
@@ -146,7 +146,7 @@ export CONEXUS_BOOTSTRAP_USERNAME="dennis"
 # Pass the password via a sops-decrypted env file or systemd
 # `EnvironmentFile=` — anything that doesn't leak into the
 # command line / `ps`-readable args.
-export CONEXUS_BOOTSTRAP_PASSWORD="$(cat /run/secrets/agent-mcp-bootstrap-pw)"
+export CONEXUS_BOOTSTRAP_PASSWORD="$(cat /run/secrets/conexus-bootstrap-pw)"
 conexus-router --port 5454
 ```
 
@@ -507,7 +507,7 @@ instead — see
 node --version  
 
 # Reinstall dependencies in dashboard directory
-cd agent_mcp/dashboard
+cd conexus/dashboard
 rm -rf node_modules package-lock.json
 npm install
 npm run dev

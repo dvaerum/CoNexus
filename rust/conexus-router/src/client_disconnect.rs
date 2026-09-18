@@ -1,5 +1,5 @@
 //! Peer-disconnect vocabulary shared by the router's request paths.
-//! Port of `agent_mcp/router/client_disconnect.py` (60 LOC, part of
+//! Port of `conexus/router/client_disconnect.py` (60 LOC, part of
 //! Phase E2 PR 15, `conexus-router-headers-misc`).
 //!
 //! **`client_is_gone` has no function to port** -- it reads

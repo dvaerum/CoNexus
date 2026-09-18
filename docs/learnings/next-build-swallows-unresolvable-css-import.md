@@ -27,7 +27,7 @@ build, `vitest run` doesn't render `globals.css`, and CI's "Dashboard
 build" job apparently didn't diff or size-check the output artifact.
 
 **Fix**: delete the dead `@import`. **Regression guard**:
-`agent_mcp/dashboard/tests/css-imports-resolve.test.ts` parses every
+`conexus/dashboard/tests/css-imports-resolve.test.ts` parses every
 `@import "pkg/...";` in `globals.css` and asserts the package name is
 declared in `package.json`.
 

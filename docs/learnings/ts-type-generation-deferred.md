@@ -2,7 +2,7 @@
 
 The original Rust migration plan's Target Architecture named `specta`/
 `ts-rs` as the replacement for the Python pipeline that generated
-`agent_mcp/dashboard/lib/api-types.generated.ts` from `agent_mcp/db/
+`conexus/dashboard/lib/api-types.generated.ts` from `conexus/db/
 pydantic_mirrors.py` (via `scripts/generate_ts_types.py`, pinned by
 `tests/test_orm_is_source_of_truth.py`). All three were deleted in
 Phase F's Python-decommission pass rather than ported, after research
@@ -17,7 +17,7 @@ found:
 - **The generated file was already stale, silently.** It still
   referenced `task_notes`/`TaskNoteMirror` months after the real
   rename to `task_comments`/`TaskCommentMirror`
-  (`agent_mcp/db/pydantic_mirrors.py`). The invariant test that was
+  (`conexus/db/pydantic_mirrors.py`). The invariant test that was
   supposed to catch this only compared two fresh generator runs
   against each other — it never read the committed file, so the drift
   was invisible.

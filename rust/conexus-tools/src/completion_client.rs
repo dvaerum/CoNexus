@@ -1,5 +1,5 @@
 //! Provider-agnostic chat-completion HTTP client. Port of
-//! `agent_mcp/external/completion_service.py`.
+//! `conexus/external/completion_service.py`.
 //!
 //! Same design departures as [`crate::embedding_client`] (see that
 //! module's doc for the full rationale): no env-mutation bootstrap to
@@ -251,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn agent_mcp_llm_base_url_overrides_the_chat_endpoint_for_openai_too() {
+    fn conexus_llm_base_url_overrides_the_chat_endpoint_for_openai_too() {
         let client = resolve(env(&[
             ("OPENAI_API_KEY", "sk-real"),
             ("OPENAI_MODEL", "gpt-4.1"),
@@ -263,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn openai_base_url_is_the_fallback_when_agent_mcp_llm_base_url_is_unset() {
+    fn openai_base_url_is_the_fallback_when_conexus_llm_base_url_is_unset() {
         let client = resolve(env(&[
             ("OPENAI_API_KEY", "sk-real"),
             ("OPENAI_MODEL", "gpt-4.1"),
@@ -281,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn chat_base_url_prefers_agent_mcp_llm_base_url_over_openai_base_url() {
+    fn chat_base_url_prefers_conexus_llm_base_url_over_openai_base_url() {
         assert_eq!(
             resolve_chat_base_url(env(&[
                 ("CONEXUS_LLM_BASE_URL", "http://a"),

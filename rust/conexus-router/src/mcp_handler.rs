@@ -1,5 +1,5 @@
 //! The router's `/mcp` + `/api/*` HTTP handler layer -- port of
-//! `agent_mcp/router/app.py`'s `backend_mcp_handler`/
+//! `conexus/router/app.py`'s `backend_mcp_handler`/
 //! `backend_api_handler` (Phase E2 PR 9). Framework-agnostic, like
 //! `proxy_core.rs`: no axum types here, so app-wiring (PR 23) converts
 //! this module's plain Rust request/response shapes into real axum
@@ -609,7 +609,7 @@ pub async fn backend_api_handler(
         // `ensure()` triggers a `systemctl start`. A cold backend with
         // no prior bearer traffic would otherwise 401 every
         // cookie-authenticated dashboard request in a tight loop (see
-        // `agent_mcp/router/app.py::_forwarding_header_from_cookie`'s
+        // `conexus/router/app.py::_forwarding_header_from_cookie`'s
         // own F015 v5 note).
         match ensure::ensure(store, registry, sock_dir, &real_name, "backend", ensure_cfg).await {
             Ok(_) => {

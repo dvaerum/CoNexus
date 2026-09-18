@@ -1,5 +1,5 @@
 //! Idle backlog reminder for the `wait_for_events` wake loop. Port of
-//! `agent_mcp/core/idle_reminder.py`.
+//! `conexus/core/idle_reminder.py`.
 //!
 //! When an agent is sitting idle in the event loop but still has
 //! unaddressed work -- unread messages and/or OPEN tasks assigned to it

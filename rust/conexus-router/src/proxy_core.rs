@@ -1,4 +1,4 @@
-//! The reverse-proxy body -- port of `agent_mcp/router/app.py::
+//! The reverse-proxy body -- port of `conexus/router/app.py::
 //! _proxy_to_backend` (Phase E2 PR 8). A dedicated research pass
 //! flagged this as "the single highest-risk trap for the whole
 //! phase" because of the R7-F3 body-buffer invariant: the full
@@ -70,8 +70,8 @@ pub struct AliasInfo {
 /// from_static`/header-map comparison; that crate needs the
 /// mixed-case display form for `sign`/`verify`'s wire format) -- a
 /// `#[cfg(test)]` assertion below keeps the two from silently
-/// re-diverging the way `X-Agent-MCP-Forwarded-Operator` vs.
-/// `x-agent-mcp-forwarded-operator` once did.
+/// re-diverging the way `X-CoNexus-Forwarded-Operator` vs.
+/// `x-conexus-forwarded-operator` once did.
 pub const FORWARDING_HEADER_NAME: &str = "x-conexus-forwarded-operator";
 
 const HOP_BY_HOP_HEADERS: [&str; 6] = [

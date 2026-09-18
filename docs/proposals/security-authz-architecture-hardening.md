@@ -11,7 +11,7 @@
   trust-model question stays flagged from Phase 1.
 * **Historical — describes the now-deleted Python implementation**,
   superseded by the full Python→Rust rewrite this repo has since
-  completed. Every file:line citation below (`agent_mcp/router/sso.py`,
+  completed. Every file:line citation below (`conexus/router/sso.py`,
   `app/rest_principal.py`, `tools/registry.py`, `core/access.py`,
   `core/stream_gates.py`, `core/agent_secrets.py`,
   `router/path_policy.py`, etc.) is a dead path. Findings A/C/D/H were
@@ -61,7 +61,7 @@
 * Date: 2026-08-23
 * Source: two security-focused `/improve-codebase-architecture` passes.
   Pass 1 ran parallel with pentest-all round 21 (see
-  `~/.claude/plans/pentest-all-Agent-MCP.md` for the full pentest ledger it
+  `~/.claude/plans/pentest-all-CoNexus.md` for the full pentest ledger it
   draws on) and produced Findings A–H below. Pass 2 (follow-up, after
   Phase 0 landed) sanity-checked A–F's sequencing and surfaced Findings
   N1–N6. Pass 2's own HTML report is an ephemeral `/tmp` artifact, not
@@ -85,7 +85,7 @@
 
 ## Why this exists
 
-Agent-MCP has run 21 rounds of `/pentest-all` since the 2026-08-19 ledger
+CoNexus has run 21 rounds of `/pentest-all` since the 2026-08-19 ledger
 reset. Severity has trended down (HIGH/MEDIUM → LOW), but the same *shape* of
 bug keeps recurring in two lineages:
 
@@ -96,14 +96,14 @@ bug keeps recurring in two lineages:
    by 3 separate pentest lanes in the same round, on top of R20-F4's fix for
    the first batch).
 2. **The SSO subject-key lineage** — 5 consecutive rounds (R16→R20) where
-   fixing the previous round's finding in `agent_mcp/router/sso.py` seeded
+   fixing the previous round's finding in `conexus/router/sso.py` seeded
    the next round's finding, in the same handful of functions.
 
 Both are architectural, not per-instance. Continuing to fix instances
 one-by-one is what the pentest loop has been doing for 21 rounds; this
 proposal is the structural fix that ends the recurrence, per the review's
 deletion-test reasoning (see the HTML report,
-`architecture-review-agent-mcp-20260823-080634.html`, for full before/after
+`architecture-review-conexus-20260823-080634.html`, for full before/after
 diagrams and file:line evidence — this doc is the actionable sequencing on
 top of it).
 
@@ -336,7 +336,7 @@ rediscover the asymmetry mid-implementation.
 
 **Widen the arch-enforcement invariant to all 3 request surfaces.**
 `test_arch_enforced_revalidation.py` (post-Phase-0) discovers targets
-dynamically but only globs `agent_mcp/router/*.py` — router admin is
+dynamically but only globs `conexus/router/*.py` — router admin is
 enforced, backend REST (40+ handlers) relies on `_proxy_to_backend`'s
 buffer-then-forward as an *undocumented* security property (FLAG-R7-1),
 MCP tools have 2 ad-hoc re-checks. Sequenced after Phase 2 because its
@@ -444,7 +444,7 @@ streams (`events.py`, `delivery.py`, `main_app.py`'s GET /mcp pump,
   loses the stream instead of delivering on a stale verdict.
 - **The actual deliverable is the discovery test.**
   `tests/test_arch_enforced_stream_revalidation.py` AST-walks the whole
-  `agent_mcp` package for awaited zero-arg `.get()` calls (the
+  `conexus` package for awaited zero-arg `.get()` calls (the
   queue-dequeue shape, bare or `wait_for`-wrapped) and fails on any that
   isn't the single one inside the seam — so the *fifth* stream trips a
   test instead of inheriting nothing. Its RED half is kept permanently:
@@ -467,7 +467,7 @@ streams (`events.py`, `delivery.py`, `main_app.py`'s GET /mcp pump,
   branch unchecked — which matters for `wait_for_events`, whose idle
   branch can itself return scheduled-fire and idle-reminder content.
 
-**N3 Tier 2 — done.** `agent_mcp/router/path_policy.py` is now the one
+**N3 Tier 2 — done.** `conexus/router/path_policy.py` is now the one
 home for the three remaining classification questions, consumed by
 `auth_middleware`, `setup_wizard` and `app.backend_api_handler`. Tests:
 `tests/router/test_arch_n3_tier2_classification.py`.
@@ -512,7 +512,7 @@ home for the three remaining classification questions, consumed by
 
 ### Phase 5 — largest effort, do last — **done** (PRs #735, #736, #737)
 
-**D — done** (PRs #735, #736). `agent_mcp/app/rest_principal.py`'s
+**D — done** (PRs #735, #736). `conexus/app/rest_principal.py`'s
 `RestPrincipal` replaced the three-shape `dict[str, Any]`, and
 `deps._forwarding_route_role` — the module-level `ContextVar` that carried
 the forwarding caller's signed `(project_role, sysadmin)` out of band — is
@@ -562,7 +562,7 @@ deleted.
   door fed before, with a scope note saying why. **Open question for the
   operator:** should the forwarding door's signed role now count toward
   confirmed-operator-tier?
-**N6 structural half — done** (PR #737). `agent_mcp/core/agent_secrets.py`
+**N6 structural half — done** (PR #737). `conexus/core/agent_secrets.py`
 is the one owner of "which columns on an `agents` row are credentials".
 (N6's two fix-now items — the plaintext-bearer log line and the
 password-policy gap — landed earlier, Step 0/PR #721.)

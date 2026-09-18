@@ -1,5 +1,5 @@
 //! Operator-session auth gate for the router's dashboard/REST surface.
-//! Port of `agent_mcp/router/auth_middleware.py`'s
+//! Port of `conexus/router/auth_middleware.py`'s
 //! `require_operator_session_middleware` (Phase E2 PR 12,
 //! `conexus-router-session-gate`).
 //!

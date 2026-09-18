@@ -1,5 +1,5 @@
 //! Streaming-lifecycle revalidation seam. Port of
-//! `agent_mcp/core/stream_gates.py` (Finding N5).
+//! `conexus/core/stream_gates.py` (Finding N5).
 //!
 //! Python's module doc explains WHY this exists: four long-lived
 //! streams each hand-rolled the same "re-check, bounded wait, re-check

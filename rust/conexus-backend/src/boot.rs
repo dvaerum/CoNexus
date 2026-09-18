@@ -1,5 +1,5 @@
 //! Boot sequence: create the project dir, init the per-project schema,
-//! load the forwarding-HMAC key. Port of `agent_mcp/app/
+//! load the forwarding-HMAC key. Port of `conexus/app/
 //! server_lifecycle.py`'s steps 1-2 + `server_bootstrap.py`'s
 //! `_load_forwarding_hmac_key` -- exact order, exact failure shape
 //! (a hard `anyhow::bail!`/process exit on a directory/schema failure,

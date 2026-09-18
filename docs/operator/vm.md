@@ -1,7 +1,7 @@
 # CoNexus — NixOS VM for end-to-end testing
 
 This directory ships a Nix flake that boots a self-contained NixOS
-VM running the full agent-mcp deployment (router, per-project
+VM running the full conexus deployment (router, per-project
 backends, dashboard, local Ollama embeddings). The VM is built to be
 the smallest reproducible mirror of the production deployment that
 still lets you point a real client at `http://localhost:5454` and
@@ -68,7 +68,7 @@ The host always reaches the VM on `http://localhost:5454`, translated
 to guest port 1337 via qemu user-mode hostfwd, bound to 127.0.0.1.
 
 History: this VM used to also support `--minimal`, booting a
-single-tenant agent-mcp backend directly on guest TCP `:8080` with no
+single-tenant conexus backend directly on guest TCP `:8080` with no
 router in front of it. That shape ran the Python implementation and
 was retired together with it — the Rust `conexus-backend` binary only
 serves over a Unix domain socket, with no standalone TCP-port mode to
@@ -93,7 +93,7 @@ the CoNexus Rust implementation (`rust/conexus-router`,
 
 Project creation goes through the dashboard's authenticated REST API
 (`POST /api/router/projects`); see the post-Phase-1+2 router for the
-URL convention. The legacy `agent-mcp-bootstrap.service` that POSTed
+URL convention. The legacy `conexus-bootstrap.service` that POSTed
 to `/conexus/__create` on first boot was retired with ADR 0014 —
 the `__create` endpoint no longer exists.
 
@@ -105,7 +105,7 @@ directory (the `ollama/` half exists in `llm = "internal"` mode only —
 
 ```
 ./vm-persistent-data/
-├── disk.qcow2                       # 8 GB sparse — agent-mcp state
+├── disk.qcow2                       # 8 GB sparse — conexus state
 └── ollama/                          # 9p host share — Ollama models
     └── models/blobs/sha256-…        # ~610 MB qwen3-embedding blob
 
@@ -118,10 +118,10 @@ directory (the `ollama/` half exists in `llm = "internal"` mode only —
 └── models/                          # blobs/, manifests/
 ```
 
-agent-mcp state goes on the qcow2 because SQLite's WAL mode needs
+conexus state goes on the qcow2 because SQLite's WAL mode needs
 real `fcntl` locks that 9p can't fake. Ollama state goes on 9p
 because its blobs are plain files — that way, deleting
-`disk.qcow2` to wipe agent-mcp state doesn't force a ~610 MB
+`disk.qcow2` to wipe conexus state doesn't force a ~610 MB
 redownload of the embedding model. The two substrates are
 independent: nuke either without disturbing the other.
 
@@ -196,7 +196,7 @@ and `embedding_client.rs` for the resolution rules those vars feed.
 a host that forgot to start llama-cpp/ollama would otherwise give you
 a VM that boots green and fails deep inside RAG indexing — a passing
 E2E run against a backend with no embeddings. `external` mode
-therefore adds `agent-mcp-llm-endpoint-check.service`: a boot-time
+therefore adds `conexus-llm-endpoint-check.service`: a boot-time
 oneshot that curls both `/v1/models` endpoints (10 attempts, 2 s
 apart) and hard-fails, naming the exact URLs on the serial console, if
 either is unreachable. Every unit that embeds or completes
@@ -226,7 +226,7 @@ The flake exposes:
 ```
 nix build github:dvaerum/CoNexus#conexus-backend      # Rust backend
 nix build github:dvaerum/CoNexus#conexus-router       # Rust router
-nix build github:dvaerum/CoNexus#agent-mcp-dashboard  # static export
+nix build github:dvaerum/CoNexus#conexus-dashboard  # static export
 nix build github:dvaerum/CoNexus#vm-multi             # multi-tenant VM
 nix build github:dvaerum/CoNexus#default              # wrapper script
 ```
@@ -240,15 +240,15 @@ opt-in.
 
 ```nix
 {
-  inputs.agent-mcp.url = "github:dvaerum/CoNexus";
-  outputs = { self, nixpkgs, agent-mcp, ... }: {
+  inputs.conexus.url = "github:dvaerum/CoNexus";
+  outputs = { self, nixpkgs, conexus, ... }: {
     nixosConfigurations.example = nixpkgs.lib.nixosSystem {
       modules = [
-        agent-mcp.nixosModules.default
+        conexus.nixosModules.default
         ({ ... }: {
-          services.agent-mcp = {
+          services.conexus = {
             enable = true;
-            src = agent-mcp;
+            src = conexus;
             externalUrl = "https://agent.example.com";
           };
         })
@@ -271,7 +271,7 @@ The module covers the systemd shape only — TLS termination
   no per-user systemd instance), and `CONEXUS_ROUTER_HOST` lets the
   VM bind `0.0.0.0` for qemu hostfwd.
 - A polkit rule (in `nix/module.nix`) grants the unprivileged
-  `agent-mcp` user permission to start/stop `conexus@*.service`
+  `conexus` user permission to start/stop `conexus@*.service`
   units via systemd, so the router doesn't need root.
 - In `llm = "internal"` mode (the default — see
   [LLM endpoints](#llm-endpoints-in-guest-internal-vs-on-host-external)),

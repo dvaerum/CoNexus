@@ -27,7 +27,7 @@ only" here.
 
 Backend/router tests live alongside the code (`#[cfg(test)] mod
 tests` in the same `.rs` file); dashboard tests live in
-`agent_mcp/dashboard/tests/*.test.ts`; Nix/home-manager tests live in
+`conexus/dashboard/tests/*.test.ts`; Nix/home-manager tests live in
 `nix/tests/checks/*.sh`. Name the specific test(s) so a reviewer can
 run them locally.
 -->
@@ -44,7 +44,7 @@ run them locally.
 
 - [ ] Tests added (or "n/a — build only" above)
 - [ ] Rust: `cargo fmt --check` / `cargo clippy --all-targets --locked -- -D warnings` / `cargo test --locked` clean (in `rust/`, `aoe-bridge/`, or both — whichever this PR touches)
-- [ ] Dashboard: `npm test` / `npm run lint` / `npm run build` green (`cd agent_mcp/dashboard`) — if touching the dashboard
+- [ ] Dashboard: `npm test` / `npm run lint` / `npm run build` green (`cd conexus/dashboard`) — if touching the dashboard
 - [ ] `bash nix/tests/checks/run-all.sh` green — if touching `nix/`
 - [ ] CI green on this PR
 - [ ] Branch name matches `fix/…`, `feat/…`, `chore/…`, or `upstream/…`

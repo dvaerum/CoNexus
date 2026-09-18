@@ -10,7 +10,7 @@
   dispatching to `users_groups_rest.rs`'s handlers, which call the
   decision logic in `admin_group_capabilities.rs`),
   and a dashboard UI to manage per-group capabilities
-  (`agent_mcp/dashboard/components/dashboard/groups/group-capabilities-section.tsx`).
+  (`conexus/dashboard/components/dashboard/groups/group-capabilities-section.tsx`).
   This wasn't a deliberate un-parking of this specific proposal — the
   full Python→Rust migration independently arrived at the same design
   as part of rebuilding authorization from scratch. Kept as a record
@@ -64,7 +64,7 @@ if not principal.has_capability("agents.register"):
 
 ### The taxonomy (28 capabilities)
 
-Single source of truth in `agent_mcp/core/capabilities.py` (`KNOWN_CAPABILITIES`):
+Single source of truth in `conexus/core/capabilities.py` (`KNOWN_CAPABILITIES`):
 
 ```
 mcp.connect

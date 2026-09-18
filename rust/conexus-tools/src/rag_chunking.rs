@@ -2,7 +2,7 @@
 //! pie -- the "6th background loop" found while porting `test_sec_r31_
 //! rag_watermark.py`, deliberately deferred at the time and resumed
 //! once the operator confirmed nothing else needed doing first).
-//! Port of `agent_mcp/features/rag/chunking.py`'s `simple_chunker`/
+//! Port of `conexus/features/rag/chunking.py`'s `simple_chunker`/
 //! `markdown_aware_chunker` -- the only two chunkers real production
 //! ever uses: `CONEXUS_EMBEDDING_DIMENSION`/`--advanced` are never
 //! set in the real deploy repo, so `code_chunking.py`'s code-aware

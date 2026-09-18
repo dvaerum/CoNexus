@@ -1,5 +1,5 @@
-//! Port of `agent_mcp/tools/rag_tools.py`'s lone tool (`ask_project_rag`)
-//! plus the slice of `agent_mcp/features/rag/query.py::query_rag_system`
+//! Port of `conexus/tools/rag_tools.py`'s lone tool (`ask_project_rag`)
+//! plus the slice of `conexus/features/rag/query.py::query_rag_system`
 //! it needs. First Phase D2 tool -- wires together every prerequisite
 //! this phase ported: `conexus_auth`'s async `Tool` (needed here, not
 //! optional -- this is the first tool with real network I/O),

@@ -8,7 +8,7 @@
 //! the natural shared home: zero I/O, no shared mutable state, sits
 //! below both consumers.
 //!
-//! Port of `agent_mcp/app/event_loop_instructions.py::
+//! Port of `conexus/app/event_loop_instructions.py::
 //! WAKE_LOOP_INSTRUCTIONS`. Python keeps the two consumers
 //! (`_patched_create_initialization_options`'s injection and the
 //! `event-loop` prompt-book entry) in sync by having BOTH read this

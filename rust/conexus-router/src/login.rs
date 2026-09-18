@@ -1,5 +1,5 @@
 //! Router login / session-minting + the first-boot setup wizard. Port
-//! of `agent_mcp/router/login.py` (597 LOC) + `agent_mcp/router/
+//! of `conexus/router/login.py` (597 LOC) + `conexus/router/
 //! setup_wizard.py` (256 LOC), combined into one module (Phase E2
 //! PR 10, `conexus-router-login`) -- setup is a thin dependent of
 //! login's own primitives (same cookie/same-origin/decoy-timing

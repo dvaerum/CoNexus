@@ -2,7 +2,7 @@
 //! attaches when proxying a cookie-authenticated dashboard request to
 //! the per-project backend.
 //!
-//! Faithful port of `agent_mcp/app/forwarding_header.py`'s `sign`/
+//! Faithful port of `conexus/app/forwarding_header.py`'s `sign`/
 //! `verify`, verified against real Python-computed golden vectors
 //! (not just re-derived independently) — see this module's tests.
 //!

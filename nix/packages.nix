@@ -1,9 +1,9 @@
 { pkgs, lib, src }:
 
-# Production package set for the agent-mcp home-manager module.
+# Production package set for the conexus home-manager module.
 #
-# The Python implementation (`agent_mcp/app`, `agent_mcp/router`,
-# `agent_mcp/cli.py`, etc.) was deleted wholesale once the Rust
+# The Python implementation (`conexus/app`, `conexus/router`,
+# `conexus/cli.py`, etc.) was deleted wholesale once the Rust
 # `rust/` workspace (conexus-backend / conexus-router / conexus-
 # daemon-agent, packaged separately in `nix/conexus.nix`) reached
 # functional completeness and became what actually runs in
@@ -19,14 +19,14 @@
 #
 # What's left here:
 #
-#   agentMcpDashboard                 — the Next.js static export,
+#   conexusDashboard                  — the Next.js static export,
 #                                        served by the router. Always
 #                                        was independent of the Python
 #                                        tree (buildNpmPackage over
-#                                        agent_mcp/dashboard/, which
+#                                        conexus/dashboard/, which
 #                                        this repo's Python deletion
 #                                        never touched).
-#   agentMcpDaemonAgentPrecompactHook — Claude Code PreCompact hook
+#   conexusDaemonAgentPrecompactHook — Claude Code PreCompact hook
 #                                       for daemon agents. A standalone
 #                                       bash script substituted via
 #                                       `runCommand`; never depended on
@@ -42,7 +42,7 @@ let
   # (Phase F: prancy-napping-pie) -- same "one file, everything else
   # derives" shape, just relocated to the one manifest this package
   # set still has.
-  version = (builtins.fromJSON (builtins.readFile "${src}/agent_mcp/dashboard/package.json")).version;
+  version = (builtins.fromJSON (builtins.readFile "${src}/conexus/dashboard/package.json")).version;
 
   # ── Dashboard static export ──────────────────────────────────────
   # Next.js 15 project with `output: 'export'`. The router serves the
@@ -55,10 +55,10 @@ let
   # configured runtime prefix on serve. One build artifact serves
   # every deployment URL — no rebuild needed when the operator points
   # the router at a different prefix.
-  agentMcpDashboard = pkgs.buildNpmPackage {
-    pname = "agent-mcp-dashboard";
+  conexusDashboard = pkgs.buildNpmPackage {
+    pname = "conexus-dashboard";
     inherit version;
-    src = "${src}/agent_mcp/dashboard";
+    src = "${src}/conexus/dashboard";
     # Re-set whenever the dashboard's package-lock.json changes
     # upstream (rare). On hash mismatch, nix prints the correct
     # value; paste it here. Updated 2026-09-08: next 15.5.23 -> 15.5.25
@@ -76,24 +76,24 @@ let
     installPhase = ''
       runHook preInstall
       mkdir -p $out/share
-      cp -r out $out/share/agent-mcp-dashboard
+      cp -r out $out/share/conexus-dashboard
       runHook postInstall
     '';
     dontFixup = true;
   };
 
-  agentMcpDaemonAgentPrecompactHook = pkgs.runCommand "agent-mcp-daemon-agent-precompact-hook" {} ''
+  conexusDaemonAgentPrecompactHook = pkgs.runCommand "conexus-daemon-agent-precompact-hook" {} ''
     mkdir -p $out/bin
-    substitute ${./agent-mcp-daemon-agent-precompact-hook.sh.in} \
-      $out/bin/agent-mcp-daemon-agent-precompact-hook \
+    substitute ${./conexus-daemon-agent-precompact-hook.sh.in} \
+      $out/bin/conexus-daemon-agent-precompact-hook \
       --replace-fail @bash@ ${pkgs.bash} \
       --replace-fail @curl@ ${pkgs.curl} \
       --replace-fail @jq@ ${pkgs.jq}
-    chmod +x $out/bin/agent-mcp-daemon-agent-precompact-hook
+    chmod +x $out/bin/conexus-daemon-agent-precompact-hook
   '';
 
 in {
   inherit
-    agentMcpDashboard
-    agentMcpDaemonAgentPrecompactHook;
+    conexusDashboard
+    conexusDaemonAgentPrecompactHook;
 }

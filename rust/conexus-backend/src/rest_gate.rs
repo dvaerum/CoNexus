@@ -1,4 +1,4 @@
-//! `/api` HTTP-layer identity gate. Port of `agent_mcp/app/deps.py::
+//! `/api` HTTP-layer identity gate. Port of `conexus/app/deps.py::
 //! require_operator_session`'s HTTP-layer responsibility, narrowed to
 //! the two doors [`crate::rest_principal`] keeps (forwarding-header +
 //! operator-tier bearer — see that module's doc for why the cookie

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Log in — agent-mcp{% endblock %}
+{% block title %}Log in — conexus{% endblock %}
 {% block body %}
   <h1>Log in</h1>
   {% if error %}
@@ -11,7 +11,7 @@
        username/password form is intentionally not rendered — the only
        way to obtain a session in OIDC mode is via the IdP. The
        setup-wizard's first-user bootstrap remains accessible at
-       /agent-mcp/setup before any user exists. #}
+       /conexus/setup before any user exists. #}
     <p>Sign in via your organisation's identity provider.</p>
     <p>
       <a class="sso-button" href="{{ sso_login_url }}">

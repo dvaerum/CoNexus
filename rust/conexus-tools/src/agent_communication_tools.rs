@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/tools/agent_communication_tools.py`'s
+//! Port of `conexus/tools/agent_communication_tools.py`'s
 //! `wait_for_events_tool_impl` (entry section, [`wait_for_events_entry`],
 //! PR 2/4; slow-path loop, [`wait_for_events_slow_path`], PR 3/4; the
 //! real [`WaitForEventsTool`] wiring both together, PR 4/4) and

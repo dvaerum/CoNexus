@@ -14,7 +14,7 @@
 //!
 //! 1. `mcp_sessions` -- created by Alembic 0004/0005, entirely absent
 //!    from `schema.rs` and from every sea-orm `Entity`. Added here
-//!    with its real ORM shape (`agent_mcp/db/models/mcp_session.py`).
+//!    with its real ORM shape (`conexus/db/models/mcp_session.py`).
 //!    Deliberately WITHOUT the FK to `agents.agent_id` that model's
 //!    own docstring claims Alembic 0008 added: confirmed live against
 //!    both real production databases (`PRAGMA foreign_key_list
@@ -138,7 +138,7 @@ impl MigrationTrait for Migration {
 
             -- Alembic 0004/0005, never ported to schema.rs or any
             -- sea-orm Entity until this baseline (see module doc gap
-            -- 1). Shape matches agent_mcp/db/models/mcp_session.py
+            -- 1). Shape matches conexus/db/models/mcp_session.py
             -- exactly; `agent_id` carries the real FK Alembic 0008
             -- added.
             CREATE TABLE IF NOT EXISTS mcp_sessions (

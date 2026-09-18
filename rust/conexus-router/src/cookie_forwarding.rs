@@ -10,7 +10,7 @@
 //! kept as a defence-in-depth fallback -- so every cookie-authenticated
 //! dashboard request 401s once a project runs the Rust backend.
 //!
-//! Port of `agent_mcp/router/app.py::_forwarding_header_from_cookie`'s
+//! Port of `conexus/router/app.py::_forwarding_header_from_cookie`'s
 //! role-resolution half only -- the `_ensure`/HMAC-key-read/`sign()`
 //! half stays in `mcp_handler.rs` itself, which already owns those
 //! dependencies (`RuntimeStore`, `sock_dir`, `EnsureConfig`) for its

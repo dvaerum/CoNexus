@@ -63,7 +63,7 @@ let
   hardening = import ../hardening.nix;
 in
 pkgs.testers.nixosTest {
-  name = "agent-mcp-single-tenant";
+  name = "conexus-single-tenant";
 
   nodes.machine = { config, pkgs, ... }: {
     imports = [ ./fake-openai.nix ];
@@ -215,7 +215,7 @@ pkgs.testers.nixosTest {
           + "--port ${toString ports.routerPort} "
           + "--projects-file /home/testuser/.config/conexus/projects.local.json "
           + "--sock-dir /run/conexus "
-          + "--dashboard-dir ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
+          + "--dashboard-dir ${packagedPkgs.conexusDashboard}/share/conexus-dashboard "
           + "--external-url ${lib.escapeShellArg "http://localhost:${toString ports.routerPort}"} "
           + "--idle-sec 14400 "
           + "--single-tenant ${singleName} "
@@ -393,7 +393,7 @@ pkgs.testers.nixosTest {
     # `.txt` payloads the dashboard tree ships at their app-relative
     # serve URL so the regression's exact failure mode is exercised.
     txt_paths = machine.succeed(
-        "find ${packagedPkgs.agentMcpDashboard}/share/agent-mcp-dashboard "
+        "find ${packagedPkgs.conexusDashboard}/share/conexus-dashboard "
         "-name '*.txt' -printf '%P\n'"
     ).split()
     rsc_urls = [
@@ -426,7 +426,7 @@ pkgs.testers.nixosTest {
     # First, force a *blocking* backend start (unlike the dashboard's
     # best-effort background warm-start, the proxied /api/<name>/...
     # path awaits `_ensure()` before responding — see
-    # agent_mcp/router/project_orchestrator.py) so the assertions below
+    # conexus/router/project_orchestrator.py) so the assertions below
     # observe the backend once it's actually up, not mid-spawn.
     #
     # R8-F2 discovery: single-tenant mode only bypasses the ROUTER's
@@ -434,7 +434,7 @@ pkgs.testers.nixosTest {
     # single_tenant.bypasses_operator_gate()) — the /api/<name>/...
     # REST proxy forwards the request three hops to the BACKEND's own
     # FastAPI process, whose `require_operator_session` dependency
-    # (agent_mcp/app/deps.py) has no single-tenant awareness at all and
+    # (conexus/app/deps.py) has no single-tenant awareness at all and
     # 401s a bare unauthenticated request in EITHER mode. Log in first,
     # same as every other test in this suite that reaches an
     # operator-gated route — the bootstrap credentials are already
@@ -472,7 +472,7 @@ pkgs.testers.nixosTest {
 
     # R8-F2's Python-specific VSS-liveness check (grepping the journal
     # for "sqlite-vec (VSS) extension confirmed loadable", a log line
-    # `agent_mcp/app/server_lifecycle.py` used to emit) has no Rust
+    # `conexus/app/server_lifecycle.py` used to emit) has no Rust
     # equivalent: `conexus-backend` links `sqlite-vec` statically via
     # the `conexus-vec` crate (see rust/conexus-vec/src/lib.rs) rather
     # than dlopen'ing a loadable-extension file at runtime, so it

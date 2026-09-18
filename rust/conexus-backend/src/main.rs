@@ -1,7 +1,7 @@
 //! CoNexus per-project MCP backend (Phase D1 step 3).
 //!
-//! Boot sequence + CLI flag surface are a faithful port of `agent_mcp/
-//! cli.py`'s `server` command + `agent_mcp/app/server_lifecycle.py`'s
+//! Boot sequence + CLI flag surface are a faithful port of `conexus/
+//! cli.py`'s `server` command + `conexus/app/server_lifecycle.py`'s
 //! steps 1-2 -- the exact invocation contract
 //! `nix/packages.nix`'s wrapper already generates for the Python
 //! binary (`--uds <sock> --project-dir <path> --forwarding-hmac-in
@@ -49,7 +49,7 @@ use rmcp::transport::streamable_http_server::tower::{
 
 use server::{ConexusServer, SharedState};
 
-/// `agent-mcp server`'s flag surface, the subset this binary actually
+/// `conexus server`'s flag surface, the subset this binary actually
 /// serves (see the module doc for what's deliberately not ported yet).
 #[derive(Parser, Debug)]
 #[command(name = "conexus-backend")]

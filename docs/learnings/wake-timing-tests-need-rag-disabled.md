@@ -1,7 +1,7 @@
 # Wake/event-timing tests must disable RAG placement analysis
 
 **Historical.** Describes the deleted Python test suite
-(`pytest`/`agent_mcp.tools.task_tools`, all gone). The underlying
+(`pytest`/`conexus.tools.task_tools`, all gone). The underlying
 premise no longer even applies to the Rust port: `assign_task_tools.rs`'s
 own header states the Rust `assign_task`/`create_self_task` ship
 mechanical-only — the whole `ENABLE_TASK_PLACEMENT_RAG` placement-
@@ -31,7 +31,7 @@ concurrent RAG-touching session or test contends for the one worker
 slot), that latency can spike well past 5 seconds — a false failure
 about wake-event *delivery* that's actually about RAG-call *queueing*.
 
-Fix: `monkeypatch.setattr("agent_mcp.tools.task_tools.ENABLE_TASK_PLACEMENT_RAG", False)`
+Fix: `monkeypatch.setattr("conexus.tools.task_tools.ENABLE_TASK_PLACEMENT_RAG", False)`
 before calling `assign_task_tool_impl` (or the `assign_task` MCP tool)
 in any test whose assertion is about timing, not placement-analysis
 content. `tests/test_sec_r3_task_cache.py` already used this pattern;

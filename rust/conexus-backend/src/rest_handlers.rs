@@ -28,7 +28,7 @@ use crate::rest_gate::ResolvedRestPrincipal;
 use crate::rest_principal::RestPrincipal;
 use crate::server::{dispatch_rest_tool, SharedState};
 
-/// Port of `agent_mcp/utils/string_utils.py::UNSAFE_KEY_ERROR`.
+/// Port of `conexus/utils/string_utils.py::UNSAFE_KEY_ERROR`.
 fn unsafe_key_error() -> serde_json::Value {
     json!({
         "error": "invalid_key_character",
@@ -41,7 +41,7 @@ fn unsafe_key_error() -> serde_json::Value {
     })
 }
 
-/// Port of `agent_mcp/utils/string_utils.py::MEMORY_KEY_ERROR`.
+/// Port of `conexus/utils/string_utils.py::MEMORY_KEY_ERROR`.
 fn memory_key_error() -> serde_json::Value {
     json!({
         "error": "invalid_key_character",
@@ -50,7 +50,7 @@ fn memory_key_error() -> serde_json::Value {
     })
 }
 
-/// Port of `agent_mcp/app/routers/_wire_validation.py::require_str`:
+/// Port of `conexus/app/routers/_wire_validation.py::require_str`:
 /// 400 iff `value` is present (`Some`) but not a JSON string. Absent
 /// (`None`) is allowed -- callers check presence/truthiness
 /// separately.
@@ -156,7 +156,7 @@ pub async fn settings_schema(Extension(resolved): Extension<ResolvedRestPrincipa
 // -- /api/memories (Phase E1 PR 4/14, conexus-rest-memories) --------
 
 /// `POST /api/memories` -- thin adapter over `create_project_context`,
-/// matching `agent_mcp/app/routers/memories.py::create_memory_api_route`.
+/// matching `conexus/app/routers/memories.py::create_memory_api_route`.
 /// R9-F2 (pentest): dispatches through the gated MCP tool rather than
 /// writing the table directly, so the tool-layer authorization gates
 /// (viewer-tier write guard, per-key creator-ownership matrix) apply
@@ -261,7 +261,7 @@ pub async fn create_memory(
 
 /// `PUT /api/memories/{context_key}` -- thin adapter over
 /// `update_project_context`, matching
-/// `agent_mcp/app/routers/memories.py::update_memory_api_route`.
+/// `conexus/app/routers/memories.py::update_memory_api_route`.
 pub async fn update_memory(
     Path(context_key): Path<String>,
     State(shared): State<Arc<SharedState>>,
@@ -343,7 +343,7 @@ pub async fn update_memory(
 
 /// `DELETE /api/memories/{context_key}` -- thin adapter over
 /// `delete_project_context`, matching
-/// `agent_mcp/app/routers/memories.py::delete_memory_api_route`.
+/// `conexus/app/routers/memories.py::delete_memory_api_route`.
 /// `force_delete` is read from the JSON body (default `false`); an
 /// empty/absent body is treated as `{}` here (Python:
 /// `bool(data.get("force_delete", False)) if isinstance(data, dict)
@@ -456,7 +456,7 @@ fn is_json_falsy(value: Option<&serde_json::Value>) -> bool {
 // -- /api/schedules (Phase E1 PR 5/14, conexus-rest-schedules) ------
 
 /// `GET /api/schedules` -- every schedule across the project's
-/// agents, matching `agent_mcp/app/routers/schedules.py::
+/// agents, matching `conexus/app/routers/schedules.py::
 /// list_schedules_api_route`. Reads the repository directly (an
 /// operator-only, cross-agent, UNSCOPED view -- deliberately not
 /// dispatched through the MCP `list_scheduled_directives` tool, which
@@ -1149,7 +1149,7 @@ async fn dispatch_settings_write(
         .into_response()
 }
 
-/// Port of `agent_mcp/utils/string_utils.py::SETTING_KEY_ERROR`.
+/// Port of `conexus/utils/string_utils.py::SETTING_KEY_ERROR`.
 fn setting_key_error() -> Value {
     json!({
         "error": "invalid_key_character",
@@ -2724,7 +2724,7 @@ pub async fn delete_message(
 
 // -- /api/agents (Phase E1 PR 11/14, conexus-rest-agents-crud) -----
 //
-// `agent_mcp/app/routers/agents.py`'s CRUD half: list, register,
+// `conexus/app/routers/agents.py`'s CRUD half: list, register,
 // restore, edit, rotate-token, purge-preview, purge. The lifecycle
 // half (disconnect/reconnect/directive -- touches live-stream +
 // waiter-wake runtime state, "different risk profile" per that
@@ -3631,7 +3631,7 @@ pub async fn poke_agent_directive(
 // -- /api/events (Phase E1 PR 13/14, conexus-rest-sse-events) ------
 //
 // Operator dashboard live-update SSE channel. Port of
-// `agent_mcp/app/routers/events.py` -- the new
+// `conexus/app/routers/events.py` -- the new
 // `crate::operator_events::OperatorEventsHub` pub/sub primitive is
 // this port's genuinely new piece (Python's `features.operator_events`
 // module); the stream loop itself reuses the already-ported

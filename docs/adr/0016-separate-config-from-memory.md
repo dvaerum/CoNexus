@@ -13,7 +13,7 @@ The per-project `project_context` table was doing double duty. It held
 the **memory** store — agent-authored, RAG-indexed shared *knowledge*
 (`view_project_context` / `update_project_context`, the Memories tab,
 the RAG corpus) — AND the **operational config** store: the `config_*`
-toggles and knobs that control how agent-mcp behaves for the project
+toggles and knobs that control how conexus behaves for the project
 (worker-policy toggles, the global event-loop flag, message retention,
 the AoE integration keys). The two concerns differ on every axis:
 

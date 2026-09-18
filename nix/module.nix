@@ -155,7 +155,7 @@ in {
   # NOTE: A legacy `autoProject` option used to live here, backed by
   # an `agent-mcp-bootstrap.service` oneshot that POSTed
   # `/agent-mcp/__create` on first boot. The `__create` endpoint was
-  # deleted in ADR 0014 (see agent_mcp/router/app.py:1410-1415) and
+  # deleted in ADR 0014 (see conexus/router/app.py:1410-1415) and
   # the REST replacement at `POST /api/router/projects` requires a
   # session cookie that a oneshot can't have. The bootstrap unit was
   # silently succeeding via curl -L following the empty-users
@@ -204,7 +204,7 @@ in {
         # `--default-workspace` has no CLI-flag equivalent on
         # `conexus-router` (env-var-only -- see rust/conexus-router/src/
         # main.rs's own `default_workspace_parent()` doc). Without this,
-        # `conexus-router` falls back to `$HOME/.local/share/agent-mcp/projects`
+        # `conexus-router` falls back to `$HOME/.local/share/conexus/projects`
         # under the `conexus` system user's HOME (`cfg.stateDir`),
         # NOT `${cfg.stateDir}/projects` where the tmpfiles rule above
         # actually creates the workspace parent.
@@ -226,7 +226,7 @@ in {
           + "--port ${toString cfg.routerPort} "
           + "--projects-file ${cfg.stateDir}/projects.local.json "
           + "--sock-dir ${cfg.runtimeDir} "
-          + "--dashboard-dir ${pkgs'.agentMcpDashboard}/share/agent-mcp-dashboard "
+          + "--dashboard-dir ${pkgs'.conexusDashboard}/share/conexus-dashboard "
           + "--external-url ${lib.escapeShellArg cfg.externalUrl} "
           + "--idle-sec 14400";
         Restart = "on-failure";

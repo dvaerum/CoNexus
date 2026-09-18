@@ -1,6 +1,6 @@
 //! OIDC's real `find_or_create_sso_user` reconciliation: reconcile-
 //! by-subject (with R19-F1's legacy self-heal), verified-email-link,
-//! or JIT-create. Port target: `agent_mcp/router/sso.py`'s
+//! or JIT-create. Port target: `conexus/router/sso.py`'s
 //! `find_or_create_sso_user` (Phase E2 PR22 step 3/8,
 //! `conexus-router-oidc-reconcile`).
 //!

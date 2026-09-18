@@ -1,7 +1,7 @@
 //! `Requirement` — what a tool requires of the calling Principal.
 //!
 //! Faithful port of the `Cap`/`Policy`/`Predicate`/`PUBLIC` taxonomy in
-//! `agent_mcp/core/authorize.py`'s `ToolRequirement` hierarchy — an
+//! `conexus/core/authorize.py`'s `ToolRequirement` hierarchy — an
 //! already-existing Python design, not new Rust-side invention (see
 //! that module's own comment: "registering a tool without stating its
 //! authorization is impossible... a silent lie is an ImportError, not
@@ -27,7 +27,7 @@ use conexus_core::principal::{is_operator_tier, Principal, PrincipalKind};
 use std::fmt;
 
 /// Raised by [`Requirement::check`] when the caller's principal fails
-/// the requirement. Port of `agent_mcp.core.authorize.AuthRejected` —
+/// the requirement. Port of `conexus.core.authorize.AuthRejected` —
 /// `reason` is short, user-facing text that reaches agent transcripts
 /// / REST error bodies verbatim, so it must never carry internal
 /// detail (matches [`conexus_core::tool_result::ToolResult::Failed`]'s

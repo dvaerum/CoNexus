@@ -5,7 +5,7 @@
 //! (a stale-socket removal that never checked whether a LIVE process
 //! still owned the path, confirmed live 2026-09-01).
 //!
-//! `nix/module.nix`'s existing `agent-mcp@<name>.service` unit already
+//! `nix/module.nix`'s existing `conexus@<name>.service` unit already
 //! owns the socket's `RuntimeDirectory` (decision: `conexus@<name>.
 //! service` shares that same path, see the migration plan's Phase D1
 //! decisions) -- this module's own parent-dir creation/chmod is

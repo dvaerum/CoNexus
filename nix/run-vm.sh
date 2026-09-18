@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# User-facing entrypoint for `nix run github:dvaerum/Agent-MCP`.
-# Wraps the pre-built `run-agent-mcp-vm` script that NixOS' qemu-vm
+# User-facing entrypoint for `nix run github:dvaerum/CoNexus`.
+# Wraps the pre-built `run-conexus-vm` script that NixOS' qemu-vm
 # module emits, adding flag parsing + persist-dir bookkeeping.
 #
 # The flake hard-substitutes @VM_MULTI@ at build time with the
 # absolute store path of the VM derivation.
 #
 # History: this script used to also support `--minimal`, booting a
-# single-tenant agent-mcp backend directly on a TCP port with no
+# single-tenant conexus backend directly on a TCP port with no
 # router in front of it. That shape ran the Python implementation and
 # was retired together with it -- the Rust `conexus-backend` binary
 # only serves over a Unix domain socket (see rust/conexus-backend/src/
@@ -20,9 +20,9 @@ MULTI_VM="@VM_MULTI@"
 
 print_usage() {
   cat <<EOF
-Usage: nix run github:dvaerum/Agent-MCP -- [flags]
+Usage: nix run github:dvaerum/CoNexus -- [flags]
 
-Boots a self-contained NixOS VM running the agent-mcp deployment.
+Boots a self-contained NixOS VM running the conexus deployment.
 The host can reach the VM at http://localhost:5454.
 
 On first boot the dashboard's identity store is empty, so the router
@@ -46,11 +46,11 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --ephemeral) ephemeral=1; shift ;;
     --persist)
-      [[ $# -ge 2 ]] || { echo "agent-mcp: --persist needs a DIR" >&2; exit 2; }
+      [[ $# -ge 2 ]] || { echo "conexus: --persist needs a DIR" >&2; exit 2; }
       persist_dir="$2"; shift 2 ;;
     --help|-h) print_usage; exit 0 ;;
     --) shift; break ;;
-    *) echo "agent-mcp: unknown flag: $1" >&2; print_usage >&2; exit 2 ;;
+    *) echo "conexus: unknown flag: $1" >&2; print_usage >&2; exit 2 ;;
   esac
 done
 
@@ -58,13 +58,13 @@ vm_store="$MULTI_VM"
 
 # Persist dir resolution.
 if [[ "$ephemeral" == "1" && -n "$persist_dir" ]]; then
-  echo "agent-mcp: --ephemeral and --persist are mutually exclusive" >&2
+  echo "conexus: --ephemeral and --persist are mutually exclusive" >&2
   exit 2
 fi
 
 cleanup=""
 if [[ "$ephemeral" == "1" ]]; then
-  state_dir="$(mktemp -d --tmpdir agent-mcp-vm.XXXXXXXX)"
+  state_dir="$(mktemp -d --tmpdir conexus-vm.XXXXXXXX)"
   cleanup="$state_dir"
   trap 'rm -rf -- "$cleanup"' EXIT
 else
@@ -76,7 +76,7 @@ else
 fi
 
 # The VM uses two substrates side-by-side inside `state_dir`:
-#   disk.qcow2  — agent-mcp state. SQLite WAL needs real fcntl
+#   disk.qcow2  — conexus state. SQLite WAL needs real fcntl
 #                 locks, so this has to be a real block device.
 #   ollama/     — Ollama's model dir, bind-mounted into the guest
 #                 at /var/lib/ollama via 9p. Ollama stores blobs
@@ -89,13 +89,13 @@ mkdir -p -- "$CONEXUS_OLLAMA_DIR"
 export TMPDIR="$state_dir"
 export USE_TMPDIR=1
 
-echo "agent-mcp: booting multi-tenant VM"
-echo "agent-mcp: dashboard will appear at http://localhost:5454/agent-mcp/"
-echo "agent-mcp: first boot lands on /setup; create the first operator,"
-echo "agent-mcp: then create projects from the dashboard UI."
-echo "agent-mcp: state dir: $state_dir"
-echo "agent-mcp: Ctrl-C to shut down"
+echo "conexus: booting multi-tenant VM"
+echo "conexus: dashboard will appear at http://localhost:5454/conexus/"
+echo "conexus: first boot lands on /setup; create the first operator,"
+echo "conexus: then create projects from the dashboard UI."
+echo "conexus: state dir: $state_dir"
+echo "conexus: Ctrl-C to shut down"
 
 # The qemu-vm module emits run-<hostname>-vm. The store path produced
 # by `config.system.build.vm` exposes it under bin/.
-exec "$vm_store/bin/run-agent-mcp-vm"
+exec "$vm_store/bin/run-conexus-vm"

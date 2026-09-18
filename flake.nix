@@ -1,5 +1,5 @@
 {
-  description = "Agent-MCP — multi-agent coordination MCP server (packages, home-manager module, and NixOS VM for e2e tests)";
+  description = "CoNexus — multi-agent coordination MCP server (packages, home-manager module, and NixOS VM for e2e tests)";
 
   # Pinning to nixos-unstable keeps the dashboard's Next.js 15 + Node
   # 22 toolchain available; the 25.05 / 25.11 releases also work.
@@ -63,16 +63,16 @@
       # There is deliberately no second package set here.
       #
       # Until 2026-08-09 this file also imported `nix/package.nix`, a
-      # near-copy of nix/packages.nix that built its own `agentMcpPy`
+      # near-copy of nix/packages.nix that built its own `conexusPy`
       # from a SEPARATELY MAINTAINED dependency list — and the two
       # drifted (see docs/learnings/duplication-drift.md). Nothing
       # imported that copy's Python app, backend wrapper, launcher or
       # readme: it reached the outside world only as two flake outputs
-      # that were themselves dead — `agent-mcp-dashboard-single`
-      # (byte-identical to `agent-mcp-dashboard` since Phase 4 made
-      # `assetPrefix` a serve-time substitution) and `agent-mcp-router`
+      # that were themselves dead — `conexus-dashboard-single`
+      # (byte-identical to `conexus-dashboard` since Phase 4 made
+      # `assetPrefix` a serve-time substitution) and `conexus-router-legacy`
       # (a wrapper around the pre-upstream vendored `nix/router.py`,
-      # superseded by `agent_mcp/router/`). Both were deleted with it.
+      # superseded by `conexus/router/`). Both were deleted with it.
       # `tests/test_nix_single_source_of_truth.py` keeps it that way.
 
       # NixOS VM builder. `nix/vm.nix` used to have a "single" bare-TCP
@@ -109,15 +109,15 @@
       }).config.system.build.vm;
 
       # Wrapper script: bind-mounts the persist dir, launches qemu.
-      runScript = pkgs.runCommand "agent-mcp-vm-run" {
+      runScript = pkgs.runCommand "conexus-vm-run" {
         nativeBuildInputs = [ pkgs.makeWrapper ];
       } ''
         mkdir -p $out/bin
-        substitute ${./nix/run-vm.sh} $out/bin/agent-mcp \
+        substitute ${./nix/run-vm.sh} $out/bin/conexus \
           --replace-fail "@VM_MULTI@" "${vmMulti}"
-        chmod +x $out/bin/agent-mcp
+        chmod +x $out/bin/conexus
         # Ensure qemu + coreutils are on PATH for the run-*-vm script.
-        wrapProgram $out/bin/agent-mcp \
+        wrapProgram $out/bin/conexus \
           --prefix PATH : ${lib.makeBinPath [ pkgs.qemu pkgs.coreutils pkgs.bash ]}
       '';
 
@@ -126,14 +126,14 @@
       # name so a developer can `nix run .#vm-dev` without
       # conflicting with `nix run .#` (which targets vmMulti on
       # host:5454).
-      runScriptDev = pkgs.runCommand "agent-mcp-vm-dev-run" {
+      runScriptDev = pkgs.runCommand "conexus-vm-dev-run" {
         nativeBuildInputs = [ pkgs.makeWrapper ];
       } ''
         mkdir -p $out/bin
-        substitute ${./nix/run-vm-dev.sh} $out/bin/agent-mcp-vm-dev \
+        substitute ${./nix/run-vm-dev.sh} $out/bin/conexus-vm-dev \
           --replace-fail "@VM_DEV@" "${vmDev}"
-        chmod +x $out/bin/agent-mcp-vm-dev
-        wrapProgram $out/bin/agent-mcp-vm-dev \
+        chmod +x $out/bin/conexus-vm-dev
+        wrapProgram $out/bin/conexus-vm-dev \
           --prefix PATH : ${lib.makeBinPath [ pkgs.qemu pkgs.coreutils pkgs.bash ]}
       '';
 
@@ -143,12 +143,12 @@
       # REST API, quiesces the SQLite DBs over the dev-mode SSH, and
       # writes nix/vm-dev/fixtures/<name>.tar.zst. See
       # nix/vm-dev/fixtures/README.md.
-      captureFixture = pkgs.runCommand "agent-mcp-capture-vm-dev-fixture" {
+      captureFixture = pkgs.runCommand "conexus-capture-vm-dev-fixture" {
         nativeBuildInputs = [ pkgs.makeWrapper ];
       } ''
         mkdir -p $out/bin
         substitute ${./nix/capture-vm-dev-fixture.sh} $out/bin/capture-vm-dev-fixture \
-          --replace-fail "@VM_DEV_RUN@" "${runScriptDev}/bin/agent-mcp-vm-dev"
+          --replace-fail "@VM_DEV_RUN@" "${runScriptDev}/bin/conexus-vm-dev"
         chmod +x $out/bin/capture-vm-dev-fixture
         wrapProgram $out/bin/capture-vm-dev-fixture \
           --prefix PATH : ${lib.makeBinPath [
@@ -158,15 +158,15 @@
       '';
     in {
       # ── packages ────────────────────────────────────────────────
-      # The Python `agent-mcp` / `agent-mcp-router-wrapper` outputs
-      # (buildPythonApplication over the now-deleted `agent_mcp/app`+
-      # `agent_mcp/router` tree) were retired together with the rest
+      # The Python `conexus` / `conexus-router-wrapper` outputs
+      # (buildPythonApplication over the now-deleted `conexus/app`+
+      # `conexus/router` tree) were retired together with the rest
       # of the Python source tree — `conexus-backend`/`conexus-router`
-      # below are their sole replacements. `agent-mcp-dashboard` was
+      # below are their sole replacements. `conexus-dashboard` was
       # always independent of the Python tree and is unaffected.
       packages.${system} = {
         # Phase 2 production set (consumed by the home-manager module).
-        agent-mcp-dashboard = productionPkgs.agentMcpDashboard;
+        conexus-dashboard = productionPkgs.conexusDashboard;
         default = conexusPkgs.conexusBackend;
 
         # CoNexus Rust backend (Phase D1) — wired into the
@@ -177,7 +177,7 @@
         conexus-launcher = conexusPkgs.conexusLauncher;
 
         # CoNexus Rust router — the sole router implementation now
-        # that the Python one (`agent-mcp-router.service`) and the
+        # that the Python one (`conexus-router-legacy.service`) and the
         # `router.impl` A/B flip between them were retired. Wired into
         # `homeModules.default` via `conexusRouterPackage` below.
         conexus-router = conexusPkgs.conexusRouter;
@@ -201,7 +201,7 @@
       apps.${system} = {
         default = {
           type = "app";
-          program = "${runScript}/bin/agent-mcp";
+          program = "${runScript}/bin/conexus";
         };
         # `nix run .#vm-dev` — Path B interactive sandbox for
         # dashboard E2E (feat/agent-select-dropdown). Forwards
@@ -209,7 +209,7 @@
         # boot. See nix/vm-dev.nix + nix/run-vm-dev.sh.
         vm-dev = {
           type = "app";
-          program = "${runScriptDev}/bin/agent-mcp-vm-dev";
+          program = "${runScriptDev}/bin/conexus-vm-dev";
         };
         # Reproducible generator for the vm-dev preload fixtures.
         capture-vm-dev-fixture = {
@@ -266,11 +266,11 @@
         services.conexus.conexusRouterPackage =
           lib.mkDefault conexusPkgsFor.conexusRouterWrapper;
       };
-      homeModules.agent-mcp = self.homeModules.default;
+      homeModules.conexus = self.homeModules.default;
 
       # ── NixOS module (legacy, used by VM tests only) ────────────
       nixosModules.default = ./nix/module.nix;
-      nixosModules.agent-mcp = ./nix/module.nix;
+      nixosModules.conexus = ./nix/module.nix;
 
       # `nix flake check` smoke test. Two flavours:
       #
@@ -282,9 +282,9 @@
       #     test driver builds a NixOS VM, but the result is cacheable
       #     and CI runners only pay it once per nixpkgs bump.
       checks.${system} = {
-        agent-mcp-dashboard = productionPkgs.agentMcpDashboard;
+        conexus-dashboard = productionPkgs.conexusDashboard;
         # CoNexus Rust backend (Phase D1 step 4) — cheap build-only
-        # check (the Python `agent-mcp`/`agent-mcp-router-wrapper`
+        # check (the Python `conexus`/`conexus-router-wrapper`
         # checks this used to sit alongside were retired with the
         # Python source tree). The CI-gated `conexus (Rust)` job
         # already covers fmt/clippy/test/audit for the crate sources

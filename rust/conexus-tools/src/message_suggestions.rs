@@ -1,5 +1,5 @@
 //! Ollama-backed subject-suggestion helper for `agent_messages`. Port
-//! of `agent_mcp/features/message_suggestions.py`.
+//! of `conexus/features/message_suggestions.py`.
 //!
 //! When a sender doesn't supply a `subject` for a root message, this
 //! module asks a local Ollama (or any OpenAI `/v1`-compatible)

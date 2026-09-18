@@ -24,29 +24,29 @@ Two things forced a redesign:
    prior waiters), so a helper cannot simply hold the poll on the session's
    behalf without fighting the session's own calls.
 2. **`aoe_notify` is the wrong shape.** It is an *outbound* HTTP push from
-   agent-mcp **to** AoE (`POST {aoe}/api/sessions/<id>/send`), off by
-   default, messages-only, and it couples agent-mcp to AoE's REST surface +
+   conexus **to** AoE (`POST {aoe}/api/sessions/<id>/send`), off by
+   default, messages-only, and it couples conexus to AoE's REST surface +
    a title→session-id heuristic. The dependency points the wrong way: the
-   orchestrator (AoE) should reach *into* agent-mcp, not the reverse.
+   orchestrator (AoE) should reach *into* conexus, not the reverse.
 
-We want a channel where agent-mcp can get a notification **into a session
+We want a channel where conexus can get a notification **into a session
 that isn't polling**, driven by a tunable policy, reaching the session
-through whatever runtime owns it — without agent-mcp knowing anything about
+through whatever runtime owns it — without conexus knowing anything about
 that runtime.
 
 ## Decision
 
 **A per-worker "delivery transport": a standard, documented channel a
-runtime opens *to* agent-mcp, over which agent-mcp pushes skinny
-notifications and the runtime reports session status.** agent-mcp owns the
+runtime opens *to* conexus, over which conexus pushes skinny
+notifications and the runtime reports session status.** conexus owns the
 *policy* (when to fire); the runtime owns *delivery* (getting text into the
-session). agent-mcp stays ignorant of the runtime.
+session). conexus stays ignorant of the runtime.
 
 The first runtime is an **AoE plugin** (a persistent daemon holding one
 connection per session, injecting via AoE's `/send` (tmux) and
 `/acp/prompt` (structured) routes). Because the API is standard and keyed
 by `(endpoint, token)` per session, a session's fallback can point at any
-agent-mcp server or any compatible implementer.
+conexus server or any compatible implementer.
 
 ### The channel (per worker, token-authed)
 
@@ -55,7 +55,7 @@ its MCP tools use (one token, both purposes; the runtime already holds it
 because it wired the per-session MCP entry). Endpoints, under the project
 mount:
 
-- `GET  /api/<project>/delivery/stream` — **SSE down.** agent-mcp streams
+- `GET  /api/<project>/delivery/stream` — **SSE down.** conexus streams
   notification frames the instant they're produced. One stream per worker.
 - `POST /api/<project>/delivery/status` — **status up.** The runtime
   reports the worker's session `transport-status` ∈
@@ -64,7 +64,7 @@ mount:
   a transient stream drop is *not* an end (registration is kept, policy
   re-evaluated on reconnect).
 
-**Transport-status is a SEPARATE presence field.** agent-mcp keeps its own
+**Transport-status is a SEPARATE presence field.** conexus keeps its own
 connection-presence (parked-waiter / live-stream derived) untouched, and
 exposes the runtime-reported status alongside it. Readers choose; the
 fallback policy reads the runtime status (it's the accurate "is it busy"
@@ -76,14 +76,14 @@ Frames carry **content, not a bare pointer** — but **skinny by default**:
 exactly the fields the event loop already exposes (message/task **id,
 title/subject, status, priority, sender**), **never the full body**. Bodies
 (and any secrets in them) stay out of the pane; the agent pulls the body
-via its MCP tools if it wants. agent-mcp renders each frame via a
+via its MCP tools if it wants. conexus renders each frame via a
 per-project template; the template may be widened to include more only by
 explicit opt-in. Delivery is **immediate** (the session buffers it); the
 status field does not gate delivery.
 
 ### When it fires (tunable per-project policy)
 
-agent-mcp owns a per-project **fallback policy** (a `project_settings`
+conexus owns a per-project **fallback policy** (a `project_settings`
 group, ADR-0016/0018), built on the existing idle-backlog reminder engine:
 
 - **Triggers** (extensible on/off set): `message.unread`,
@@ -101,7 +101,7 @@ group, ADR-0016/0018), built on the existing idle-backlog reminder engine:
 ### Identity lifecycle
 
 On session **end** the runtime posts `status=dead` and deregisters; the
-agent-mcp **agent row + token persist** — the inbox/history survive and a
+conexus **agent row + token persist** — the inbox/history survive and a
 restarted session re-attaches as the *same* identity (these agents are
 long-lived and address each other by name). A **transient** stream drop is
 treated as temporarily-gone, not ended.
@@ -109,12 +109,12 @@ treated as temporarily-gone, not ended.
 ### Per-session MCP (the agent's tools) — an AoE-side capability
 
 Orthogonal but part of the same story: giving each session its own
-agent-mcp identity/token as a first-class MCP tool needs **per-session MCP
+conexus identity/token as a first-class MCP tool needs **per-session MCP
 config**, which AoE lacks (its MCP config is per-agent/profile/project, never
 per-session). That is an **AoE patch** (general per-session MCP servers —
 `http {url, headers}` / `stdio` / `sse`; settable at create and on a running
 session via respawn-on-next-idle; a `session.mcp` capability, trust-by-grant;
-targets any session). It is not an agent-mcp change; agent-mcp is merely the
+targets any session). It is not an conexus change; conexus is merely the
 first consumer. The **same token** wired into the session's MCP entry is the
 token the delivery transport authenticates with — one token links tools,
 fallback, and identity.
@@ -124,10 +124,10 @@ fallback, and identity.
 **Positive**
 - Sessions that never poll still receive their messages/tasks, on a tunable
   schedule — the core failure this addresses.
-- The dependency direction flips: the runtime reaches *into* agent-mcp;
-  agent-mcp needs no knowledge of AoE (no REST calls, no title heuristic).
+- The dependency direction flips: the runtime reaches *into* conexus;
+  conexus needs no knowledge of AoE (no REST calls, no title heuristic).
 - One standard, portable API — a session can point its fallback at any
-  compatible server; agent-mcp gains real per-worker status without
+  compatible server; conexus gains real per-worker status without
   disturbing its existing presence.
 - Retires `aoe_notify` + `config_aoe_*` — one mechanism, less coupling.
 - Skinny-by-default keeps bodies/secrets out of panes (aligns with ADR-0017's
@@ -154,7 +154,7 @@ fallback, and identity.
 - **Channel**: worker-bearer auth on `/delivery/stream` + `/delivery/status`;
   a frame produced by a `send_agent_message` reaches a connected stream;
   skinny-by-default rendering (id/title/status, no body).
-- **Presence**: transport-status is a distinct field; agent-mcp's own
+- **Presence**: transport-status is a distinct field; conexus's own
   connection-presence is unchanged for existing consumers.
 - **Lifecycle**: `status=dead` deregisters but the agent row + token persist
   (a re-attach resumes the same identity); a transient drop keeps the

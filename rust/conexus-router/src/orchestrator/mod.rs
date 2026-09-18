@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/router/project_orchestrator.py` (1302 LOC,
+//! Port of `conexus/router/project_orchestrator.py` (1302 LOC,
 //! Phase E2 PR 6, `conexus-router-orchestrator`) -- the router's
 //! state machine + systemd shell-out that starts/stops per-project
 //! backend processes on demand and idle-stops them.

@@ -1,7 +1,7 @@
 //! `Tool` trait + type-erased [`ToolDescriptor`] + [`dispatch`].
 //!
-//! Port of the OTHER half of `agent_mcp/core/authorize.py` +
-//! `agent_mcp/tools/registry.py::register_tool`: a `Tool` implementation
+//! Port of the OTHER half of `conexus/core/authorize.py` +
+//! `conexus/tools/registry.py::register_tool`: a `Tool` implementation
 //! declares its own name and [`Requirement`] as associated consts —
 //! there is no second, decorator-level place for them to drift against
 //! (see `crate::requirement`'s module doc).

@@ -12,10 +12,10 @@ A live production session (`pikvm-manager`) was found sitting idle with a
 scheduled directive (`sd_cb9e4377c87334b9`, 20-minute interval, "check in
 with all workers") overdue by roughly three hours. Investigation traced
 this to a structural gap: `collect_due_and_fire()`
-(`agent_mcp/repositories/scheduled_directive_repository.py`) — the
+(`conexus/repositories/scheduled_directive_repository.py`) — the
 function that evaluates and fires due scheduled directives — is **only
 ever called from inside a live `wait_for_events`/`fetch_events_since` MCP
-tool call** (`agent_mcp/tools/agent_communication_tools.py`,
+tool call** (`conexus/tools/agent_communication_tools.py`,
 `_collect_scheduled_directive_events_for`). A chat-style session that
 never calls those tools (never runs its own polling loop) will never have
 its directives evaluated, no matter how overdue they are. This is not a
@@ -25,9 +25,9 @@ firing is entirely lazy and wait-loop-native.
 Separately, ADR-0021 (three weeks **after** the scheduled-directive
 feature landed) built exactly the missing piece for a different case
 (unread messages / unfinished tasks / unassigned tasks): a per-worker SSE
-"delivery transport" (`agent_mcp/features/delivery_transport.py`) that a
+"delivery transport" (`conexus/features/delivery_transport.py`) that a
 runtime (the AoE bridge plugin) subscribes to, plus a background
-scheduler (`agent_mcp/features/delivery_scheduler.py`, `tick()`/
+scheduler (`conexus/features/delivery_scheduler.py`, `tick()`/
 `run_loop()`) that proactively pushes skinny frames to any **connected**
 worker whose policy condition is met — entirely independent of whether
 that worker ever calls `wait_for_events`.
@@ -48,7 +48,7 @@ Add `directive.due` as a new trigger on the existing delivery-transport
 background scheduler, reusing 100% of the existing SSE transport,
 connectivity registry, and background-loop wiring. **Zero changes to
 `aoe-bridge/` (Rust)** — it is deliberately policy-blind (ADR-0021:
-"agent-mcp owns policy, the runtime owns delivery") and already just
+"conexus owns policy, the runtime owns delivery") and already just
 relays whatever frame arrives on the stream it subscribes to.
 
 `tick()` gains a second, additive per-connected-agent step:

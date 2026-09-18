@@ -5,7 +5,7 @@ version: 2
 updates:
   # Dashboard (Next.js) npm deps.
   - package-ecosystem: "npm"
-    directory: "/agent_mcp/dashboard"
+    directory: "/conexus/dashboard"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

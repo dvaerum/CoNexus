@@ -120,7 +120,7 @@ same state is correct by construction.
 ## Operational notes
 
 * The retired `agent_event_locks` dict still exists in
-  `agent_mcp/core/state.py` — empty by default, lazily populated by
+  `conexus/core/state.py` — empty by default, lazily populated by
   any third-party that still calls `lock_for(agent_id)`. Slated for
   full removal in a future cleanup once we've audited there are no
   remaining external consumers.

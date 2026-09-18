@@ -1,7 +1,7 @@
 //! sqlite-vec extension loading — the "gracefully degrade to no-RAG"
 //! contract.
 //!
-//! Faithful in *intent* to `agent_mcp/db/connection.py`'s
+//! Faithful in *intent* to `conexus/db/connection.py`'s
 //! `check_vss_loadability()`/`is_vss_loadable()` (never panics, a
 //! failure to load just means "no RAG on this host"), but the
 //! *mechanism* is deliberately re-derived rather than ported at face

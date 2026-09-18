@@ -10,7 +10,7 @@
 3. [Prerequisites](#prerequisites)
 4. [Installing Ollama](#installing-ollama)
 5. [Pulling Embedding Models](#pulling-embedding-models)
-6. [Configuring CoNexus](#configuring-agent-mcp)
+6. [Configuring CoNexus](#configuring-conexus)
 7. [Testing Your Setup](#testing-your-setup)
 8. [Performance Benchmarks](#performance-benchmarks)
 9. [Troubleshooting](#troubleshooting)
@@ -188,7 +188,7 @@ environment variables only — there is no `.env`-file-loading mechanism
 over). Set these however your deployment already sets other env vars:
 plain `export` in a dev shell, a systemd `Environment=`/
 `EnvironmentFile=` line, or (for the Nix/home-manager deployment path)
-the `services.agent-mcp.*` module options.
+the `services.conexus.*` module options.
 
 The provider switch is presence/absence of a non-empty `OPENAI_API_KEY`
 — leave it **unset entirely** and Ollama is used; set it to a real
@@ -475,7 +475,7 @@ Once your local embeddings are working:
 1. **Start the router** with the local-embedding variables exported
    (see [Getting Started](getting-started.md) for the full quick-start):
    ```bash
-   conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/agent-mcp-sockets --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
+   conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/conexus-sockets --dashboard-dir ./result-dashboard/share/conexus-dashboard
    ```
 
 2. **Test RAG functionality**: Try searching your codebase through the CoNexus dashboard
@@ -525,7 +525,7 @@ export CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
 export CONEXUS_EMBEDDING_DIMENSION=1024
 
 # Start the router (see Getting Started for the full command)
-conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/agent-mcp-sockets --dashboard-dir ./result-dashboard/share/agent-mcp-dashboard
+conexus-router --port 5454 --projects-file projects.json --sock-dir /tmp/conexus-sockets --dashboard-dir ./result-dashboard/share/conexus-dashboard
 ```
 
 **That's it!** You're now running CoNexus with free, fast, private local embeddings! 🚀

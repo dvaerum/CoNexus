@@ -1,6 +1,6 @@
 //! MCP resources subsystem (Phase E1 PR B2).
 //!
-//! Port of `agent_mcp/resources/*` -- the data + auth half of the
+//! Port of `conexus/resources/*` -- the data + auth half of the
 //! `resources/list`/`resources/read` MCP surfaces (`main_app.py`'s
 //! `mcp_list_resources_handler`/`mcp_read_resource_handler`; wiring
 //! into `rmcp`'s `ServerHandler` lives in `conexus-backend::server`,

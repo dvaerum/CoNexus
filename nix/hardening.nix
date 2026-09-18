@@ -1,7 +1,7 @@
 # Shared systemd sandboxing directives (defense-in-depth).
 #
 # Single source of truth for the SAFE hardening subset merged into
-# every agent-mcp Service block by BOTH modules:
+# every conexus Service block by BOTH modules:
 #
 #   - nix/home-manager-module.nix  (user-scope units, run under $HOME)
 #   - nix/module.nix               (system-scope units, run as a

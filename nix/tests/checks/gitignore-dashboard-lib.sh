@@ -11,7 +11,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$REPO_ROOT"
 
-TARGET="agent_mcp/dashboard/lib/api/index.ts"
+TARGET="conexus/dashboard/lib/api/index.ts"
 
 TRACKED="$(git ls-files "$TARGET")"
 if [ "$TRACKED" != "$TARGET" ]; then
@@ -46,7 +46,7 @@ if [ "$CHECK_STATUS" -eq 0 ]; then
             echo "FAIL: $TARGET is matched by a .gitignore rule: $CHECK_OUTPUT" >&2
             echo "      A generic 'lib/' convention is shadowing the dashboard's" >&2
             echo "      JS lib directory; add a negation rule (e.g." >&2
-            echo "      '!agent_mcp/dashboard/lib/') to .gitignore." >&2
+            echo "      '!conexus/dashboard/lib/') to .gitignore." >&2
             exit 1
             ;;
     esac

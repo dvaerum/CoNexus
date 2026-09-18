@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/router/project_registry.py` (892 LOC, Phase E2
+//! Port of `conexus/router/project_registry.py` (892 LOC, Phase E2
 //! PR 5, `conexus-router-project-registry`) -- the locking JSON store
 //! backing `projects.local.json`, the file both the router and
 //! `conexus-launcher` read on every request/boot.
@@ -77,7 +77,7 @@ pub const DEFAULT_BACKEND_IMPL: &str = "rust";
 const VALID_BACKEND_IMPLS: [&str; 2] = ["python", "rust"];
 
 /// Kept in sync with `path_policy.rs`'s own project-name-segment
-/// extraction and the router-side `_SLUG_RE` in `agent_mcp/router/
+/// extraction and the router-side `_SLUG_RE` in `conexus/router/
 /// app.py`; duplicated (not shared) the same way Python's own copy in
 /// this module is duplicated to avoid a circular import. Uses the
 /// `regex` crate directly (a real dependency, not a hand-rolled

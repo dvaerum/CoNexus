@@ -2,22 +2,22 @@
 # Precompact-hook URL-derivation contract.
 #
 # The daemon-agent precompact hook
-# (`nix/agent-mcp-daemon-agent-precompact-hook.sh.in`) posts a tiny
+# (`nix/conexus-daemon-agent-precompact-hook.sh.in`) posts a tiny
 # resume-pointer back to the project_context REST endpoint. To do that
-# it needs the REST API root, which it derives from `AGENT_MCP_MCP_URL`.
+# it needs the REST API root, which it derives from `CONEXUS_MCP_URL`.
 #
 # Pre-PR-D (URL redesign), MCP URLs were:
-#     https://host/agent-mcp/<name>/mcp
+#     https://host/conexus/<name>/mcp
 # so `${mcp_url%/mcp}/api` stripped the trailing `/mcp` and gave
-#     https://host/agent-mcp/<name>/api
+#     https://host/conexus/<name>/api
 # which is NOT the REST root anyway -- but for the project_context POST
 # that path coincidentally worked because the old REST surface lived
-# under `/agent-mcp/<name>/...`.
+# under `/conexus/<name>/...`.
 #
 # Post-PR-D the URL is:
-#     https://host/agent-mcp/mcp/<name>
+#     https://host/conexus/mcp/<name>
 # `${mcp_url%/mcp}` is now a NO-OP (the suffix doesn't match), so the
-# old line produced `https://host/agent-mcp/mcp/<name>/api` -- which
+# old line produced `https://host/conexus/mcp/<name>/api` -- which
 # doesn't exist and 404s.
 #
 # The correct derivation: strip the trailing `/mcp/<name>` and append
@@ -33,7 +33,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-HOOK_TEMPLATE="$REPO_ROOT/nix/agent-mcp-daemon-agent-precompact-hook.sh.in"
+HOOK_TEMPLATE="$REPO_ROOT/nix/conexus-daemon-agent-precompact-hook.sh.in"
 
 # Pull out the api_root derivation block. Anchored on the comment
 # "Derive the REST API root from the MCP URL" (a stable marker that
@@ -86,30 +86,30 @@ assert_api_root() {
 
 # New URL shape (post-PR-D, what production actually emits).
 
-# Daemon wrapper builds http://127.0.0.1:1337/agent-mcp/mcp/<name>.
+# Daemon wrapper builds http://127.0.0.1:1337/conexus/mcp/<name>.
 # The hook must derive the matching REST root.
 assert_api_root \
     "api_root for loopback mcp url" \
-    "http://127.0.0.1:1337/agent-mcp/mcp/washing-brothers" \
-    "http://127.0.0.1:1337/agent-mcp/api/projects/washing-brothers"
+    "http://127.0.0.1:1337/conexus/mcp/washing-brothers" \
+    "http://127.0.0.1:1337/conexus/api/projects/washing-brothers"
 
 # If an operator points the daemon at the public tailnet URL the same
 # derivation must work -- `_validate_name` reserves `mcp` so the
 # pattern is unambiguous.
 assert_api_root \
     "api_root for tailnet mcp url" \
-    "https://nixos-developer-system.tailfdae0.ts.net/agent-mcp/mcp/washing-brothers" \
-    "https://nixos-developer-system.tailfdae0.ts.net/agent-mcp/api/projects/washing-brothers"
+    "https://nixos-developer-system.tailfdae0.ts.net/conexus/mcp/washing-brothers" \
+    "https://nixos-developer-system.tailfdae0.ts.net/conexus/api/projects/washing-brothers"
 
 # Project names allow single hyphens. The derivation must not eat them.
 assert_api_root \
     "api_root handles single-hyphen project name" \
-    "http://127.0.0.1:1337/agent-mcp/mcp/my-project" \
-    "http://127.0.0.1:1337/agent-mcp/api/projects/my-project"
+    "http://127.0.0.1:1337/conexus/mcp/my-project" \
+    "http://127.0.0.1:1337/conexus/api/projects/my-project"
 
 assert_api_root \
     "api_root handles non-default port" \
-    "http://127.0.0.1:8080/agent-mcp/mcp/proj" \
-    "http://127.0.0.1:8080/agent-mcp/api/projects/proj"
+    "http://127.0.0.1:8080/conexus/mcp/proj" \
+    "http://127.0.0.1:8080/conexus/api/projects/proj"
 
 echo "ok: precompact-hook-api-root"

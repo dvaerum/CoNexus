@@ -1,5 +1,5 @@
 //! Names the two single-tenant authorization policies (arch-r4 #8).
-//! Port of `agent_mcp/router/single_tenant.py` (Phase E2 PR 16,
+//! Port of `conexus/router/single_tenant.py` (Phase E2 PR 16,
 //! `conexus-router-lifecycle-foundations`).
 //!
 //! Single-tenant mode (ADR-0008) pins a router deploy to one

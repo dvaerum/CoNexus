@@ -1,4 +1,4 @@
-# Task Creation Requirements Analysis: Python vs Node.js Agent-MCP
+# Task Creation Requirements Analysis: Python vs Node.js CoNexus
 
 > **Historical snapshot.** This document predates the
 > `retire-system-token` waves (PRs #208–#211, 2026-06). The
@@ -13,7 +13,7 @@
 
 ## Executive Summary
 
-This analysis examines the task creation requirements in both Python and Node.js Agent-MCP implementations, revealing significant philosophical differences in agent orchestration approaches. The Node.js implementation enforces stricter task management rules while Python allows more flexible task creation patterns.
+This analysis examines the task creation requirements in both Python and Node.js CoNexus implementations, revealing significant philosophical differences in agent orchestration approaches. The Node.js implementation enforces stricter task management rules while Python allows more flexible task creation patterns.
 
 ---
 
@@ -21,7 +21,7 @@ This analysis examines the task creation requirements in both Python and Node.js
 
 ### 1.1 Python Implementation: assign_task_tool_impl
 
-**File:** `agent_mcp/tools/task_tools.py` (lines 1087+)  
+**File:** `conexus/tools/task_tools.py` (lines 1087+)  
 **Size:** 162KB monolithic file  
 **Approach:** Flexible task creation with multiple modes
 
@@ -79,7 +79,7 @@ if target_agent_id.lower().startswith("admin"):
 
 ### 1.2 Node.js Implementation: assign_task
 
-**File:** `agent-mcp-node/src/tools/tasks/creation.ts` (lines 254+)  
+**File:** `conexus-node/src/tools/tasks/creation.ts` (lines 254+)  
 **Architecture:** Modular design with separate task files  
 **Approach:** Strict task orchestration with mandatory relationships
 
@@ -176,7 +176,7 @@ if (!actualParentTaskId) {
 
 ### 2.1 Python create_agent Logic
 
-**File:** `agent_mcp/tools/admin_tools.py` (lines 47+)
+**File:** `conexus/tools/admin_tools.py` (lines 47+)
 
 ```python
 # Task ID validation in create_agent
@@ -189,7 +189,7 @@ if not task_ids:  # Allows empty list
 
 ### 2.2 Node.js create_agent Logic  
 
-**File:** `agent-mcp-node/src/tools/agent.ts` (lines 84+)
+**File:** `conexus-node/src/tools/agent.ts` (lines 84+)
 
 ```typescript
 // CRITICAL DIFFERENCE: Task requirement

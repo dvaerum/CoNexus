@@ -34,7 +34,7 @@ with no UI signal (a mis-tier that only a data-driven schema can prevent).
 A single **backend registry** owns every setting's schema, and the
 frontend consumes it.
 
-1. **`agent_mcp/core/settings_schema.py`** — a frozen `SettingSpec`
+1. **`conexus/core/settings_schema.py`** — a frozen `SettingSpec`
    (`key`, `type` ∈ `bool|int|string|secret`, `default`, `tier` ∈
    `operator|sysadmin`, `group` ∈
    `worker_permissions|event_loop|retention|aoe`, `title`, `description`,

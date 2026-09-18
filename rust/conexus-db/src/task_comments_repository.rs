@@ -1,4 +1,4 @@
-//! Port of `agent_mcp/db/actions/task_comments_db.py` — the
+//! Port of `conexus/db/actions/task_comments_db.py` — the
 //! `task_comments` side table's sole read/write surface (migration
 //! 0009's per-comment table, renamed from `task_notes` in migration
 //! 0026; replaces the `tasks.notes` JSON-list-in-TEXT pattern so

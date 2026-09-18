@@ -3,7 +3,7 @@
 *   **Objective:** Implement a Multi-Agent Collaboration Protocol (MCP) template for creating and managing multi-agent systems.
 *   **Scope:** Python-based MCP server and client implementation with environment variable support, dashboard visualization, and task management.
 *   **Success Criteria:** 
-    * Server can be started using `uv run -m agent_mcp.cli -- server --port xxxx --project-dir xxxxx`
+    * Server can be started using `uv run -m conexus.cli -- server --port xxxx --project-dir xxxxx`
     * API keys and configuration use environment variables (no hardcoded values)
     * Agents can connect to the MCP server and collaborate on tasks
     * Dashboard provides visualization of agent interactions
@@ -99,7 +99,7 @@
 
 ## 5. Implementation Details & File Structure
 
-*   **Target Directory/Module:** `/agent-mcp`
+*   **Target Directory/Module:** `/conexus`
 *   **File Structure Plan:**
     ```
     /conexus/
@@ -138,7 +138,7 @@
 *   **Unit 1: Environment Setup**
     *   **File(s):** `pyproject.toml`
     *   **Purpose:** Configure project build configuration. No `.env`
-        template is needed — Agent-MCP defaults to a local Ollama
+        template is needed — CoNexus defaults to a local Ollama
         endpoint when `OPENAI_API_KEY` is unset.
     *   **Agent Task(s):**
         1.  `CREATE_FILE`: Create pyproject.toml with build configuration

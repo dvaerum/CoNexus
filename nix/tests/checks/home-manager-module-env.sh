@@ -116,13 +116,13 @@ fail=0
 # test_router_environment_sets_CONEXUS_ROUTER_DB:
 # The router service must set `CONEXUS_ROUTER_DB` to an
 # XDG_DATA_HOME path. Without this, user-mode systemd falls back to
-# conexus-router's own compiled-in `/var/lib/agent-mcp/router.db`
+# conexus-router's own compiled-in `/var/lib/conexus/router.db`
 # default, which it can't write, and the router restart-loops
 # forever (see header comment).
 if ! grep -qF 'CONEXUS_ROUTER_DB' <<<"$ENV_BLOCK"; then
   echo "FAIL: home-manager-module.nix must set CONEXUS_ROUTER_DB on " \
     "conexus-router; the compiled-in default " \
-    "(/var/lib/agent-mcp/router.db) is unwritable by user-mode units." >&2
+    "(/var/lib/conexus/router.db) is unwritable by user-mode units." >&2
   fail=1
 else
   value=$(grep -oP '"CONEXUS_ROUTER_DB=\K[^"]+' <<<"$ENV_BLOCK" | head -1)
@@ -141,8 +141,8 @@ else
     # ~/.local/share interpolation via %h.
     if ! grep -qF 'xdg.dataHome' <<<"$value" && ! grep -qF '%h/.local/share' <<<"$value"; then
       echo "FAIL: CONEXUS_ROUTER_DB='$value' should resolve under " \
-        'XDG_DATA_HOME (use ${config.xdg.dataHome}/agent-mcp/router.db ' \
-        'or %h/.local/share/agent-mcp/router.db).' >&2
+        'XDG_DATA_HOME (use ${config.xdg.dataHome}/conexus/router.db ' \
+        'or %h/.local/share/conexus/router.db).' >&2
       fail=1
     fi
   fi
