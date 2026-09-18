@@ -3,7 +3,7 @@ name = "aoe-bridge"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
-description = "Agent-MCP delivery bridge — an Agent of Empires plugin worker that injects agent-mcp delivery notifications into AoE-run Claude sessions (ADR-0021)."
+description = "CoNexus delivery bridge — an Agent of Empires plugin worker that injects CoNexus delivery notifications into AoE-run Claude sessions (ADR-0021)."
 license = "MIT"
 publish = false
 

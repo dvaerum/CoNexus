@@ -2,36 +2,36 @@
 //!
 //! ## The model: one base, everything derived
 //!
-//! There is exactly ONE agent-mcp URL to configure — `agent_mcp_base`, the
+//! There is exactly ONE conexus URL to configure — `conexus_base`, the
 //! BARE router address you reach it at (on the same host `http://127.0.0.1:1337`,
-//! no `/agent-mcp`). The `/agent-mcp` prefix is a reverse-proxy concern (a front
+//! no `/conexus`). The `/conexus` prefix is a reverse-proxy concern (a front
 //! door may serve the router under it externally), not part of this base. Every
 //! per-session URL is derived from it plus the row's `project`:
 //!
 //! ```text
-//!   delivery = <agent_mcp_base>/api/<project>   (SSE /delivery/stream + status POST)
-//!   mcp      = <agent_mcp_base>/mcp/<project>   (injected per-session MCP server)
+//!   delivery = <conexus_base>/api/<project>   (SSE /delivery/stream + status POST)
+//!   mcp      = <conexus_base>/mcp/<project>   (injected per-session MCP server)
 //! ```
 //!
 //! So a covered-session row carries only identity — `session_id`, `token`,
 //! `project` (+ optional `expose_mcp`, `mode`) — never a URL. The one token
-//! drives both surfaces: an agent-mcp agent token authenticates the delivery
+//! drives both surfaces: a conexus agent token authenticates the delivery
 //! stream AND the MCP transport. The operator supplies it per session (minted
-//! via agent-mcp's `register_agent`); the bridge wires delivery (always) and MCP
+//! via conexus's `register_agent`); the bridge wires delivery (always) and MCP
 //! (when `expose_mcp`, over `session.mcp.set`) — no separate provisioning step.
 //!
 //! `aoe_base` is a SEPARATE concern: the AoE-side REST the bridge injects INTO
-//! (`/api/sessions/<id>/send|acp/prompt`), not an agent-mcp url.
+//! (`/api/sessions/<id>/send|acp/prompt`), not a conexus url.
 //!
 //! The bridge sources all of this from **its own plugin settings**, read over
 //! the `config.get` host RPC (which only ever returns this plugin's own table).
 //!
 //! ## Assumptions (see README)
 //! - `session_id` matches `sessions.list[].id` (stable across respawn).
-//! - `agent_mcp_base` is the bare router address (no reverse-proxy prefix); the
+//! - `conexus_base` is the bare router address (no reverse-proxy prefix); the
 //!   bridge appends `/api/<project>` (+ `/delivery/stream|status`) and
 //!   `/mcp/<project>`.
-//! - `token` == the session's agent-mcp bearer; it authenticates BOTH the
+//! - `token` == the session's conexus bearer; it authenticates BOTH the
 //!   delivery stream and the injected MCP server.
 //! - `sessions.list` exposes no definitive terminal/structured flag, so `auto`
 //!   is best-effort (it inspects `tool` + `status`); set `mode` explicitly to
@@ -46,7 +46,7 @@ use crate::mode::{normalize_mode, view_mode, Mode};
 use crate::plugin::PluginConn;
 
 /// `expose_mcp` defaults to true: covering a session normally means you also
-/// want it to hold agent-mcp's tools, not just receive the fallback push.
+/// want it to hold conexus's tools, not just receive the fallback push.
 fn default_true() -> bool {
     true
 }
@@ -57,19 +57,19 @@ pub struct Settings {
     pub enabled: bool,
     /// AoE serve REST base — where the bridge POSTs to INJECT nudges into a
     /// session (AoE's own `/api/sessions/<id>/send|acp/prompt`). Distinct from
-    /// `agent_mcp_base`: this is the AoE side. E.g. `http://127.0.0.1:8080`.
+    /// `conexus_base`: this is the AoE side. E.g. `http://127.0.0.1:8080`.
     pub aoe_base: String,
     /// AoE serve bearer token, only if this AoE instance runs with auth. Empty
     /// for a `--auth=none` instance.
     pub aoe_token: String,
-    /// The BARE agent-mcp router address shared by all covered sessions (e.g.
-    /// `http://127.0.0.1:1337`, no `/agent-mcp` — that prefix is a reverse-proxy
+    /// The BARE conexus router address shared by all covered sessions (e.g.
+    /// `http://127.0.0.1:1337`, no `/conexus` — that prefix is a reverse-proxy
     /// concern, not part of this base). The bridge derives BOTH per-session URLs
     /// from it + the row's `project`:
-    ///   delivery = `<agent_mcp_base>/api/<project>`   (SSE + status POST)
-    ///   mcp      = `<agent_mcp_base>/mcp/<project>`   (injected MCP server)
+    ///   delivery = `<conexus_base>/api/<project>`   (SSE + status POST)
+    ///   mcp      = `<conexus_base>/mcp/<project>`   (injected MCP server)
     /// Blank ⇒ no routes resolve (nothing to point at).
-    pub agent_mcp_base: String,
+    pub conexus_base: String,
     /// How often to re-resolve routes and re-post transport-status.
     pub status_interval_secs: u64,
     /// When true (default), each covered session that gets MCP injected is also
@@ -84,23 +84,23 @@ pub struct Settings {
 }
 
 /// One row of the `sessions` object-list setting. A row is just the identity of
-/// a covered session — everything URL-shaped is derived from `agent_mcp_base` +
+/// a covered session — everything URL-shaped is derived from `conexus_base` +
 /// `project`, so there is no per-row endpoint to keep in sync.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SessionEntry {
     /// AoE session id (matches `sessions.list[].id`). Required.
     #[serde(default)]
     pub session_id: String,
-    /// The session's agent-mcp bearer token. Authenticates BOTH the delivery
+    /// The session's conexus bearer token. Authenticates BOTH the delivery
     /// stream and the injected MCP server. Required. Empty ⇒ the row is skipped.
     #[serde(default)]
     pub token: String,
-    /// agent-mcp project this session acts as. Appended to `agent_mcp_base` for
+    /// conexus project this session acts as. Appended to `conexus_base` for
     /// both the delivery (`/api/<project>`) and MCP (`/mcp/<project>`) urls.
     /// Required. Empty ⇒ the row is skipped.
     #[serde(default)]
     pub project: String,
-    /// Whether to also inject agent-mcp's tools into this session as a
+    /// Whether to also inject conexus's tools into this session as a
     /// per-session MCP server (over `session.mcp.set`). Delivery fires
     /// regardless; this only gates the MCP-tools half. Defaults to true.
     #[serde(default = "default_true")]
@@ -179,14 +179,14 @@ pub fn parse_liveness(value: &Value) -> HashMap<String, Liveness> {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub session_id: String,
-    /// The agent-mcp project this session acts as. Not used to build URLs (the
+    /// The conexus project this session acts as. Not used to build URLs (the
     /// endpoints below already embed it) — carried so the observability surface
     /// can name the project without re-deriving it from a URL.
     pub project: String,
     pub endpoint: String,
     pub token: String,
     pub mode: Mode,
-    /// The agent-mcp MCP url to inject (`<agent_mcp_base>/mcp/<project>`), or
+    /// The conexus MCP url to inject (`<conexus_base>/mcp/<project>`), or
     /// `None` when MCP injection is off for this row (`expose_mcp` false).
     /// Delivery is independent of this.
     pub mcp_url: Option<String>,
@@ -243,12 +243,12 @@ impl Route {
     }
 }
 
-/// Join the agent-mcp base with a sub-path (`api/<project>` or `mcp/<project>`),
+/// Join the conexus base with a sub-path (`api/<project>` or `mcp/<project>`),
 /// tolerant of a trailing slash on the base.
-fn join_base(agent_mcp_base: &str, kind: &str, project: &str) -> String {
+fn join_base(conexus_base: &str, kind: &str, project: &str) -> String {
     format!(
         "{}/{}/{}",
-        agent_mcp_base.trim().trim_end_matches('/'),
+        conexus_base.trim().trim_end_matches('/'),
         kind,
         project.trim().trim_matches('/')
     )
@@ -313,13 +313,13 @@ pub fn effective_mode(route: &Route, fresh: Option<&Liveness>, learned: Option<M
 }
 
 /// Resolve every configured session entry into a [`Route`]. Both the delivery
-/// endpoint and the MCP url are DERIVED from `agent_mcp_base` + the row's
+/// endpoint and the MCP url are DERIVED from `conexus_base` + the row's
 /// `project`, so a row is self-contained given the one global base. A row is
 /// dropped unless it has a `session_id`, a `token`, a `project`, and the global
-/// `agent_mcp_base` is set. Mode + liveness come from AoE's web REST liveness
+/// `conexus_base` is set. Mode + liveness come from AoE's web REST liveness
 /// map (`GET /api/sessions`).
 pub fn resolve_routes(settings: &Settings, live: &HashMap<String, Liveness>) -> Vec<Route> {
-    let base = settings.agent_mcp_base.trim();
+    let base = settings.conexus_base.trim();
     if base.is_empty() {
         return Vec::new(); // nothing to point at.
     }
@@ -407,7 +407,7 @@ pub async fn load_settings(conn: &PluginConn) -> Settings {
         .as_str()
         .map(str::to_string)
         .unwrap_or_default();
-    let agent_mcp_base = get_value(conn, "agent_mcp_base")
+    let conexus_base = get_value(conn, "conexus_base")
         .await
         .as_str()
         .map(str::to_string)
@@ -426,7 +426,7 @@ pub async fn load_settings(conn: &PluginConn) -> Settings {
         enabled,
         aoe_base,
         aoe_token,
-        agent_mcp_base,
+        conexus_base,
         status_interval_secs,
         ensure_acp,
         sessions,
@@ -455,12 +455,12 @@ mod tests {
             .collect()
     }
 
-    fn settings(sessions: Vec<SessionEntry>, agent_mcp_base: &str) -> Settings {
+    fn settings(sessions: Vec<SessionEntry>, conexus_base: &str) -> Settings {
         Settings {
             enabled: true,
             aoe_base: "http://127.0.0.1:8080".to_string(),
             aoe_token: "aoe-tok".to_string(),
-            agent_mcp_base: agent_mcp_base.to_string(),
+            conexus_base: conexus_base.to_string(),
             status_interval_secs: 30,
             ensure_acp: true,
             sessions,
@@ -496,12 +496,12 @@ mod tests {
         // A trailing slash on the base is tolerated.
         let entries = vec![entry("s1", "t1", "washing", "auto")];
         let live = live_map(&[("s1", "claude", "Running")]);
-        let routes = resolve_routes(&settings(entries, "https://host/agent-mcp/"), &live);
+        let routes = resolve_routes(&settings(entries, "https://host/conexus/"), &live);
         assert_eq!(routes.len(), 1);
-        assert_eq!(routes[0].endpoint, "https://host/agent-mcp/api/washing");
+        assert_eq!(routes[0].endpoint, "https://host/conexus/api/washing");
         assert_eq!(
             routes[0].mcp_url.as_deref(),
-            Some("https://host/agent-mcp/mcp/washing")
+            Some("https://host/conexus/mcp/washing")
         );
         assert!(routes[0].live);
     }
@@ -510,7 +510,7 @@ mod tests {
     fn auto_mode_inferred_from_live_record() {
         let entries = vec![entry("s1", "t1", "p", "auto"), entry("s2", "t2", "p", "")];
         let live = live_map(&[("s1", "claude", "acp running"), ("s2", "claude", "Running")]);
-        let routes = resolve_routes(&settings(entries, "https://h/agent-mcp"), &live);
+        let routes = resolve_routes(&settings(entries, "https://h/conexus"), &live);
         // s1: status mentions acp -> structured; s2: terminal-ish -> terminal.
         assert_eq!(routes[0].mode, Mode::Structured);
         assert_eq!(routes[1].mode, Mode::Terminal);
@@ -740,7 +740,7 @@ mod tests {
         let entries = vec![entry("s1", "t1", "p", "structured")];
         // Live status looks terminal, but explicit "structured" wins.
         let live = live_map(&[("s1", "claude", "Running")]);
-        let routes = resolve_routes(&settings(entries, "https://h/agent-mcp"), &live);
+        let routes = resolve_routes(&settings(entries, "https://h/conexus"), &live);
         assert_eq!(routes[0].mode, Mode::Structured);
     }
 
@@ -751,7 +751,7 @@ mod tests {
             entry("s2", "", "p", ""), // no token
             entry("s3", "t", "", ""), // no project
         ];
-        let routes = resolve_routes(&settings(entries, "https://h/agent-mcp"), &HashMap::new());
+        let routes = resolve_routes(&settings(entries, "https://h/conexus"), &HashMap::new());
         assert!(routes.is_empty());
     }
 
@@ -765,7 +765,7 @@ mod tests {
     #[test]
     fn configured_but_not_live_is_marked_not_live() {
         let entries = vec![entry("ghost", "t", "p", "auto")];
-        let routes = resolve_routes(&settings(entries, "https://h/agent-mcp"), &HashMap::new());
+        let routes = resolve_routes(&settings(entries, "https://h/conexus"), &HashMap::new());
         assert_eq!(routes.len(), 1);
         assert!(!routes[0].live);
         // No live signal -> auto defaults to terminal.
@@ -777,10 +777,10 @@ mod tests {
         let mut e = entry("s1", "t1", "p", "auto");
         e.expose_mcp = false;
         let live = live_map(&[("s1", "claude", "Running")]);
-        let routes = resolve_routes(&settings(vec![e], "https://h/agent-mcp"), &live);
+        let routes = resolve_routes(&settings(vec![e], "https://h/conexus"), &live);
         assert!(routes[0].mcp_url.is_none());
         // Delivery endpoint is still derived (delivery is independent of MCP).
-        assert_eq!(routes[0].endpoint, "https://h/agent-mcp/api/p");
+        assert_eq!(routes[0].endpoint, "https://h/conexus/api/p");
     }
 
     #[test]

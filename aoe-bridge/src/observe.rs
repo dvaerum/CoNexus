@@ -26,7 +26,7 @@
 //! ## Redaction
 //!
 //! Every message — stderr and file alike — passes through [`redact`] before it
-//! is emitted. The bridge's settings carry a per-session agent-mcp bearer and an
+//! is emitted. The bridge's settings carry a per-session conexus bearer and an
 //! AoE serve bearer, and those tokens end up in `Authorization` headers that a
 //! transport error (or a careless future `format!`) could echo back. Redaction
 //! at the single write path is the only place that cannot be forgotten.

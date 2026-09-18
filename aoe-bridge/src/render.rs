@@ -1,6 +1,6 @@
 //! The skinny frame renderer.
 //!
-//! A delivery frame from agent-mcp carries **ids/subjects/status only, never a
+//! A delivery frame from conexus carries **ids/subjects/status only, never a
 //! message body** (ADR-0021). The renderer turns one frame into a short block
 //! of text that points the agent at its own MCP tools (`get_agent_messages`,
 //! `view_tasks`) — it never inlines a body, so no secret from a message body
@@ -102,7 +102,7 @@ pub fn parse_frame(data: &str) -> Result<Frame, serde_json::Error> {
 /// interpolated into the pane nudge (R3-F1).
 ///
 /// `subject`/`title` (and, defensively, every other frame field rendered
-/// below) come straight from agent-mcp's DB with no upstream sanitisation
+/// below) come straight from conexus's DB with no upstream sanitisation
 /// beyond an outer `.strip()` — see `task_tools.py`'s `task_title` and
 /// `agent_communication_tools.py`'s message `subject`, which its own comment
 /// notes is "persisted verbatim". `inject.rs` then POSTs the rendered nudge
@@ -214,7 +214,7 @@ pub fn render_skinny(f: &Frame) -> String {
         } else {
             "Scheduled directive due"
         };
-        return format!("[agent-mcp delivery] {headline}: {prompt}");
+        return format!("[conexus delivery] {headline}: {prompt}");
     }
 
     let mut lines: Vec<String> = Vec::new();
@@ -231,7 +231,7 @@ pub fn render_skinny(f: &Frame) -> String {
             f.unread_count, f.task_count
         ),
     };
-    lines.push(format!("[agent-mcp delivery] {headline}"));
+    lines.push(format!("[conexus delivery] {headline}"));
 
     if !f.unread_messages.is_empty() {
         lines.push("Unread messages (call get_agent_messages to read the body):".to_string());
@@ -267,7 +267,7 @@ pub fn render_skinny(f: &Frame) -> String {
     }
 
     lines.push(
-        "(Fallback nudge — act via your agent-mcp tools; this marks nothing read or done.)"
+        "(Fallback nudge — act via your conexus tools; this marks nothing read or done.)"
             .to_string(),
     );
     lines.join("\n")
