@@ -121,18 +121,60 @@ pub fn is_stream_request(method: &Method, path: &str) -> bool {
     method == Method::GET && matches!(path, "/mcp" | "/api/delivery/stream" | "/api/events")
 }
 
-/// Port of `_sse_agent_key`, minus the cookie-authenticated
-/// (`op:`-prefixed) branch -- that branch needs operator-session
-/// state this crate hasn't ported yet (see the module doc). A bearer
-/// token hashes to a stable per-caller key; anything else (no
-/// `Authorization` header at all) falls back to a shared `"anon"`
-/// bucket, same as Python's own fallback.
+/// Port of `_sse_agent_key`, PLUS the cookie-authenticated
+/// (`op:`-prefixed) branch this function's own doc used to say was
+/// deferred (F11 fix): a bearer token hashes to a stable per-caller
+/// key; failing that, the router's OWN signed forwarding header
+/// (`X-Conexus-Forwarded-Operator`) yields a stable per-OPERATOR key;
+/// only a caller with NEITHER credential at all falls back to the
+/// shared `"anon"` bucket.
+///
+/// **Before this fix**: every cookie-authenticated dashboard operator,
+/// across EVERY project, shared the SAME `"anon"` bucket (this
+/// function only ever inspected `Authorization`, which a cookie-
+/// authenticated request never carries) -- confirmed live, a brand
+/// new unprivileged user's very first SSE stream got a `429` purely
+/// because a DIFFERENT operator's streams on a DIFFERENT project had
+/// already filled the shared 4-slot cap. See
+/// `sse_agent_key_isolates_cookie_authenticated_operators_by_identity`
+/// below.
+///
+/// **Call-site precondition this relies on**: [`proxy_to_backend`]
+/// calls this function on its OWN `headers` value AFTER it has
+/// already attached the freshly-signed forwarding header (see that
+/// function's body) -- so the header is already present here whenever
+/// the caller came in through the cookie-forwarding bridge, no extra
+/// parameter needs threading through.
+///
+/// Parsing `operator_id` out of the header WITHOUT re-verifying its
+/// HMAC is safe here, not a shortcut: [`filter_headers`] unconditionally
+/// strips any CLIENT-supplied header of this exact name before this
+/// point (see that function's own doc) -- the ONLY value this map can
+/// ever carry by construction is one THIS router process just signed,
+/// moments ago, for the current request's own resolved identity. There
+/// is no attacker-controlled input on this path to spoof; verifying
+/// the MAC again here would just re-check a fact this process itself
+/// already established.
 pub fn sse_agent_key(headers: &HeaderMap) -> String {
     if let Some(auth) = headers.get(hyper::header::AUTHORIZATION) {
         if let Ok(s) = auth.to_str() {
             let digest = Sha256::digest(s.as_bytes());
             let hex = format!("{digest:x}");
             return hex[..16].to_string();
+        }
+    }
+    if let Some(fwd) = headers.get(FORWARDING_HEADER_NAME) {
+        if let Ok(s) = fwd.to_str() {
+            // Wire format is `"<operator_id>.<role>.<expiry>.<mac>"`
+            // (see `conexus_auth::forwarding_header`'s own doc) --
+            // `operator_id` is everything before the first '.'.
+            if let Some((operator_id, _rest)) = s.split_once('.') {
+                if !operator_id.is_empty() {
+                    let digest = Sha256::digest(operator_id.as_bytes());
+                    let hex = format!("{digest:x}");
+                    return format!("op:{}", &hex[..16]);
+                }
+            }
         }
     }
     "anon".to_string()
@@ -591,6 +633,56 @@ mod tests {
         assert_eq!(sse_agent_key(&HeaderMap::new()), "anon");
     }
 
+    /// F11: a cookie-authenticated caller (no `Authorization` header at
+    /// all, only the router's own signed forwarding header) must get a
+    /// key derived from THEIR resolved operator identity, not the
+    /// shared `"anon"` fallback -- and that key must be STABLE across
+    /// requests for the same operator even though `sign()` mints a
+    /// fresh MAC/expiry every call (see `backend_api_handler`'s own
+    /// doc: it re-signs with a fresh clock read on every request), and
+    /// DISTINCT for a different operator.
+    #[test]
+    fn sse_agent_key_isolates_cookie_authenticated_operators_by_identity() {
+        let mut alice1 = HeaderMap::new();
+        alice1.insert(
+            FORWARDING_HEADER_NAME,
+            HeaderValue::from_static("alice.viewer.1000.aaaa"),
+        );
+        let mut alice2 = HeaderMap::new();
+        alice2.insert(
+            // Same operator, but a DIFFERENT role/expiry/mac -- as a
+            // real second request's fresh `sign()` call would produce.
+            FORWARDING_HEADER_NAME,
+            HeaderValue::from_static("alice.operator.2000.bbbb"),
+        );
+        let mut bob = HeaderMap::new();
+        bob.insert(
+            FORWARDING_HEADER_NAME,
+            HeaderValue::from_static("bob.viewer.1000.cccc"),
+        );
+
+        let alice_key1 = sse_agent_key(&alice1);
+        let alice_key2 = sse_agent_key(&alice2);
+        let bob_key = sse_agent_key(&bob);
+
+        assert_ne!(
+            alice_key1, "anon",
+            "a resolved operator must never fall back to anon"
+        );
+        assert!(
+            alice_key1.starts_with("op:"),
+            "a forwarding-header-derived key must be distinguishable from a bearer-derived one, got {alice_key1:?}"
+        );
+        assert_eq!(
+            alice_key1, alice_key2,
+            "the SAME operator must hash to the SAME key across two independently-signed requests"
+        );
+        assert_ne!(
+            alice_key1, bob_key,
+            "two DIFFERENT operators must never share a bucket key"
+        );
+    }
+
     #[test]
     fn stream_cap_registry_admits_up_to_the_per_agent_and_global_caps() {
         let registry = Arc::new(StreamCapRegistry::new(2, 3));
@@ -1012,6 +1104,96 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(err, ProxyError::TooManyStreams));
+    }
+
+    /// F11 end-to-end, through the REAL `StreamCapRegistry` admission
+    /// path `proxy_to_backend` drives (not just the pure `sse_agent_key`
+    /// unit above): confirmed live exploit was a brand-new operator's
+    /// very first stream 429ing purely because a DIFFERENT operator's
+    /// streams (on a different project) had already filled the shared
+    /// `"anon"` bucket. Both callers here are cookie-authenticated (a
+    /// forwarding header, no `Authorization` header at all) -- exactly
+    /// the caller shape that used to collapse onto one shared bucket.
+    #[tokio::test]
+    async fn proxy_to_backend_isolates_stream_caps_by_forwarded_operator_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let sock_dir = dir.path().join("sockets");
+        std::fs::create_dir_all(sock_dir.join("proj-a")).unwrap();
+        spawn_backend(sock_dir.join("proj-a").join("backend.sock"), |_req| {
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", "text/event-stream")
+                .body(Full::new(Bytes::from_static(b"data: x\n\n")))
+                .unwrap()
+        })
+        .await;
+
+        let registry = registry_with(dir.path(), "proj-a");
+        let store = RuntimeStore::new();
+        // Per-agent cap of 4 (this crate's real default), a global cap
+        // generous enough that it never interferes with this test.
+        let stream_caps = Arc::new(StreamCapRegistry::new(4, 64));
+
+        let open_stream = |fwd_header: &'static str| {
+            let store = &store;
+            let stream_caps = &stream_caps;
+            let registry = &registry;
+            let sock_dir = &sock_dir;
+            async move {
+                proxy_to_backend(
+                    store,
+                    stream_caps,
+                    registry,
+                    sock_dir,
+                    "proj-a",
+                    &fast_ensure_cfg(),
+                    ProxyRequest {
+                        method: Method::GET,
+                        path_and_query: "/mcp".to_string(),
+                        headers: HeaderMap::new(),
+                        body: Bytes::new(),
+                    },
+                    None,
+                    Some(fwd_header),
+                )
+                .await
+            }
+        };
+
+        // Operator alice fills HER OWN cap of 4 -- kept alive (not
+        // drained/dropped) for the rest of the test so the slots stay
+        // held, matching a real caller with 4 concurrent live streams.
+        let mut alice_streams = Vec::new();
+        for _ in 0..4 {
+            alice_streams.push(
+                open_stream("alice.viewer.9999999999.deadbeef")
+                    .await
+                    .unwrap(),
+            );
+        }
+
+        // Alice's OWN 5th stream must still be correctly rejected --
+        // per-operator isolation must not accidentally turn into NO
+        // cap at all.
+        let alice_5th = open_stream("alice.viewer.9999999999.deadbeef").await;
+        assert!(
+            matches!(alice_5th, Err(ProxyError::TooManyStreams)),
+            "alice's own 5th stream must still hit her own cap of 4, got {alice_5th:?}"
+        );
+
+        // A DIFFERENT operator (bob), on the same project, must be
+        // completely unaffected by alice's exhausted bucket -- before
+        // the F11 fix, both hashed to the shared "anon" bucket and
+        // bob's very first stream would ALSO have been rejected here.
+        let bob_stream = open_stream("bob.viewer.9999999999.deadbeef").await;
+        assert!(
+            bob_stream.is_ok(),
+            "a different operator's first stream must not be rejected by \
+             another operator's exhausted cap, got {bob_stream:?}"
+        );
+
+        drop(alice_streams);
+        drop(bob_stream);
     }
 
     #[tokio::test]
