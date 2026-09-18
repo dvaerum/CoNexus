@@ -21,7 +21,10 @@ use conexus_core::capability::Capability;
 use conexus_core::principal::Principal;
 use conexus_db::group_capability_repository;
 use conexus_db::group_membership_repository;
-use sea_orm::DatabaseConnection;
+use sea_orm::{
+    ConnectionTrait, DatabaseConnection, SqliteTransactionMode, TransactionOptions,
+    TransactionTrait,
+};
 
 use crate::admin_users_gate::{self, AdminUsersError};
 use crate::mcp_handler::HandlerResponse;
@@ -34,14 +37,14 @@ fn not_found(group_id: &str) -> HandlerResponse {
     )
 }
 
-async fn group_exists(db: &DatabaseConnection, group_id: &str) -> Result<bool, sea_orm::DbErr> {
+async fn group_exists<C: ConnectionTrait>(db: &C, group_id: &str) -> Result<bool, sea_orm::DbErr> {
     Ok(group_membership_repository::get_group(db, group_id)
         .await?
         .is_some())
 }
 
-async fn sorted_caps(
-    db: &DatabaseConnection,
+async fn sorted_caps<C: ConnectionTrait>(
+    db: &C,
     group_id: &str,
 ) -> Result<Vec<String>, sea_orm::DbErr> {
     let caps = group_capability_repository::fetch(db, group_id).await?;
@@ -87,6 +90,23 @@ fn validation_rejected(message: &str) -> HandlerResponse {
 /// shrinking PUT revokes caps too, so both added AND removed caps
 /// must be within the caller's own held set unless they're a real
 /// sysadmin).
+///
+/// **F9 fix**: the existence check, the `current` read the symmetric-
+/// difference amplification calc uses, the decision itself, and the
+/// final `replace()` write ALL run inside one `BEGIN IMMEDIATE`
+/// transaction -- ported from `identity.rs::create_user_row`'s own
+/// `begin_with_options(SqliteTransactionMode::Immediate)` pattern,
+/// same as `admin_group_members.rs`'s `decide_add_group_member`/
+/// `decide_remove_group_member` do with a rusqlite transaction.
+/// Without this, three unsynchronized round trips let a concurrent
+/// write to the SAME `group_id` land between this function's `fetch`
+/// and its `replace`, so a stale `current` read lets the amplification
+/// guard pass on a delta that would have been correctly rejected
+/// against fresh state -- silently RESURRECTING a capability another
+/// caller just revoked. See
+/// `concurrent_revoke_and_preserve_cannot_resurrect_a_revoked_capability`
+/// below for the confirmed live exploit this closes (30 real-OS-thread
+/// repetitions).
 pub async fn decide_replace_group_capabilities(
     db: &DatabaseConnection,
     group_id: &str,
@@ -95,7 +115,14 @@ pub async fn decide_replace_group_capabilities(
     caller_principal: Option<&Principal>,
     raw_body: &serde_json::Value,
 ) -> Result<ReplaceGroupCapabilitiesOutcome, sea_orm::DbErr> {
-    if !group_exists(db, group_id).await? {
+    let tx = db
+        .begin_with_options(TransactionOptions {
+            sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+            ..Default::default()
+        })
+        .await?;
+
+    if !group_exists(&tx, group_id).await? {
         return Ok(ReplaceGroupCapabilitiesOutcome::Rejected(not_found(
             group_id,
         )));
@@ -188,7 +215,7 @@ pub async fn decide_replace_group_capabilities(
     // an atomic REPLACE, so a shrinking PUT revokes caps too, and a
     // non-sysadmin must not strip authority they don't themselves
     // hold any more than they may grant it.
-    let current = group_capability_repository::fetch(db, group_id).await?;
+    let current = group_capability_repository::fetch(&tx, group_id).await?;
     let new_caps: HashSet<String> = ordered.iter().cloned().collect();
     let delta: Vec<String> = new_caps.symmetric_difference(&current).cloned().collect();
     let lacked = admin_users_gate::caps_caller_lacks(caller_is_sysadmin, caller_principal, &delta);
@@ -198,10 +225,11 @@ pub async fn decide_replace_group_capabilities(
         ));
     }
 
-    group_capability_repository::replace(db, group_id, ordered.iter().map(String::as_str)).await?;
-    Ok(ReplaceGroupCapabilitiesOutcome::Replaced(
-        sorted_caps(db, group_id).await?,
-    ))
+    group_capability_repository::replace_in_tx(&tx, group_id, ordered.iter().map(String::as_str))
+        .await?;
+    let result = sorted_caps(&tx, group_id).await?;
+    tx.commit().await?;
+    Ok(ReplaceGroupCapabilitiesOutcome::Replaced(result))
 }
 
 #[cfg(test)]
@@ -550,5 +578,171 @@ mod tests {
             panic!("expected Replaced, got {outcome:?}");
         };
         assert_eq!(caps, vec!["system.config.write"]);
+    }
+
+    // -- F9: TOCTOU resurrection race ------------------------------------
+
+    /// Confirmed live exploit this closes: a sysadmin's real revoke
+    /// (`PUT capabilities: []`) racing a non-sysadmin delegate's PUT
+    /// that (naively) echoes back the capability it just read as still
+    /// present -- but doesn't itself hold. Before the F9 fix, three
+    /// unsynchronized round trips (existence check / `fetch` / decide /
+    /// `replace`) let the delegate's server-side `current` read observe
+    /// STALE (pre-revoke) state: the symmetric-difference delta comes
+    /// out empty (nothing looks like it changed), the amplification
+    /// guard has nothing to flag, and the delegate's write lands AFTER
+    /// the sysadmin's revoke commits -- resurrecting a capability the
+    /// delegate was never authorized to grant.
+    ///
+    /// With the fix (one `BEGIN IMMEDIATE` transaction spanning
+    /// existence + fetch + decision + write), the two requests are
+    /// strictly serialized against each other regardless of which
+    /// racing OS thread's scheduling happens to run first:
+    ///   - sysadmin-then-delegate: delegate's fresh `current` read (once
+    ///     it acquires the lock) already reflects the revoke, so the
+    ///     delta correctly includes the capability, the delegate lacks
+    ///     it, and the guard REJECTS (403) -- final state stays revoked.
+    ///   - delegate-then-sysadmin: the delegate's PUT is a genuine no-op
+    ///     (current already matches what it's asking for, so the delta
+    ///     is empty and nothing needs checking) -- harmless, and the
+    ///     sysadmin's own revoke (which bypasses the guard entirely)
+    ///     still runs after and wins.
+    ///
+    /// Either serialization ends with the capability revoked -- so the
+    /// group's final state must be empty in EVERY one of the 30
+    /// repetitions below.
+    ///
+    /// **Real OS threads, not `tokio::spawn`**: a single `#[tokio::test]`
+    /// runs on ONE current-thread runtime by default, so two
+    /// `tokio::spawn`'d tasks sharing one cloned `DatabaseConnection`
+    /// never truly run in parallel -- they only interleave at await
+    /// points the cooperative scheduler happens to hit, which isn't
+    /// enough to reproduce this race reliably (confirmed: an earlier
+    /// draft of this test using exactly that shape passed even against
+    /// the unfixed code). This mirrors `identity.rs::
+    /// create_user_bootstrap_is_atomic_under_real_concurrent_racing`'s
+    /// own fix for the identical problem: each racing caller is a genuine
+    /// `std::thread::spawn` OS thread, running its own single-threaded
+    /// tokio runtime, each opening its OWN `sea_orm::Database::connect()`
+    /// to the SAME tempfile-backed DB (an in-memory `:memory:` DB can't
+    /// be shared across connection handles the way a real file can) --
+    /// synchronized with `std::sync::Barrier` so both requests actually
+    /// land at the same instant. Repeated 30x (a race is a timing-
+    /// dependent bug; one clean run proves nothing) to make a flake in
+    /// either direction visible.
+    #[test]
+    fn concurrent_revoke_and_preserve_cannot_resurrect_a_revoked_capability() {
+        use conexus_core::capability::Capabilities;
+        use conexus_core::principal::PrincipalKind;
+
+        fn rt() -> tokio::runtime::Runtime {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+        }
+
+        for round in 0..30 {
+            let dir = tempfile::tempdir().unwrap();
+            let db_path = dir.path().join("router.db");
+
+            let gid = {
+                let c = rusqlite::Connection::open(&db_path).unwrap();
+                c.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+                init_router_schema(&c).unwrap();
+                drop(c);
+                rt().block_on(async {
+                    let db = sea_orm::Database::connect(format!("sqlite://{}", db_path.display()))
+                        .await
+                        .unwrap();
+                    let gid = seed_group(&db, "engineers").await;
+                    group_capability_repository::replace(&db, &gid, ["system.config.write"])
+                        .await
+                        .unwrap();
+                    gid
+                })
+            };
+
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+
+            // Writer A: a real sysadmin revoking everything.
+            let db_path_a = db_path.clone();
+            let gid_a = gid.clone();
+            let barrier_a = barrier.clone();
+            let handle_a = std::thread::spawn(move || {
+                rt().block_on(async move {
+                    let db =
+                        sea_orm::Database::connect(format!("sqlite://{}", db_path_a.display()))
+                            .await
+                            .unwrap();
+                    barrier_a.wait();
+                    decide_replace_group_capabilities(
+                        &db,
+                        &gid_a,
+                        true,
+                        "root",
+                        None,
+                        &serde_json::json!({"capabilities": []}),
+                    )
+                    .await
+                    .unwrap()
+                })
+            });
+
+            // Writer B: a non-sysadmin delegate who does NOT hold
+            // "system.config.write" themselves (only an unrelated
+            // capability), echoing back what they saw as the group's
+            // current state.
+            let db_path_b = db_path.clone();
+            let gid_b = gid.clone();
+            let barrier_b = barrier.clone();
+            let handle_b = std::thread::spawn(move || {
+                rt().block_on(async move {
+                    let db =
+                        sea_orm::Database::connect(format!("sqlite://{}", db_path_b.display()))
+                            .await
+                            .unwrap();
+                    let principal = Principal {
+                        kind: PrincipalKind::OperatorSession,
+                        user_id: Some("bob".to_string()),
+                        agent_id: None,
+                        project_name: None,
+                        project_role: None,
+                        agent_role: None,
+                        can_wake_loop: false,
+                        source_token: None,
+                        capabilities: Capabilities::Set(HashSet::from([
+                            Capability::SystemGroupsCapabilitiesManage,
+                        ])),
+                    };
+                    barrier_b.wait();
+                    decide_replace_group_capabilities(
+                        &db,
+                        &gid_b,
+                        false,
+                        "bob",
+                        Some(&principal),
+                        &serde_json::json!({"capabilities": ["system.config.write"]}),
+                    )
+                    .await
+                    .unwrap()
+                })
+            });
+
+            handle_a.join().unwrap();
+            handle_b.join().unwrap();
+
+            let final_caps = rt().block_on(async {
+                let db = sea_orm::Database::connect(format!("sqlite://{}", db_path.display()))
+                    .await
+                    .unwrap();
+                group_capability_repository::fetch(&db, &gid).await.unwrap()
+            });
+            assert!(
+                final_caps.is_empty(),
+                "round {round}: revoked capability \"system.config.write\" was \
+                 resurrected -- final state was {final_caps:?}"
+            );
+        }
     }
 }
