@@ -110,6 +110,23 @@ impl DeliveryTransportHub {
         subs.iter().any(|s| s.agent_id == agent_id)
     }
 
+    /// Every worker with at least one live delivery stream -- the
+    /// delivery scheduler's (ADR-0021/ADR-0026) tick work-set. Port of
+    /// `connected_agent_ids()`. Agent-id-sorted and deduplicated for
+    /// deterministic iteration order; Python's own version iterates an
+    /// unordered dict, but that iteration order was never a load-bearing
+    /// contract for the scheduler (each connected agent is visited
+    /// exactly once regardless of order), so sorting here (matching
+    /// `snapshot()`'s own discipline) costs nothing and makes tests
+    /// deterministic.
+    pub fn connected_agent_ids(&self) -> Vec<String> {
+        let subs = self.subs.lock().expect("delivery_transport mutex poisoned");
+        let mut ids: Vec<String> = subs.iter().map(|s| s.agent_id.clone()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+
     pub fn set_status(&self, agent_id: &str, status: &str) {
         let mut map = self
             .status
@@ -207,6 +224,22 @@ mod tests {
 
         hub.unsubscribe(a.id); // already gone -- silent no-op
         assert!(hub.is_connected("alice"));
+    }
+
+    #[test]
+    fn connected_agent_ids_lists_only_live_streams_sorted_and_deduped() {
+        let hub = DeliveryTransportHub::new();
+        assert!(hub.connected_agent_ids().is_empty());
+
+        let _b1 = hub.subscribe("bob");
+        let _a1 = hub.subscribe("alice");
+        let _a2 = hub.subscribe("alice"); // reconnect overlap -- must not duplicate
+        hub.set_status("carol", "idle"); // status only, never connected
+
+        assert_eq!(
+            hub.connected_agent_ids(),
+            vec!["alice".to_string(), "bob".to_string()]
+        );
     }
 
     #[test]
