@@ -177,17 +177,30 @@ pub async fn rate_limit_layer(
 /// Port of `empty_users_redirect_middleware`.
 pub async fn empty_users_redirect_layer(
     State(state): State<Arc<RouterState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     req: Request,
     next: Next,
 ) -> Response {
-    let path = mount::canonical_path(req.uri().path());
+    let raw_path = req.uri().path().to_string();
+    let path = mount::canonical_path(&raw_path);
     let users_empty = identity::users_table_is_empty(&state.sea_orm_db)
         .await
         .unwrap_or(false);
     if login::should_redirect_to_setup(&path, users_empty) {
+        // Deliberately `raw_path`, NOT the canonicalized `path` above --
+        // same class as `session_gate_layer`'s own `login_url` fix: a
+        // hardcoded `/conexus/setup` target sends a root-mounted first-
+        // boot caller into the same infinite-redirect-loop shape once
+        // they hit any auth-gated route afterward (the setup-success
+        // session cookie would be minted with a mismatched `Path`).
+        let peer = peer_info(addr);
+        let is_trusted = is_request_trusted(&state, &peer);
+        let forwarded_prefix = header_str(&req, "x-forwarded-prefix").map(str::to_string);
+        let location =
+            mount::external_path(&raw_path, is_trusted, forwarded_prefix.as_deref(), "/setup");
         return HandlerResponse {
             status: 303,
-            headers: vec![("Location".to_string(), "/conexus/setup".to_string())],
+            headers: vec![("Location".to_string(), location)],
             body: HandlerBody::Empty,
         }
         .into_response();
@@ -205,7 +218,8 @@ pub async fn session_gate_layer(
 ) -> Response {
     let peer = peer_info(addr);
     let is_trusted = is_request_trusted(&state, &peer);
-    let path = mount::canonical_path(req.uri().path());
+    let raw_path = req.uri().path().to_string();
+    let path = mount::canonical_path(&raw_path);
     let raw_path_qs = req
         .uri()
         .path_and_query()
@@ -215,7 +229,20 @@ pub async fn session_gate_layer(
     let accept_header = header_str(&req, "accept").map(str::to_string);
     let cookie_header = header_str(&req, "cookie").map(str::to_string);
     let forwarded_prefix = header_str(&req, "x-forwarded-prefix").map(str::to_string);
-    let login_url = mount::external_path(&path, is_trusted, forwarded_prefix.as_deref(), "/login");
+    // Deliberately `raw_path`, NOT the canonicalized `path` above --
+    // `external_path` needs to see whether the client's OWN request
+    // arrived under `/conexus/...` or at the bare root to compute the
+    // correct client-facing login URL. `canonical_path` normalizes a
+    // root-arriving request INTO the `/conexus/...` shape for internal
+    // gate/routing matching (`GateRequest.path` below correctly uses
+    // the canonicalized form for that reason) -- reusing it here would
+    // make every request look like it arrived under the mount, always
+    // resolving to `/conexus/login` even for a genuinely root-mounted
+    // caller, which (combined with the session cookie's matching
+    // mount-derived `Path`) produces an infinite redirect loop for any
+    // real user landing on the bare domain.
+    let login_url =
+        mount::external_path(&raw_path, is_trusted, forwarded_prefix.as_deref(), "/login");
 
     // Port of `_try_proxy_header_identity`'s own `sso.get_sso_config()`
     // call -- resolved once per request, matching Python exactly. A
@@ -479,6 +506,45 @@ mod tests {
             let resp = oneshot_get(app, "/conexus/app/secret/", Some("application/json")).await;
             assert_eq!(resp.status(), StatusCode::UNAUTHORIZED, "{resp:?}");
             assert_hardened(resp.headers());
+        }
+
+        /// Regression for a real, live-reproduced infinite redirect loop:
+        /// a genuinely root-arriving, unauthenticated browser request
+        /// (bare `/`, no `/conexus/` prefix -- e.g. a deployment reached
+        /// only through its own bare public domain, no path-scoping
+        /// reverse proxy in front) must be redirected to the ROOT-scoped
+        /// `/login`, not `/conexus/login`. Before the fix,
+        /// `session_gate_layer` canonicalized the request path INTO
+        /// `/conexus/...` for its own internal gate matching, then reused
+        /// that already-canonicalized value to compute the client-facing
+        /// `login_url` too -- so a root-arriving request always got
+        /// redirected to `/conexus/login`, and the session cookie minted
+        /// after login was always `Path=/conexus/`, which a browser never
+        /// sends back on a bare `/` request -- producing an infinite
+        /// `/ -> /conexus/login?next=/ -> /` loop for every real user who
+        /// ever landed on the bare domain.
+        #[tokio::test]
+        async fn root_arriving_unauthenticated_request_redirects_to_a_root_scoped_login_url() {
+            let (_dir, state) = test_router_state().await;
+            let protected = Router::new()
+                .route("/", get(|| async { "should never run" }))
+                .layer(axum::middleware::from_fn_with_state(
+                    Arc::clone(&state),
+                    session_gate_layer,
+                ))
+                .with_state(state);
+
+            let resp = oneshot_get(protected, "/", Some("text/html")).await;
+            assert_eq!(resp.status(), StatusCode::SEE_OTHER, "{resp:?}");
+            let location = resp
+                .headers()
+                .get(axum::http::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .unwrap();
+            assert!(
+                location.starts_with("/login?next="),
+                "expected a root-scoped login redirect, got {location:?}"
+            );
         }
     }
 }
