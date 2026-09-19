@@ -51,7 +51,13 @@ sea-orm-migration = { version = "2", default-features = false, features = [
 # real async runtime is now needed to BUILD this crate, not just test
 # it. Promoted out of dev-dependencies (where it lived for Phase G PR
 # 1's entity round-trip tests only) for exactly that reason.
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+#
+# "sync"/"time": needed by this crate's own `#[cfg(test)]` F17
+# race-injection seams (`tokio::sync::Notify` + `tokio::time::timeout`
+# in scheduled_directive_repository/pending_directive_repository) --
+# cfg(test)-gated, so this adds no runtime behavior, just compiles
+# the test binary.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 [dev-dependencies]
 # Only needed to register the real sqlite-vec extension for THIS

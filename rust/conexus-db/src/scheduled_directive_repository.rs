@@ -28,21 +28,26 @@
 //!    2, where the LAST fire still emits an event on its way to
 //!    terminal.
 //!
-//! Concurrency note ported from ADR-0026, NOT automatically true in
-//! Rust: Python's version is safe to call from two independent
-//! trigger paths (the wait-loop collector and the delivery-scheduler
-//! tick) because CPython's single-threaded event loop never yields
-//! mid-transaction between the SELECT and the UPDATEs here. A Rust
-//! caller running this on a multi-threaded runtime or from genuinely
-//! concurrent callers MUST NOT assume that for free — either run
-//! `collect_due_and_fire` inside one exclusive DB transaction per
-//! call (recommended: the whole SELECT+loop+UPDATEs as one unit), or
-//! add an explicit claim (`UPDATE ... RETURNING`-style atomic claim)
-//! before this crate is composed into `conexus-mcp`'s actor model in
-//! a later phase. This module itself does not open a transaction —
-//! that stays the caller's responsibility, matching every other
-//! repository here, but the caller must not skip it for this
-//! function the way it safely could for a single independent UPDATE.
+//! Concurrency note ported from ADR-0026, updated after the F17 fix:
+//! Python's version is safe to call from two independent trigger
+//! paths (the wait-loop collector and the delivery-scheduler tick)
+//! because CPython's single-threaded event loop never yields
+//! mid-transaction between the SELECT and the UPDATEs here. Rust has
+//! no such free lunch — [`collect_due_and_fire`] now opens its OWN
+//! `BEGIN IMMEDIATE` transaction (`TransactionTrait::
+//! begin_with_options` with `SqliteTransactionMode::Immediate`, the
+//! same idiom `conexus-router::identity.rs::create_user_row` and the
+//! F9 fix in `admin_group_capabilities.rs` already established for
+//! this exact TOCTOU shape) spanning its whole SELECT+loop+UPDATEs,
+//! so a concurrent delete of a candidate row (e.g. the `DELETE
+//! /schedules/{id}` REST endpoint) can never land in between: it
+//! either fully precedes this transaction (the row is simply absent
+//! from the SELECT — no event) or fully follows it (the row fired
+//! legitimately, atomically, before the delete could observe/remove
+//! it). Unlike the read-only helpers in this module, this function
+//! owns its transaction internally rather than leaving it to the
+//! caller — it is the only place the invariant needs to hold, and a
+//! future second caller must not be able to forget it.
 //!
 //! Phase G (sea-orm migration): the seventh repository converted.
 //! Every function that touches the DB takes the `&DatabaseConnection`
@@ -57,7 +62,8 @@ use crate::pending_directive_repository::{DirectiveEvent, DirectiveEventData};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, Condition, DatabaseConnection, DbErr, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder,
+    PaginatorTrait, QueryFilter, QueryOrder, SqliteTransactionMode, TransactionOptions,
+    TransactionTrait,
 };
 
 pub use crate::entity::scheduled_directive::Model as ScheduledDirectiveRow;
@@ -429,15 +435,24 @@ fn compute_next_and_terminal(
 ///   the last allowed fire — but UNLIKE the reap case, still appends
 ///   an event even on the terminal fire.
 ///
-/// See the module doc for the concurrency contract this function
-/// requires from its caller (it is NOT self-healing/idempotent —
-/// a failed downstream push after this commits is a LOST fire, not a
-/// retried one).
+/// **F17 fix**: the whole SELECT+loop+UPDATEs below runs inside one
+/// `BEGIN IMMEDIATE` transaction (see the module doc) — this function
+/// is idempotent-per-call and safe under real concurrent callers/
+/// concurrent deletes of a candidate row, unlike before. It is still
+/// NOT self-healing across calls (a failed downstream push after this
+/// commits is a LOST fire, not a retried one).
 pub async fn collect_due_and_fire(
     db: &DatabaseConnection,
     agent_id: &str,
     now_iso: &str,
 ) -> Result<Vec<DirectiveEvent>, CollectDueError> {
+    let tx = db
+        .begin_with_options(TransactionOptions {
+            sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+            ..Default::default()
+        })
+        .await?;
+
     let candidates = Entity::find()
         .filter(Column::AgentId.eq(agent_id))
         .filter(Column::Enabled.eq(true))
@@ -450,11 +465,16 @@ pub async fn collect_due_and_fire(
             ),
         )
         .order_by_asc(Column::NextDueAt)
-        .all(db)
+        .all(&tx)
         .await?;
 
     let mut events = Vec::new();
     for c in candidates {
+        // F17 test-only race-injection seam -- see `tests::race_hook`'s
+        // doc comment. No-op (and compiled out entirely) outside tests.
+        #[cfg(test)]
+        tests::race_hook::pause_before_write(&c.directive_id).await;
+
         // Mirrors the SQL filter's own `until_at <= now_iso` predicate
         // exactly (plain string compare) — this decides whether the
         // row was pulled in because it's window-closed, so it must
@@ -468,7 +488,7 @@ pub async fn collect_due_and_fire(
                 updated_by: Set(Some("system".to_string())),
                 ..Default::default()
             };
-            Entity::update(am).exec(db).await?;
+            Entity::update(am).exec(&tx).await?;
             continue; // reaped -- no event
         }
 
@@ -492,7 +512,7 @@ pub async fn collect_due_and_fire(
             am.status = Set("completed".to_string());
             am.enabled = Set(false);
         }
-        Entity::update(am).exec(db).await?;
+        Entity::update(am).exec(&tx).await?;
 
         events.push(DirectiveEvent {
             event_type: "directive".to_string(),
@@ -507,6 +527,7 @@ pub async fn collect_due_and_fire(
         });
     }
 
+    tx.commit().await?;
     Ok(events)
 }
 
@@ -988,5 +1009,177 @@ mod tests {
         assert!(parse_flexible("2026-01-01T00:00:00.123456").is_ok());
         assert!(parse_flexible("2026-01-01T00:00:00").is_ok());
         assert!(parse_flexible("not a timestamp").is_err());
+    }
+
+    /// F17 (HIGH, business-logic race): a scheduled directive DELETEd
+    /// concurrently with `collect_due_and_fire`'s sweep could
+    /// previously either abort the WHOLE sweep with a raw `DbErr`
+    /// (dropping every other legitimately-due directive's event too,
+    /// via the wake-loop's best-effort `Err(_) => Vec::new()` swallow)
+    /// or -- for the identical-shaped `pending_directive_repository`
+    /// sibling -- silently deliver a phantom event for a row already
+    /// gone, because nothing serialized the SELECT+loop against a
+    /// concurrent writer at all.
+    ///
+    /// Deterministic, not timing-dependent: [`race_hook`] pauses
+    /// `collect_due_and_fire` (via a `#[cfg(test)]`-only seam, see its
+    /// doc comment) immediately after its SELECT has captured "target"
+    /// but strictly before this function's own per-row write for it --
+    /// precisely the window the finding exploited. This test's own
+    /// task then races a concurrent DELETE against that exact pause
+    /// point. The fix (`BEGIN IMMEDIATE` spanning the whole
+    /// SELECT+loop) can't make "fire, then delete" impossible when the
+    /// delete genuinely arrives after the sweep already started (that
+    /// serialization is legitimate, not a bug) -- what it proves
+    /// instead is that the delete is now structurally BLOCKED by the
+    /// sweep's own transaction lock for as long as the sweep holds it,
+    /// so the two can never interleave mid-row the way the finding
+    /// exploited; the assertions below confirm both that blocking
+    /// (`still_blocked`, provably true only because the collector is
+    /// deliberately held back until this test explicitly releases it)
+    /// and that the sweep still resolves cleanly (no error, and no
+    /// event silently dropped) once released.
+    #[tokio::test]
+    async fn concurrent_delete_is_blocked_by_the_sweeps_own_transaction_not_interleaved() {
+        let (_dir, db) = test_conn().await;
+        seed(
+            &db,
+            "target",
+            "alice",
+            3600,
+            "2026-01-01T00:00:00Z",
+            None,
+            None,
+        )
+        .await;
+
+        let (reached, proceed) = race_hook::arm("target");
+
+        let db_collector = db.clone();
+        let collector = tokio::spawn(async move {
+            collect_due_and_fire(&db_collector, "alice", "2026-01-01T00:00:00Z").await
+        });
+
+        // The collector has SELECTed "target" into memory and is now
+        // parked immediately before its own per-row write for it.
+        reached.notified().await;
+
+        let db_deleter = db.clone();
+        let mut deleter = tokio::spawn(async move { delete(&db_deleter, "target").await });
+
+        // The collector hasn't been released yet (we haven't called
+        // `proceed.notify_one()` below), so this can ONLY resolve
+        // within the window if nothing is actually serializing the
+        // delete against the sweep -- i.e. the pre-fix bug. Fixed code
+        // holds the whole sweep's transaction lock across the pause
+        // point, so the delete is structurally unable to complete here
+        // no matter how long we wait; 200ms is just a generous bound
+        // to fail fast instead of hanging forever if something regresses.
+        let still_blocked =
+            tokio::time::timeout(std::time::Duration::from_millis(200), &mut deleter)
+                .await
+                .is_err();
+        assert!(
+            still_blocked,
+            "the concurrent DELETE completed while collect_due_and_fire was \
+             still paused mid-sweep, BEFORE this test released it -- the \
+             sweep's transaction is not actually excluding concurrent \
+             writers, so a delete can still interleave mid-row"
+        );
+
+        // Release the collector now that the blocking is proven; it
+        // will finish its transaction (including "target", which
+        // legitimately still existed for the sweep's entire duration)
+        // and commit, after which the queued delete finally applies.
+        proceed.notify_one();
+
+        let deleted = deleter.await.unwrap().unwrap();
+        assert!(
+            deleted,
+            "delete must remove the row once the sweep releases it"
+        );
+
+        let events = collector.await.unwrap().unwrap_or_else(|e| {
+            panic!(
+                "collect_due_and_fire must not error out merely because \
+                 \"target\" was concurrently deleted mid-sweep -- a naive \
+                 per-row Entity::update() aborts the WHOLE batch with {e}, \
+                 silently dropping every other legitimately-due directive's \
+                 event for this poll cycle too (via the wake-loop's \
+                 best-effort Err(_) => Vec::new() swallow)"
+            )
+        });
+
+        race_hook::disarm();
+
+        assert!(
+            events.iter().any(|e| e.ref_id == "target"),
+            "\"target\" legitimately existed for the sweep's entire atomic \
+             transaction and must still fire -- events were {events:?}"
+        );
+        assert_eq!(
+            get(&db, "target").await.unwrap(),
+            None,
+            "\"target\" must be deleted once the queued delete finally applies"
+        );
+    }
+
+    /// F17 test-only race-injection seam. Entirely `#[cfg(test)]` --
+    /// zero cost and absent from production builds. Guarded by
+    /// `directive_id` so it is a silent no-op for every OTHER test in
+    /// this binary, including ones running concurrently with the one
+    /// test that arms it.
+    pub(crate) mod race_hook {
+        use std::sync::{Arc, Mutex, OnceLock};
+        use tokio::sync::Notify;
+
+        struct Hook {
+            directive_id: String,
+            reached: Arc<Notify>,
+            proceed: Arc<Notify>,
+        }
+
+        static HOOK: OnceLock<Mutex<Option<Hook>>> = OnceLock::new();
+
+        /// Arms the hook for `directive_id`. The caller awaits the
+        /// returned `reached.notified()` to know `collect_due_and_fire`
+        /// has selected the row into memory and is now parked
+        /// immediately before its own per-row write for it, then calls
+        /// `proceed.notify_one()` once done manipulating the row
+        /// concurrently.
+        pub fn arm(directive_id: &str) -> (Arc<Notify>, Arc<Notify>) {
+            let reached = Arc::new(Notify::new());
+            let proceed = Arc::new(Notify::new());
+            let slot = HOOK.get_or_init(|| Mutex::new(None));
+            *slot.lock().unwrap() = Some(Hook {
+                directive_id: directive_id.to_string(),
+                reached: reached.clone(),
+                proceed: proceed.clone(),
+            });
+            (reached, proceed)
+        }
+
+        pub fn disarm() {
+            if let Some(slot) = HOOK.get() {
+                *slot.lock().unwrap() = None;
+            }
+        }
+
+        /// No-op unless armed for this exact `directive_id`.
+        pub async fn pause_before_write(directive_id: &str) {
+            let pair = {
+                let Some(slot) = HOOK.get() else {
+                    return;
+                };
+                let guard = slot.lock().unwrap();
+                guard.as_ref().and_then(|h| {
+                    (h.directive_id == directive_id).then(|| (h.reached.clone(), h.proceed.clone()))
+                })
+            };
+            if let Some((reached, proceed)) = pair {
+                reached.notify_one();
+                proceed.notified().await;
+            }
+        }
     }
 }

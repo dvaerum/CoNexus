@@ -39,7 +39,7 @@
 
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder,
+    QueryFilter, QueryOrder, SqliteTransactionMode, TransactionOptions, TransactionTrait,
 };
 
 pub use crate::entity::pending_directive::Model as PendingDirectiveRow;
@@ -141,27 +141,58 @@ pub async fn create_poke(
 /// `_sort_events_priority_then_time`), NOT this repository's job;
 /// don't conflate SQL ordering with delivery-order guarantees.
 /// Empty (never an error) when nothing is undelivered.
+///
+/// **F17 class-sweep fix**: this has the IDENTICAL shape as
+/// [`crate::scheduled_directive_repository::collect_due_and_fire`] --
+/// select into memory, per-row mark-delivered, `events.push` per row
+/// -- and the SAME fix: the whole SELECT+loop+UPDATEs now runs inside
+/// one `BEGIN IMMEDIATE` transaction (`TransactionTrait::
+/// begin_with_options` with `SqliteTransactionMode::Immediate`, same
+/// idiom as the scheduled sibling and the F9 fix in
+/// `admin_group_capabilities.rs`), so a concurrent delete of a
+/// candidate poke can never land in between the SELECT and its own
+/// mark-delivered UPDATE. No delete/cancel-poke endpoint exists on
+/// this table yet, so this was latent rather than live-exploitable --
+/// fixed anyway per this project's class-sweep discipline (the bug
+/// pattern here is actually *worse* than the scheduled sibling's:
+/// `Entity::update_many()` never errors on zero affected rows, so a
+/// race would have silently delivered a phantom event for an
+/// already-gone poke with no error signal at all, unlike
+/// `collect_due_and_fire`'s single-row `Entity::update()`, which at
+/// least surfaces `DbErr::RecordNotUpdated`).
 pub async fn collect_undelivered(
     db: &DatabaseConnection,
     agent_id: &str,
     now_iso: &str,
 ) -> Result<Vec<DirectiveEvent>, DbErr> {
+    let tx = db
+        .begin_with_options(TransactionOptions {
+            sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+            ..Default::default()
+        })
+        .await?;
+
     let rows = Entity::find()
         .filter(Column::AgentId.eq(agent_id))
         .filter(Column::DeliveredAt.is_null())
         .order_by_asc(Column::CreatedAt)
-        .all(db)
+        .all(&tx)
         .await?;
 
     let mut events = Vec::with_capacity(rows.len());
     for row in rows {
+        // F17 test-only race-injection seam -- see `tests::race_hook`'s
+        // doc comment. No-op (and compiled out entirely) outside tests.
+        #[cfg(test)]
+        tests::race_hook::pause_before_write(&row.poke_id).await;
+
         Entity::update_many()
             .col_expr(
                 Column::DeliveredAt,
                 sea_orm::sea_query::Expr::value(now_iso),
             )
             .filter(Column::PokeId.eq(row.poke_id.clone()))
-            .exec(db)
+            .exec(&tx)
             .await?;
         events.push(poke_event(
             &row.poke_id,
@@ -170,6 +201,7 @@ pub async fn collect_undelivered(
             now_iso,
         ));
     }
+    tx.commit().await?;
     Ok(events)
 }
 
@@ -425,5 +457,156 @@ mod tests {
                 .unwrap(),
             Vec::new()
         );
+    }
+
+    /// F17 class-sweep: `collect_undelivered` has the IDENTICAL shape as
+    /// `scheduled_directive_repository::collect_due_and_fire` -- select
+    /// into memory, per-row mark-delivered, unconditional
+    /// `events.push`. Unlike the scheduled sibling (whose per-row write
+    /// is a single-row `Entity::update()`, which sea-orm itself refuses
+    /// with `DbErr::RecordNotUpdated` when 0 rows match), this one uses
+    /// `Entity::update_many().filter(...)`, which does NOT error on 0
+    /// affected rows -- pre-fix, it would silently no-op and the code
+    /// would push the event regardless, an even worse failure mode
+    /// than the scheduled sibling's (no error signal at all). No
+    /// delete/cancel-poke endpoint exists in this codebase yet (nothing
+    /// currently calls `Entity::delete_*` against this table), so this
+    /// test drives the race directly against the repository function
+    /// with a raw `Entity::delete_by_id`, proving the fix holds even
+    /// before a real caller exists.
+    ///
+    /// Same deterministic [`race_hook`]-based design as the scheduled-
+    /// directive race test in the sibling module (see its doc comment
+    /// for the full reasoning on why "no event ever" is the wrong
+    /// invariant once the fix is a transaction: "fire, then delete" is
+    /// a legitimate serialization, and what the fix actually
+    /// guarantees is that the concurrent delete is structurally BLOCKED
+    /// by the sweep's own transaction for as long as it holds the
+    /// candidate row, never interleaved mid-row).
+    #[tokio::test]
+    async fn concurrent_delete_is_blocked_by_the_sweeps_own_transaction_not_interleaved() {
+        let (_dir, db) = test_conn().await;
+        create_poke(
+            &db,
+            "target",
+            "alice",
+            "check in",
+            None,
+            None,
+            "2026-01-01T00:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        let (reached, proceed) = race_hook::arm("target");
+
+        let db_collector = db.clone();
+        let collector = tokio::spawn(async move {
+            collect_undelivered(&db_collector, "alice", "2026-01-01T00:00:05Z").await
+        });
+
+        // The collector has SELECTed "target" into memory and is now
+        // parked immediately before its own per-row mark-delivered
+        // write for it.
+        reached.notified().await;
+
+        let db_deleter = db.clone();
+        let mut deleter = tokio::spawn(async move {
+            Entity::delete_by_id("target".to_string())
+                .exec(&db_deleter)
+                .await
+                .map(|r| r.rows_affected > 0)
+        });
+
+        // Collector hasn't been released yet -- see the scheduled-
+        // directive sibling test's doc comment for why this can only
+        // resolve early if the sweep isn't actually excluding
+        // concurrent writers (the pre-fix bug).
+        let still_blocked =
+            tokio::time::timeout(std::time::Duration::from_millis(200), &mut deleter)
+                .await
+                .is_err();
+        assert!(
+            still_blocked,
+            "the concurrent DELETE completed while collect_undelivered was \
+             still paused mid-sweep, BEFORE this test released it -- the \
+             sweep's transaction is not actually excluding concurrent \
+             writers, so a delete can still interleave mid-row"
+        );
+
+        proceed.notify_one();
+
+        let deleted = deleter.await.unwrap().unwrap();
+        assert!(
+            deleted,
+            "delete must remove the row once the sweep releases it"
+        );
+
+        let events = collector.await.unwrap().unwrap_or_else(|e| {
+            panic!(
+                "collect_undelivered must not error out merely because \
+                 \"target\" was concurrently deleted mid-sweep: {e}"
+            )
+        });
+
+        race_hook::disarm();
+
+        assert!(
+            events.iter().any(|e| e.ref_id == "target"),
+            "\"target\" legitimately existed for the sweep's entire atomic \
+             transaction and must still fire -- events were {events:?}"
+        );
+    }
+
+    /// F17 test-only race-injection seam, identical in shape to
+    /// `scheduled_directive_repository::tests::race_hook` (see its doc
+    /// comment) -- entirely `#[cfg(test)]`, guarded by `poke_id` so it
+    /// is a no-op for every other test in this binary.
+    pub(crate) mod race_hook {
+        use std::sync::{Arc, Mutex, OnceLock};
+        use tokio::sync::Notify;
+
+        struct Hook {
+            poke_id: String,
+            reached: Arc<Notify>,
+            proceed: Arc<Notify>,
+        }
+
+        static HOOK: OnceLock<Mutex<Option<Hook>>> = OnceLock::new();
+
+        pub fn arm(poke_id: &str) -> (Arc<Notify>, Arc<Notify>) {
+            let reached = Arc::new(Notify::new());
+            let proceed = Arc::new(Notify::new());
+            let slot = HOOK.get_or_init(|| Mutex::new(None));
+            *slot.lock().unwrap() = Some(Hook {
+                poke_id: poke_id.to_string(),
+                reached: reached.clone(),
+                proceed: proceed.clone(),
+            });
+            (reached, proceed)
+        }
+
+        pub fn disarm() {
+            if let Some(slot) = HOOK.get() {
+                *slot.lock().unwrap() = None;
+            }
+        }
+
+        /// No-op unless armed for this exact `poke_id`.
+        pub async fn pause_before_write(poke_id: &str) {
+            let pair = {
+                let Some(slot) = HOOK.get() else {
+                    return;
+                };
+                let guard = slot.lock().unwrap();
+                guard.as_ref().and_then(|h| {
+                    (h.poke_id == poke_id).then(|| (h.reached.clone(), h.proceed.clone()))
+                })
+            };
+            if let Some((reached, proceed)) = pair {
+                reached.notify_one();
+                proceed.notified().await;
+            }
+        }
     }
 }
