@@ -47,7 +47,7 @@
 //! ## Observability
 //!
 //! Every step above records into a shared [`Snapshot`] ([`crate::status`]) that
-//! [`run_publisher`] pushes to the host as a `settings-page` UI entry, and logs
+//! [`run_publisher`] pushes to the host as a `home-pane` UI entry, and logs
 //! through [`crate::observe`] at a level chosen for volume: per-frame and
 //! per-inject traffic is `debug`, state *transitions* (stream up/down, coverage
 //! gained/lost) are `info`, degraded-but-retrying is `warn`, and a refused
@@ -486,7 +486,7 @@ pub async fn run_bridge(
     }
 }
 
-/// Push the observable state to the host's `settings-page` slot.
+/// Push the observable state to the host's `home-pane` slot.
 ///
 /// Coalescing: a burst of state changes (a reconcile touching twenty sessions)
 /// drains into a single push, so the host's UI revision moves once. A periodic

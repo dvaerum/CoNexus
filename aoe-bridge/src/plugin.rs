@@ -133,8 +133,8 @@ impl PluginConn {
 
     /// `ui.state.set` (needs `runtime.worker` AND the `(slot, id)` pair declared
     /// in the manifest's `[[ui]]`) — replace this plugin's entry in a
-    /// host-rendered slot. The bridge uses the global `settings-page` slot, which
-    /// the AoE dashboard mounts as its own Settings nav entry.
+    /// host-rendered slot. The bridge uses the global `home-pane` slot, which
+    /// the host docks on the home view.
     pub async fn ui_state_set(&self, slot: &str, id: &str, payload: Value) -> Result<Value> {
         self.call(
             "ui.state.set",

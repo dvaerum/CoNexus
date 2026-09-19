@@ -1,17 +1,19 @@
 # CoNexus delivery bridge — Agent of Empires plugin manifest.
 #
 # Schema reference: aoe-plugin-api (PluginManifest), docs/plugin-api.md.
-# api_version 14 is required for the `sessions` dynamic_select option source (the
-# session_id dropdown) and the `password` (masked) field type (the token field).
-# 13 already covers the `session.mcp` capability / `session.mcp.set` RPC (the
-# per-session-MCP host patch) and the `object_list` widget (≥9); 14 adds both
-# field-type niceties. A pre-14 host emits an "upgrade aoe" message rather than
+# api_version 15 is required for the `sessions` dynamic_select option source (the
+# session_id dropdown) and the `password` (masked) field type (the token field) --
+# upstream's independent 12->13 bump (an unrelated home-pane/sparkline feature)
+# pushed our two feature bumps to 14 (`session.mcp`) and 15 (these field types),
+# one higher than an earlier draft of this manifest assumed. 13 already covers
+# the `home-pane` UI slot and the `object_list` widget (≥9); 15 adds both
+# field-type niceties. A pre-15 host emits an "upgrade aoe" message rather than
 # an "unknown variant" error.
 
 id = "dev.dvaerum.conexus-delivery"
 name = "CoNexus Delivery Bridge"
 version = "0.1.0"
-api_version = 14
+api_version = 15
 description = "Injects CoNexus delivery notifications into AoE-run sessions that don't poll wait_for_events (ADR-0021): subscribes to each covered session's delivery SSE stream, reports transport-status up, injects skinny (id/subject/status only) nudges via AoE's /send and /acp/prompt routes, and (optionally) wires conexus's tools into each covered session as a per-session MCP server."
 
 # runtime.worker: run the worker at all, plus the config.get and ui.state.*
@@ -31,16 +33,16 @@ capabilities = ["runtime.worker", "session.read", "session.mcp", "net", "notific
 # UI contributions
 # ---------------------------------------------------------------------------
 # The host gates `ui.state.set` on the (slot, id) pair being declared here
-# (host_api.rs::require_declared_slot). `settings-page` is a GLOBAL slot, so one
-# entry covers every session the bridge holds; the dashboard mounts it as its own
-# entry in the Settings nav, labelled with this plugin's name.
+# (host_api.rs::require_declared_slot). `home-pane` is a GLOBAL slot (not tied
+# to any session), so one entry covers every session the bridge holds; the host
+# docks it on the home view.
 #
 # This is the bridge's only durable operator-facing surface. A worker's stderr
 # goes to an unnamed per-spawn file nothing reads, and a `[[commands]]` invoke is
 # fire-and-forget (202, no result channel) — so pushed UI state is the only way
 # an operator can ask "is this session covered, and is delivery working?".
 [[ui]]
-slot = "settings-page"
+slot = "home-pane"
 id = "main"
 
 # ---------------------------------------------------------------------------

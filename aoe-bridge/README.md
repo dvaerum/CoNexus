@@ -159,7 +159,7 @@ stdin EOF (host closed the pipe).
 | `render.rs` | skinny frame renderer (`render_skinny`) | ✅ |
 | `inject.rs` | REST request building, SSE data extraction | ✅ |
 | `observe.rs` | leveled + redacted diagnostics, durable log file, rotation | ✅ |
-| `status.rs` | observable state, notify gating, settings-page renderer | ✅ |
+| `status.rs` | observable state, notify gating, home-pane renderer | ✅ |
 | `bridge.rs` | async orchestrator: reconcile, SSE client, status reporter, injector, publisher | — |
 | `main.rs` | wiring | — |
 
@@ -189,8 +189,8 @@ Two surfaces, because the host gives a runtime worker exactly two channels.
 
 ### The status page (live state)
 
-The manifest declares the global `settings-page` UI slot, so the AoE dashboard
-mounts **Settings → conexus Delivery Bridge**. The worker re-pushes it after
+The manifest declares the global `home-pane` UI slot, so the AoE dashboard
+docks it on the home view as its own panel. The worker re-pushes it after
 every reconcile, on every stream/inject state change, and at least every 30s.
 It answers, per covered session:
 
