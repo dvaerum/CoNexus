@@ -1,6 +1,6 @@
-//! Live bridge state, and the AoE settings page it renders into.
+//! Live bridge state, and the AoE home-pane it renders into.
 //!
-//! ## Why a `settings-page`
+//! ## Why a `home-pane`
 //!
 //! A runtime worker has exactly two channels to the operator, and the host owns
 //! both (verified against the AoE host source):
@@ -37,7 +37,7 @@
 //!   channel stays what it is; inject health is a *bridge* concern and belongs
 //!   on the bridge's own page.
 //!
-//! `settings-page` is global (not per-session), so one entry covers every
+//! `home-pane` is global (not per-session), so one entry covers every
 //! session the bridge holds — which is exactly the cross-session question an
 //! operator asks ("is anything broken?"). A per-session `pane` would need N
 //! entries and would only be visible while sitting in that one session's view.
@@ -60,13 +60,13 @@ use crate::observe::{format_age, Level};
 
 /// The `[[ui]]` slot the manifest declares. Global (not per-session), so one
 /// entry covers every session the bridge holds.
-pub const PAGE_SLOT: &str = "settings-page";
+pub const PAGE_SLOT: &str = "home-pane";
 
 /// The `[[ui]]` contribution id the manifest declares for the page.
 pub const PAGE_ID: &str = "main";
 
 /// Cap on how many sessions get a detail section. The host caps a
-/// `settings-page` payload at 64 KiB and the `sessions` setting allows 200 rows,
+/// `home-pane` payload at 64 KiB and the `sessions` setting allows 200 rows,
 /// so a full render could be refused — and a refused push means *no* page at
 /// all, the worst possible failure for an observability surface. Failing
 /// sessions sort first ([`Snapshot::ordered`]), so a truncated page still shows
@@ -249,7 +249,7 @@ impl SessionObs {
     }
 
     pub fn note_error(&mut self, what: &str, at: u64) {
-        // `last_error` renders into the settings page (a durable operator
+        // `last_error` renders into the home-pane (a durable operator
         // surface), so it must pass through the same scrubber as every log
         // line — the module docstrings claim "a single redactor on the one
         // write path", and this sink would otherwise bypass it and echo a
@@ -435,7 +435,7 @@ fn verdict(snap: &Snapshot, health: Health) -> (String, String) {
     }
 }
 
-/// Render the `ui.state.set` payload for the bridge's settings page.
+/// Render the `ui.state.set` payload for the bridge's home-pane.
 ///
 /// Pure over `(snapshot, now, log_path, level)` so the whole surface is
 /// testable without a host.
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn note_error_redacts_before_it_reaches_the_page_sink() {
-        // `last_error` is a durable operator surface (the settings page). A
+        // `last_error` is a durable operator surface (the home-pane). A
         // transport error can carry a bearer token in its `Debug` rendering;
         // the module docstrings promise a single redactor on the write path,
         // so this sink must scrub too — not echo the credential onto the page.
@@ -1164,6 +1164,39 @@ mod tests {
     fn deployed_manifest() -> String {
         let src = include_str!("../aoe-plugin.toml");
         src.split("\n[runtime]").next().unwrap().to_string()
+    }
+
+    /// The AoE host's closed `UiSlot` enum (`aoe-plugin-api::manifest::UiSlot`,
+    /// serialized `rename_all = "kebab-case"`). An unknown slot fails TOML
+    /// parsing at plugin-load time with a confusing "unknown variant" error
+    /// rather than a clean "upgrade aoe" message -- this is what the manifest's
+    /// own `slot = "settings-page"` hit for real (there is no such slot; the
+    /// bridge wanted the global, host-docked `home-pane` slot, and nothing in
+    /// this crate checked `PAGE_SLOT` against the real host vocabulary before
+    /// this test existed). Kept as a literal list rather than a dependency on
+    /// aoe-plugin-api (this crate has none) -- update it if the host adds a
+    /// slot.
+    const KNOWN_HOST_SLOTS: &[&str] = &[
+        "status-bar",
+        "row-badge",
+        "row-column",
+        "sort-key",
+        "filter-facet",
+        "card",
+        "pane",
+        "composer-action",
+        "detail-badge",
+        "home-pane",
+        "notification",
+    ];
+
+    #[test]
+    fn page_slot_is_a_real_host_slot() {
+        assert!(
+            KNOWN_HOST_SLOTS.contains(&PAGE_SLOT),
+            "PAGE_SLOT {PAGE_SLOT:?} is not one of the host's known UI slots {KNOWN_HOST_SLOTS:?} \
+             -- the host will refuse to parse the manifest with an \"unknown variant\" error"
+        );
     }
 
     #[test]
