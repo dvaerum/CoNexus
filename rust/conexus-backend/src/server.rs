@@ -21,12 +21,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use rmcp::model::{
-    CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, GetPromptRequestParams,
-    GetPromptResponse, GetPromptResult, Implementation, InitializeRequestParams, InitializeResult,
-    ListPromptsResult, ListResourcesResult, ListToolsResult, PaginatedRequestParams,
-    ProgressNotificationParam, ProgressToken, Prompt, PromptArgument, PromptMessage,
-    ProtocolVersion, ReadResourceRequestParams, ReadResourceResponse, ReadResourceResult, Resource,
-    ResourceContents, Role, ServerCapabilities, ServerInfo, Tool,
+    CacheScope, CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock,
+    GetPromptRequestParams, GetPromptResponse, GetPromptResult, Implementation,
+    InitializeRequestParams, InitializeResult, ListPromptsResult, ListResourcesResult,
+    ListToolsResult, PaginatedRequestParams, ProgressNotificationParam, ProgressToken, Prompt,
+    PromptArgument, PromptMessage, ProtocolVersion, ReadResourceRequestParams,
+    ReadResourceResponse, ReadResourceResult, Resource, ResourceContents, Role, ServerCapabilities,
+    ServerInfo, Tool,
 };
 use rmcp::service::{Peer, RequestContext};
 use rmcp::{ErrorData as McpError, RoleServer, ServerHandler};
@@ -174,6 +175,56 @@ impl ConexusServer {
     pub fn new(shared: Arc<SharedState>) -> Self {
         Self { shared }
     }
+}
+
+/// SEP-2549 cache hints, attached to every list/read result below.
+/// `get_info()` advertises `ProtocolVersion::LATEST`, but `initialize()`
+/// echoes back whatever protocol version the client requested as long as
+/// it's in `supported_protocol_versions()` -- which, by inheriting
+/// `ServerHandler`'s default, is `ProtocolVersion::KNOWN_VERSIONS`
+/// (through 2026-07-28). That version's spec schema makes `ttlMs`/
+/// `cacheScope` REQUIRED on every paginated list result (and on
+/// `resources/read`); omitting them is what made Claude Code's MCP
+/// client reject `tools/list` with a Zod validation error on both
+/// fields. This server does no result caching of its own, and every
+/// catalogue below is filtered per caller `CatalogRole` -- so a result
+/// is always immediately stale (`ttlMs: 0`) and never safe to share
+/// across principals (`cacheScope: private`). Older negotiated protocol
+/// versions simply ignore these as additive fields.
+const SEP_2549_TTL_MS: u64 = 0;
+const SEP_2549_CACHE_SCOPE: CacheScope = CacheScope::Private;
+
+fn list_tools_result(tools: Vec<Tool>) -> ListToolsResult {
+    ListToolsResult {
+        tools,
+        ttl_ms: Some(SEP_2549_TTL_MS),
+        cache_scope: Some(SEP_2549_CACHE_SCOPE),
+        ..Default::default()
+    }
+}
+
+fn list_prompts_result(prompts: Vec<Prompt>) -> ListPromptsResult {
+    ListPromptsResult {
+        prompts,
+        ttl_ms: Some(SEP_2549_TTL_MS),
+        cache_scope: Some(SEP_2549_CACHE_SCOPE),
+        ..Default::default()
+    }
+}
+
+fn list_resources_result(resources: Vec<Resource>) -> ListResourcesResult {
+    ListResourcesResult {
+        resources,
+        ttl_ms: Some(SEP_2549_TTL_MS),
+        cache_scope: Some(SEP_2549_CACHE_SCOPE),
+        ..Default::default()
+    }
+}
+
+fn read_resource_result(contents: Vec<ResourceContents>) -> ReadResourceResult {
+    ReadResourceResult::new(contents)
+        .with_ttl_ms(SEP_2549_TTL_MS)
+        .with_cache_scope(SEP_2549_CACHE_SCOPE)
 }
 
 fn principal_from_context(context: &RequestContext<RoleServer>) -> Option<Principal> {
@@ -475,10 +526,7 @@ impl ServerHandler for ConexusServer {
                 tools.push(Tool::new(descriptor.name, descriptor.description, schema));
             }
         }
-        Ok(ListToolsResult {
-            tools,
-            ..Default::default()
-        })
+        Ok(list_tools_result(tools))
     }
 
     async fn call_tool(
@@ -600,10 +648,7 @@ impl ServerHandler for ConexusServer {
                 .with_title(entry.title.clone())
             })
             .collect();
-        Ok(ListPromptsResult {
-            prompts,
-            ..Default::default()
-        })
+        Ok(list_prompts_result(prompts))
     }
 
     // Port of `mcp_get_prompt_handler` (Phase E1 PR B1). Error codes
@@ -661,10 +706,7 @@ impl ServerHandler for ConexusServer {
                     .with_mime_type(entry.mime_type)
             })
             .collect();
-        Ok(ListResourcesResult {
-            resources,
-            ..Default::default()
-        })
+        Ok(list_resources_result(resources))
     }
 
     // Port of `mcp_read_resource_handler` (Phase E1 PR B2). Error
@@ -691,7 +733,7 @@ impl ServerHandler for ConexusServer {
         })?;
         match outcome {
             conexus_tools::resources::ReadOutcome::Ok { body, mime_type } => {
-                Ok(ReadResourceResult::new(vec![
+                Ok(read_resource_result(vec![
                     ResourceContents::text(body, request.uri).with_mime_type(mime_type)
                 ])
                 .into())
@@ -713,6 +755,66 @@ impl ServerHandler for ConexusServer {
 mod tests {
     use super::*;
     use conexus_core::tool_result::ToolResult;
+
+    // SEP-2549 (cache hints): `get_info()` advertises support for protocol
+    // version 2026-07-28 (inherited from `ServerHandler`'s default
+    // `supported_protocol_versions()`, `ProtocolVersion::KNOWN_VERSIONS`,
+    // which `initialize()` echoes back verbatim when the client requests
+    // it). That protocol version's spec schema makes `ttlMs`/`cacheScope`
+    // REQUIRED on every paginated list result. `list_tools`/`list_prompts`/
+    // `list_resources` build their result via `..Default::default()`,
+    // which leaves both `None` -- and rmcp's `skip_serializing_if` then
+    // omits them from the wire entirely. Claude Code's MCP client (a
+    // strict Zod validator keyed to the negotiated protocol version)
+    // rejected `tools/list` for exactly this: "expected: number ... path:
+    // [ttlMs]" plus an `invalid_value` on the `cacheScope` enum.
+    #[test]
+    fn list_tools_result_must_carry_sep_2549_cache_hints_for_2026_07_28() {
+        let result = list_tools_result(vec![]);
+        assert_eq!(
+            result.ttl_ms,
+            Some(0),
+            "ttlMs is required once protocol 2026-07-28 is negotiated"
+        );
+        assert_eq!(
+            result.cache_scope,
+            Some(CacheScope::Private),
+            "cacheScope is required once protocol 2026-07-28 is negotiated"
+        );
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["ttlMs"], 0);
+        assert_eq!(json["cacheScope"], "private");
+    }
+
+    #[test]
+    fn list_prompts_result_must_carry_sep_2549_cache_hints_for_2026_07_28() {
+        let result = list_prompts_result(vec![]);
+        assert_eq!(result.ttl_ms, Some(0));
+        assert_eq!(result.cache_scope, Some(CacheScope::Private));
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["ttlMs"], 0);
+        assert_eq!(json["cacheScope"], "private");
+    }
+
+    #[test]
+    fn list_resources_result_must_carry_sep_2549_cache_hints_for_2026_07_28() {
+        let result = list_resources_result(vec![]);
+        assert_eq!(result.ttl_ms, Some(0));
+        assert_eq!(result.cache_scope, Some(CacheScope::Private));
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["ttlMs"], 0);
+        assert_eq!(json["cacheScope"], "private");
+    }
+
+    #[test]
+    fn read_resource_result_must_carry_sep_2549_cache_hints_for_2026_07_28() {
+        let result = read_resource_result(vec![]);
+        assert_eq!(result.ttl_ms, Some(0));
+        assert_eq!(result.cache_scope, Some(CacheScope::Private));
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["ttlMs"], 0);
+        assert_eq!(json["cacheScope"], "private");
+    }
 
     #[test]
     fn ok_result_renders_as_success_with_structured_content() {
