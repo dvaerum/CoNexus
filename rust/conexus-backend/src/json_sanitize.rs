@@ -46,7 +46,25 @@ use serde_json::{Map, Value};
 /// independently for Rust's stack, not copied from a Python constant
 /// -- CPython's default recursion limit and Rust's native stack depth
 /// per JSON nesting level are not the same budget).
-const MAX_NESTING_DEPTH: usize = 200;
+///
+/// F16: pinned to `serde_json` 1.0.151's (the version in `Cargo.lock`)
+/// own empirically-measured internal recursion limit for `Value`
+/// deserialization -- 127 levels succeed, 128 fails with "recursion
+/// limit exceeded" (measured directly against `serde_json::from_str`,
+/// the exact call this module makes below; see
+/// `serde_json_recursion_limit_matches_the_boundary_this_module_assumes`
+/// for the reproducible probe). The constant used to be a looser 200,
+/// which let a body in the 127-199 range sail past this pre-scan and
+/// get rejected by `serde_json` itself with the wrong error message
+/// ("not valid JSON" instead of "too deeply nested") -- this module's
+/// OWN guard must be the one that fires first, at the exact boundary
+/// `serde_json` actually enforces, both for the correct message AND so
+/// the "reject before an unbounded-depth parse could abort the
+/// process" safety property this module exists for is guaranteed by
+/// this code, not by an accident of the currently-pinned dependency
+/// version. The canary test below fails loudly if a future
+/// `serde_json` upgrade moves this boundary.
+const MAX_NESTING_DEPTH: usize = 127;
 
 /// Client-safe error from [`decode_untrusted_body`]. `Display` is
 /// deliberately the only way to extract text -- see Python's
@@ -276,14 +294,84 @@ mod tests {
         assert_eq!(err.to_string(), "request body must be a JSON object");
     }
 
+    fn nested_body(depth: usize) -> String {
+        let mut body = "{\"a\":".repeat(depth);
+        body.push('1');
+        body.push_str(&"}".repeat(depth));
+        body
+    }
+
     #[test]
     fn excessively_deep_nesting_is_rejected_before_parsing() {
-        let mut body = "x".repeat(0);
-        body.push_str(&"{\"a\":".repeat(MAX_NESTING_DEPTH + 10));
-        body.push('1');
-        body.push_str(&"}".repeat(MAX_NESTING_DEPTH + 10));
-        let err = decode_untrusted_body(body.as_bytes()).unwrap_err();
+        // Exercise a spread of depths, not just one far past
+        // MAX_NESTING_DEPTH: 165 sits inside what used to be the F16 gap
+        // (127-199, back when MAX_NESTING_DEPTH was 200) where a body
+        // sailed past this pre-scan and was rejected by `serde_json`
+        // itself with the WRONG message instead of this one. See
+        // `depth_just_past_the_serde_json_recursion_limit_gets_the_correct_message`
+        // for the exact regression pin.
+        for depth in [MAX_NESTING_DEPTH + 1, MAX_NESTING_DEPTH + 10, 165, 250] {
+            let err = decode_untrusted_body(nested_body(depth).as_bytes()).unwrap_err();
+            assert_eq!(err.to_string(), "request body is too deeply nested");
+        }
+    }
+
+    #[test]
+    fn depth_at_the_serde_json_recursion_limit_is_still_accepted() {
+        // MAX_NESTING_DEPTH is pinned to serde_json 1.0.151's own
+        // empirically-measured `Value` recursion limit (see
+        // `serde_json_recursion_limit_matches_the_boundary_this_module_assumes`).
+        // A body exactly at that limit must still decode normally --
+        // proves the fix didn't overshoot into rejecting legitimate,
+        // moderately-nested request bodies.
+        let decoded = decode_untrusted_body(nested_body(MAX_NESTING_DEPTH).as_bytes()).unwrap();
+        let mut cursor = &Value::Object(decoded);
+        for _ in 0..MAX_NESTING_DEPTH {
+            cursor = &cursor["a"];
+        }
+        assert_eq!(cursor, &Value::from(1));
+    }
+
+    #[test]
+    fn depth_just_past_the_serde_json_recursion_limit_gets_the_correct_message() {
+        // F16: pins the exact bug. Before the fix, `MAX_NESTING_DEPTH`
+        // (200) was looser than serde_json 1.0.151's own internal
+        // recursion limit for `Value` deserialization (empirically 127 --
+        // see the canary test below). A body one level past 127 used to
+        // sail past this module's pre-scan (127 < 200), then fail inside
+        // `serde_json::from_str` itself, whose error got mapped to the
+        // generic "not valid JSON" message instead of "too deeply
+        // nested" -- misleading, since the body IS syntactically valid
+        // JSON, just deep. This must now be rejected by this module's
+        // OWN guard, with the correct message.
+        let err = decode_untrusted_body(nested_body(MAX_NESTING_DEPTH + 1).as_bytes()).unwrap_err();
         assert_eq!(err.to_string(), "request body is too deeply nested");
+    }
+
+    #[test]
+    fn serde_json_recursion_limit_matches_the_boundary_this_module_assumes() {
+        // Canary, independent of `exceeds_max_nesting_depth`: calls
+        // `serde_json::from_str` directly (bypassing this module's own
+        // pre-scan) to reconfirm serde_json's real enforced recursion
+        // limit sits exactly where `MAX_NESTING_DEPTH` assumes. If a
+        // future serde_json upgrade shifts this limit, this test fails
+        // loudly instead of silently reopening the F16 message-mismatch
+        // gap (a tightened limit) or silently weakening the actual
+        // stack-overflow safety property (a loosened/removed limit).
+        assert!(
+            serde_json::from_str::<Value>(&nested_body(MAX_NESTING_DEPTH)).is_ok(),
+            "serde_json now rejects a body at MAX_NESTING_DEPTH ({}) -- its \
+             recursion limit tightened; re-measure and lower MAX_NESTING_DEPTH to match",
+            MAX_NESTING_DEPTH
+        );
+        assert!(
+            serde_json::from_str::<Value>(&nested_body(MAX_NESTING_DEPTH + 1)).is_err(),
+            "serde_json now accepts a body one level past MAX_NESTING_DEPTH \
+             ({}) -- its recursion limit loosened or was removed, so this \
+             module's pre-scan is no longer the binding safety limit against \
+             a native stack overflow; re-measure and raise MAX_NESTING_DEPTH",
+            MAX_NESTING_DEPTH
+        );
     }
 
     #[test]
