@@ -3666,8 +3666,33 @@ impl Drop for EventsUnsubscribeGuard {
     }
 }
 
+/// Pentest finding F12: a `Forwarding`-admitted stream previously
+/// stayed `true` forever, with no re-check at all against the
+/// underlying identity for the life of the connection -- confirmed
+/// live, a deleted user's stream kept receiving keep-alives 9.7s+
+/// after account deletion. `conexus-backend` is deliberately
+/// router-db-blind (see `rest_principal.rs`'s own doc, Phase E1 PR1's
+/// "no new router.db handle" decision) -- it has no DB table to
+/// re-check a forwarding-admitted user/membership against, so the
+/// `delivery_stream`-style per-cycle `is_live` re-check this class
+/// normally gets isn't available here without reversing that
+/// boundary. Bounding the stream's own MAX LIFETIME instead needs no
+/// new cross-process dependency: it converts an unbounded exposure
+/// window into a bounded one (a stale grant now self-expires within
+/// `FORWARDING_STREAM_MAX_LIFETIME_SECONDS` of connecting, forcing a
+/// reconnect that re-runs the router's own real membership check),
+/// the standard mitigation for long-lived-stream revocation when a
+/// tighter per-cycle liveness check isn't available. Deliberately
+/// NOT re-checking the forwarding header's own embedded expiry (see
+/// below) -- that's a different mechanism protecting against a
+/// different threat, not a substitute for this cap.
+const FORWARDING_STREAM_MAX_LIFETIME_SECONDS: i64 = 300;
+
 /// True iff `admission` would still be admitted at `/api/events` right
 /// now -- the R5-F1 re-validation `_still_authorized` performs.
+/// `connected_at` is the stream's own connect-time RFC3339 timestamp
+/// (captured once at subscribe time), used only by the `Forwarding`
+/// arm's max-lifetime cap below.
 ///
 /// **A genuine re-derivation, not a literal port**: Python re-runs the
 /// SAME `require_operator_session` dependency against the connection's
@@ -3681,16 +3706,30 @@ impl Drop for EventsUnsubscribeGuard {
 ///   persistent, revocable session. It was already fully verified
 ///   once, at connect time; re-checking its own embedded expiry here
 ///   would revoke every forwarding-admitted stream within ~30 SECONDS
-///   of opening, which is not what R5-F1 is protecting against.
-///   Stays live for the life of the connection once admitted.
+///   of opening, which is not what R5-F1 is protecting against. Stays
+///   live until `FORWARDING_STREAM_MAX_LIFETIME_SECONDS` have elapsed
+///   since connect (F12's bounded-lifetime mitigation), then forces a
+///   reconnect through the router's own real check.
 /// - `OperatorBearer`: DOES have real, persistent revocation state --
 ///   `rotate_agent_token`/`purge_agent` can invalidate it mid-stream,
 ///   exactly the "a revoked credential must not survive it" case
 ///   R5-F1 exists for. Re-checked for real: the token must still
 ///   resolve to a live, non-terminated, manager-role `agents` row.
-async fn events_still_authorized(shared: &Arc<SharedState>, admission: &RestPrincipal) -> bool {
+async fn events_still_authorized(
+    shared: &Arc<SharedState>,
+    admission: &RestPrincipal,
+    connected_at: &str,
+) -> bool {
     match admission {
-        RestPrincipal::Forwarding { .. } => true,
+        RestPrincipal::Forwarding { .. } => {
+            let Ok(connected_at) = chrono::DateTime::parse_from_rfc3339(connected_at) else {
+                // Malformed/missing connect timestamp -- fail closed
+                // rather than granting an unbounded stream.
+                return false;
+            };
+            let age = chrono::Utc::now().signed_duration_since(connected_at);
+            age.num_seconds() < FORWARDING_STREAM_MAX_LIFETIME_SECONDS
+        }
         RestPrincipal::OperatorBearer { bearer_token } => {
             let guard = shared.conn.lock().await;
             let row =
@@ -3724,13 +3763,15 @@ pub async fn operator_events_stream(
 
     let admission = resolved.admission.clone();
     let shared_for_liveness = shared.clone();
+    let connected_at = now.clone();
     let gate = RevalidatingStream::new(
         sub.receiver,
         move || {
             let shared = shared_for_liveness.clone();
             let admission = admission.clone();
+            let connected_at = connected_at.clone();
             Box::pin(async move {
-                if events_still_authorized(&shared, &admission).await {
+                if events_still_authorized(&shared, &admission, &connected_at).await {
                     Liveness::live()
                 } else {
                     Liveness::revoked("operator session no longer valid")
@@ -4914,5 +4955,80 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let body = body_json(resp).await;
         assert_eq!(body["offset"], json!(0));
+    }
+
+    // -----------------------------------------------------------
+    // Pentest F12: a Forwarding-admitted /api/events stream must not
+    // stay "authorized" forever -- confirmed live, a deleted user's
+    // stream kept receiving keep-alives 9.7s+ after account deletion.
+    // conexus-backend is deliberately router-db-blind (no table to
+    // re-check a forwarding-admitted user against), so the fix is a
+    // bounded max-lifetime cap rather than delivery_stream's per-cycle
+    // DB re-check -- these tests pin that cap directly against
+    // events_still_authorized, the exact function R5-F1 documents as
+    // this stream's re-validation seam.
+    // -----------------------------------------------------------
+
+    #[tokio::test]
+    async fn events_still_authorized_forwarding_stays_live_within_max_lifetime() {
+        let conn = test_conn();
+        let shared = test_shared_state(conn).await;
+        let admission =
+            resolved_forwarding("alice", conexus_core::capability::ProjectRole::Operator).admission;
+        let connected_at = chrono::Utc::now().to_rfc3339();
+        assert!(events_still_authorized(&shared, &admission, &connected_at).await);
+    }
+
+    #[tokio::test]
+    async fn events_still_authorized_forwarding_expires_past_max_lifetime() {
+        let conn = test_conn();
+        let shared = test_shared_state(conn).await;
+        let admission =
+            resolved_forwarding("alice", conexus_core::capability::ProjectRole::Operator).admission;
+        let connected_at = (chrono::Utc::now()
+            - chrono::Duration::seconds(FORWARDING_STREAM_MAX_LIFETIME_SECONDS + 10))
+        .to_rfc3339();
+        assert!(!events_still_authorized(&shared, &admission, &connected_at).await);
+    }
+
+    #[tokio::test]
+    async fn events_still_authorized_forwarding_still_live_just_under_the_cap() {
+        let conn = test_conn();
+        let shared = test_shared_state(conn).await;
+        let admission =
+            resolved_forwarding("alice", conexus_core::capability::ProjectRole::Operator).admission;
+        let connected_at = (chrono::Utc::now()
+            - chrono::Duration::seconds(FORWARDING_STREAM_MAX_LIFETIME_SECONDS - 5))
+        .to_rfc3339();
+        assert!(events_still_authorized(&shared, &admission, &connected_at).await);
+    }
+
+    #[tokio::test]
+    async fn events_still_authorized_forwarding_fails_closed_on_malformed_connected_at() {
+        let conn = test_conn();
+        let shared = test_shared_state(conn).await;
+        let admission =
+            resolved_forwarding("alice", conexus_core::capability::ProjectRole::Operator).admission;
+        assert!(!events_still_authorized(&shared, &admission, "not-a-timestamp").await);
+    }
+
+    #[tokio::test]
+    async fn events_still_authorized_operator_bearer_unaffected_by_the_forwarding_cap() {
+        // Regression guard: the max-lifetime cap must apply ONLY to
+        // Forwarding admissions -- an OperatorBearer's own real DB
+        // liveness check (already correct pre-fix) must not be
+        // affected by connected_at at all, no matter how old.
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agents (token, agent_id, created_at, status, \
+             working_directory, color, agent_role) \
+             VALUES ('tok-1', 'bearer-agent', '2026-03-01T00:00:00', 'active', '/tmp', '#000000', 'manager')",
+            [],
+        )
+        .unwrap();
+        let shared = test_shared_state(conn).await;
+        let admission = resolved_operator_bearer("tok-1").admission;
+        let ancient = (chrono::Utc::now() - chrono::Duration::days(365)).to_rfc3339();
+        assert!(events_still_authorized(&shared, &admission, &ancient).await);
     }
 }
