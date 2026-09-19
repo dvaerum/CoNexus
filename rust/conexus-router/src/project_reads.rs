@@ -180,7 +180,10 @@ pub fn project_counts(workspace: &str) -> ProjectCounts {
         return ProjectCounts::default();
     };
     ProjectCounts {
-        agents: count(&conn, "SELECT COUNT(*) FROM agents WHERE status != 'tombstone'"),
+        agents: count(
+            &conn,
+            "SELECT COUNT(*) FROM agents WHERE status != 'tombstone'",
+        ),
         tasks: count(&conn, "SELECT COUNT(*) FROM tasks"),
         open_messages: count(&conn, "SELECT COUNT(*) FROM agent_messages WHERE read = 0"),
     }
