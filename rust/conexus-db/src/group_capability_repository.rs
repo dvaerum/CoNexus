@@ -29,8 +29,8 @@
 
 use rusqlite::{Connection, Result};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter, TransactionTrait,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseConnection, DbErr,
+    EntityTrait, QueryFilter, TransactionTrait,
 };
 use std::collections::HashSet;
 
@@ -40,8 +40,16 @@ use crate::entity::group_capability::{ActiveModel, Column, Entity};
 /// indistinguishable from "no such group" — existence-checking the
 /// group itself is the caller's job, matching Python (neither this
 /// function nor [`replace`] validates the group exists).
-pub async fn fetch(
-    db: &DatabaseConnection,
+///
+/// Generic over `C: ConnectionTrait` (not just `&DatabaseConnection`)
+/// so a caller that needs this read to observe the SAME transaction as
+/// a subsequent [`replace_in_tx`] write can pass a `&DatabaseTransaction`
+/// instead -- see `conexus-router::admin_group_capabilities::
+/// decide_replace_group_capabilities`'s F9 fix, which holds one
+/// `BEGIN IMMEDIATE` transaction across an existence check, this read,
+/// the amplification decision, and the write.
+pub async fn fetch<C: ConnectionTrait>(
+    db: &C,
     group_id: &str,
 ) -> std::result::Result<HashSet<String>, DbErr> {
     let rows = Entity::find()
@@ -82,6 +90,23 @@ pub async fn replace<'a, I: IntoIterator<Item = &'a str>>(
     group_id: &str,
     capabilities: I,
 ) -> std::result::Result<(), DbErr> {
+    let tx = db.begin().await?;
+    replace_in_tx(&tx, group_id, capabilities).await?;
+    tx.commit().await
+}
+
+/// The DELETE+INSERT body of [`replace`], factored out so a caller
+/// that already holds its OWN transaction (e.g. one also spanning an
+/// existence check and a `fetch` read used for an amplification
+/// decision -- see `fetch`'s own doc) can run it without `replace`
+/// opening a second, independent transaction. `replace` itself is a
+/// thin `begin` + this + `commit` wrapper, kept for every caller that
+/// has no wider transaction of its own to join.
+pub async fn replace_in_tx<'a, C: ConnectionTrait, I: IntoIterator<Item = &'a str>>(
+    tx: &C,
+    group_id: &str,
+    capabilities: I,
+) -> std::result::Result<(), DbErr> {
     // De-dup, preserving nothing about order (this is a set-store) —
     // matches Python's `dict.fromkeys` dedup before the executemany.
     let mut seen = HashSet::new();
@@ -90,20 +115,19 @@ pub async fn replace<'a, I: IntoIterator<Item = &'a str>>(
         .filter(|c| seen.insert(*c))
         .collect();
 
-    let tx = db.begin().await?;
     Entity::delete_many()
         .filter(Column::GroupId.eq(group_id))
-        .exec(&tx)
+        .exec(tx)
         .await?;
     for cap in &deduped {
         ActiveModel {
             group_id: Set(group_id.to_string()),
             capability: Set((*cap).to_string()),
         }
-        .insert(&tx)
+        .insert(tx)
         .await?;
     }
-    tx.commit().await
+    Ok(())
 }
 
 #[cfg(test)]

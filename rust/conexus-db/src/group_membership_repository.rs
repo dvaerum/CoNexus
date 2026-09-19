@@ -988,8 +988,15 @@ pub fn get_group_sync(conn: &Connection, group_id: &str) -> Result<Option<GroupR
 /// `admin_group_capabilities.rs`'s decision functions and
 /// `admin_group_members.rs::list_group_members_response` (plain reads,
 /// no transaction).
-pub async fn get_group(
-    db: &DatabaseConnection,
+///
+/// Generic over `C: ConnectionTrait` (not just `&DatabaseConnection`):
+/// `admin_group_capabilities.rs::decide_replace_group_capabilities`'s
+/// F9 fix needs this existence check to run INSIDE the same `BEGIN
+/// IMMEDIATE` transaction as its `fetch`/decision/write, so it must
+/// accept a `&DatabaseTransaction` too. Existing `&DatabaseConnection`
+/// call sites are unaffected -- `C` is inferred from the argument.
+pub async fn get_group<C: ConnectionTrait>(
+    db: &C,
     group_id: &str,
 ) -> std::result::Result<Option<GroupRow>, DbErr> {
     let row = GroupEntity::find_by_id(group_id).one(db).await?;
