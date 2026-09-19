@@ -147,13 +147,40 @@ pub struct ProjectCounts {
 /// SQLite error degrades that ONE count to zero rather than failing
 /// the whole card -- matching Python's per-query `try/except`
 /// granularity exactly (one broken table doesn't zero the other two).
+///
+/// **Agent count semantics (fixed post-launch, see PR that added this
+/// comment)**: this used to be a raw, unfiltered `COUNT(*)`, which
+/// included `tombstone` rows -- agents an operator already purged, and
+/// which the purge feature's whole point is to make disappear from
+/// every user-facing count. That disagreed with the two OTHER agent
+/// counts a user actually looks at for the same project:
+/// `conexus_db::agent_repository::AgentRepository::list_for_dashboard`
+/// (the Agents tab table + the per-project Overview page, both fed via
+/// `/api/all-data`), which excludes only `tombstone`. This card is
+/// answering "how many agents does this project have" (an existence
+/// question -- the project-list landing page, before you've drilled
+/// into any one project), not "how many are currently active", so it
+/// is aligned with `list_for_dashboard`'s exclusion set: `tombstone`
+/// out, `terminated` still counted (an operator can still restore a
+/// terminated agent, so it still "exists").
+///
+/// Deliberately NOT aligned with
+/// `AgentRepository::count_active_by_status` (feeds `/api/status`'s
+/// `total_agents`, an operational/health-check field with no dashboard
+/// UI consumer today), which excludes `terminated` too -- that's an
+/// intentionally different, narrower question ("how many are
+/// operationally active right now") answered for a different
+/// consumer. Keep it that way rather than converging all three: a
+/// health endpoint and a "does this exist" count are different
+/// questions, and forcing them to share one answer would make one of
+/// them wrong for its own purpose.
 pub fn project_counts(workspace: &str) -> ProjectCounts {
     let db = project_db_path(workspace);
     let Some(conn) = open_readonly(&db) else {
         return ProjectCounts::default();
     };
     ProjectCounts {
-        agents: count(&conn, "SELECT COUNT(*) FROM agents"),
+        agents: count(&conn, "SELECT COUNT(*) FROM agents WHERE status != 'tombstone'"),
         tasks: count(&conn, "SELECT COUNT(*) FROM tasks"),
         open_messages: count(&conn, "SELECT COUNT(*) FROM agent_messages WHERE read = 0"),
     }
@@ -651,11 +678,11 @@ mod tests {
         let db_path = agent_dir.join("mcp_state.db");
         let db = Connection::open(&db_path).unwrap();
         db.execute_batch(
-            "CREATE TABLE agents (agent_id TEXT PRIMARY KEY);
+            "CREATE TABLE agents (agent_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active');
              CREATE TABLE tasks (task_id TEXT PRIMARY KEY);
              CREATE TABLE agent_messages (id INTEGER PRIMARY KEY, read INTEGER NOT NULL);
              CREATE TABLE mcp_sessions (agent_id TEXT, alias_used TEXT);
-             INSERT INTO agents VALUES ('a1'), ('a2');
+             INSERT INTO agents (agent_id) VALUES ('a1'), ('a2');
              INSERT INTO tasks VALUES ('t1');
              INSERT INTO agent_messages (read) VALUES (0), (0), (1);
              INSERT INTO mcp_sessions (agent_id, alias_used) VALUES ('a1', 'old-name'), ('a2', 'old-name'), ('a1', 'old-name');",
@@ -688,13 +715,104 @@ mod tests {
         std::fs::create_dir_all(&agent_dir).unwrap();
         let db = Connection::open(agent_dir.join("mcp_state.db")).unwrap();
         db.execute_batch(
-            "CREATE TABLE agents (agent_id TEXT PRIMARY KEY); INSERT INTO agents VALUES ('a1');",
+            "CREATE TABLE agents (agent_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active');
+             INSERT INTO agents (agent_id) VALUES ('a1');",
         )
         .unwrap();
         let counts = project_counts(dir.path().to_str().unwrap());
         assert_eq!(counts.agents, 1);
         assert_eq!(counts.tasks, 0);
         assert_eq!(counts.open_messages, 0);
+    }
+
+    /// The bug, precisely: a raw `COUNT(*)` counted `tombstone` rows
+    /// (purged agents), which every other agent-facing surface in this
+    /// project treats as gone. Mix of `active`/`created`/`terminated`/
+    /// `tombstone` rows -- only the two `tombstone` rows must be
+    /// excluded; `terminated` stays counted (see the doc comment on
+    /// `project_counts` for why).
+    #[test]
+    fn project_counts_agents_excludes_tombstone_but_counts_terminated() {
+        let dir = tempfile::tempdir().unwrap();
+        let agent_dir = dir.path().join(".agent");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        let db = Connection::open(agent_dir.join("mcp_state.db")).unwrap();
+        db.execute_batch(
+            "CREATE TABLE agents (agent_id TEXT PRIMARY KEY, status TEXT NOT NULL);
+             INSERT INTO agents (agent_id, status) VALUES
+                 ('a1', 'active'),
+                 ('a2', 'created'),
+                 ('a3', 'terminated'),
+                 ('a4', 'tombstone'),
+                 ('a5', 'tombstone');",
+        )
+        .unwrap();
+        let counts = project_counts(dir.path().to_str().unwrap());
+        assert_eq!(
+            counts.agents, 3,
+            "2 tombstoned agents must be invisible to this count; terminated stays visible"
+        );
+    }
+
+    /// Cross-crate regression for the live-reproduced bug: this project's
+    /// own "Agents: N" project-list card (`project_counts`, this file)
+    /// must agree with the Agents tab / per-project Overview page
+    /// (`conexus_db::agent_repository::AgentRepository::list_for_dashboard`)
+    /// for the SAME underlying data. Before the fix, `project_counts`
+    /// counted the 2 tombstoned rows below (8 vs. `list_for_dashboard`'s
+    /// 6, matching the real `pikvm-on-nixos-with-mcp-support` symptom).
+    #[tokio::test]
+    async fn project_counts_agents_agrees_with_list_for_dashboard() {
+        let dir = tempfile::tempdir().unwrap();
+        let agent_dir = dir.path().join(".agent");
+        std::fs::create_dir_all(&agent_dir).unwrap();
+        let db_path = agent_dir.join("mcp_state.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conexus_db::schema::init_schema(&conn).unwrap();
+        let db = sea_orm::Database::connect(format!("sqlite://{}", db_path.display()))
+            .await
+            .unwrap();
+
+        let statuses = [
+            ("live1", "active"),
+            ("live2", "active"),
+            ("live3", "created"),
+            ("dead1", "terminated"),
+            ("dead2", "terminated"),
+            ("tomb1", "tombstone"),
+            ("tomb2", "tombstone"),
+        ];
+        for (agent_id, status) in statuses {
+            conexus_db::agent_repository::AgentRepository::create(
+                &db,
+                conexus_db::agent_repository::NewAgent {
+                    token: agent_id,
+                    agent_id,
+                    created_at: "2026-01-01T00:00:00Z",
+                    status,
+                    current_task: None,
+                    working_directory: "/tmp",
+                    color: None,
+                    agent_role: "worker",
+                },
+            )
+            .await
+            .unwrap();
+        }
+
+        let workspace = dir.path().to_string_lossy().into_owned();
+        let router_count = project_counts(&workspace).agents;
+        let dashboard_count =
+            conexus_db::agent_repository::AgentRepository::list_for_dashboard(&db, None, 100)
+                .await
+                .unwrap()
+                .len() as i64;
+
+        assert_eq!(router_count, 5, "5 non-tombstone rows out of 7");
+        assert_eq!(
+            router_count, dashboard_count,
+            "the project-list card and the Agents tab/Overview page must show the same count"
+        );
     }
 
     #[test]

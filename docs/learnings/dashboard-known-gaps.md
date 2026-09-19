@@ -9,18 +9,22 @@ still relevant (not a duplicate of anything already tracked here)
 before moving. Not superseded by the Rust migration — these are
 dashboard/frontend-side, language-independent of the backend.
 
-## Agents tab counters don't match the row statuses
+## Agents tab counters don't match the row statuses — RESOLVED
 
-Create 3 agents on a project, terminate 2. The Agents tab's summary
-row shows something like `Total 3 / Running 0 / Pending 0 / Failed 0`
-even though the table has 1 system agent + 2 terminated rows — no
-bucket accounts for `system` or `terminated` status. The donut/summary
-is misinformation; users end up distrusting either the summary or the
-table underneath it.
-
-Fix direction: add buckets for `system`/`terminated`, or sum only the
-buckets the summary already exposes — whichever, make the two numbers
-agree.
+**Verified fixed** while investigating a related agent-count-mismatch
+bug (project-list "Agents: N" card disagreeing with this same Agents
+tab; see `rust/conexus-router/src/project_reads.rs::project_counts`).
+`agentPresence()` (`conexus/dashboard/lib/api/agents.ts`) is now a
+total function over every `Agent.status` — it always returns one of
+`online`/`offline`/`pending`/`terminated`, with `pending` as the
+default fallback rather than an unbucketed gap. The Agents tab's
+`stats` (`conexus/dashboard/components/dashboard/agents-dashboard.tsx`)
+sets `total: agents.length` and buckets every one of those same
+`agents` through `agentPresence()`, so `online + pending + offline +
+terminated` sums to `total` by construction — there is no longer a
+status value that falls outside all four buckets. Reproduced the
+original repro shape (create 3, terminate 2) against current code: the
+Total card and the four buckets agree.
 
 ## "System Online" sidebar indicator is hardcoded
 
