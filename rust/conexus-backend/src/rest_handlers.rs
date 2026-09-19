@@ -3807,9 +3807,27 @@ pub async fn operator_events_stream(
 /// per-stream snapshot (`user_id`/`connected_at`/`age_seconds`/
 /// `queue_depth`). A JSON REST endpoint, unlike the `events` stream
 /// itself.
-pub async fn operator_events_status(State(shared): State<Arc<SharedState>>) -> Response {
+///
+/// F15 (pentest convergence round 4): the per-subscriber `subscribers`
+/// array (another user's `user_id` plus live connection telemetry) is
+/// gated on `confirmed_operator_tier`, matching this file's own
+/// `tokens`/`all-data` idiom -- a forwarding admission (ANY project
+/// role, viewer or operator) is never confirmed-operator-tier on REST
+/// by deliberate policy (see `rest_principal::is_confirmed_operator_tier`),
+/// so only a real operator-bearer caller sees who is connected. The
+/// aggregate `connected` count stays visible to every admitted project
+/// member -- it carries no identity, and is the endpoint's only
+/// legitimate use for a non-operator caller ("is anyone watching").
+pub async fn operator_events_status(
+    State(shared): State<Arc<SharedState>>,
+    Extension(resolved): Extension<ResolvedRestPrincipal>,
+) -> Response {
+    let connected = shared.operator_events.subscriber_count();
+    if !resolved.confirmed_operator_tier {
+        return Json(json!({ "connected": connected })).into_response();
+    }
     Json(json!({
-        "connected": shared.operator_events.subscriber_count(),
+        "connected": connected,
         "subscribers": shared.operator_events.snapshot(chrono::Utc::now()),
     }))
     .into_response()
@@ -4632,6 +4650,75 @@ mod tests {
             .unwrap();
         assert_ne!(row["value"], "[redacted]");
         assert_eq!(row["value"], "true");
+    }
+
+    // -----------------------------------------------------------
+    // F15 (pentest convergence round 4): `operator_events_status`
+    // leaked every subscriber's `user_id` plus live SSE telemetry
+    // (`connected_at`/`age_seconds`/`queue_depth`) to ANY authenticated
+    // project member, including the lowest-privilege `Viewer` role --
+    // no capability/role check existed at all. Fixed to match this
+    // file's own `tokens`/`all-data` idiom: only a confirmed-operator-
+    // tier caller (a real `OperatorBearer`, never a forwarding
+    // admission regardless of signed project role -- see
+    // `rest_principal::is_confirmed_operator_tier`'s own doc) sees the
+    // per-subscriber `subscribers` array; everyone else still gets the
+    // aggregate `connected` count, preserving the endpoint's
+    // legitimate "is anyone watching" use without leaking identity.
+    // -----------------------------------------------------------
+
+    #[tokio::test]
+    async fn operator_events_status_hides_subscriber_identity_from_non_operator_tier_caller() {
+        let conn = test_conn();
+        let shared = test_shared_state(conn).await;
+        let _sub = shared.operator_events.subscribe(
+            Some("4647ab4bce4b7708".to_string()),
+            "2026-01-01T00:00:00+00:00",
+        );
+
+        // A `Viewer`-role forwarding caller -- the lowest project role,
+        // and the exact shape of the live-confirmed repro.
+        let resolved = resolved_forwarding("alice", conexus_core::capability::ProjectRole::Viewer);
+        let resp = operator_events_status(State(shared.clone()), Extension(resolved)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert_eq!(body["connected"], 1);
+        assert!(
+            body.get("subscribers").is_none(),
+            "non-operator-tier caller must not receive the subscribers array at all, got: {body}"
+        );
+        let rendered = body.to_string();
+        assert!(!rendered.contains("4647ab4bce4b7708"));
+
+        // An `Operator`-PROJECT-role forwarding caller is still not
+        // `confirmed_operator_tier` on REST (deliberate policy, see
+        // `is_confirmed_operator_tier`'s doc) -- must be redacted too.
+        let resolved_op =
+            resolved_forwarding("bob", conexus_core::capability::ProjectRole::Operator);
+        let resp_op = operator_events_status(State(shared), Extension(resolved_op)).await;
+        let body_op = body_json(resp_op).await;
+        assert!(body_op.get("subscribers").is_none());
+    }
+
+    #[tokio::test]
+    async fn operator_events_status_shows_subscriber_identity_to_confirmed_operator_tier_caller() {
+        let conn = test_conn();
+        let shared = test_shared_state(conn).await;
+        let _sub = shared.operator_events.subscribe(
+            Some("4647ab4bce4b7708".to_string()),
+            "2026-01-01T00:00:00+00:00",
+        );
+
+        let resolved = resolved_operator_bearer("real-admin-bearer-token");
+        let resp = operator_events_status(State(shared), Extension(resolved)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert_eq!(body["connected"], 1);
+        let subscribers = body["subscribers"]
+            .as_array()
+            .expect("confirmed operator-tier caller must still see the subscribers array");
+        assert_eq!(subscribers.len(), 1);
+        assert_eq!(subscribers[0]["user_id"], "4647ab4bce4b7708");
     }
 
     // -----------------------------------------------------------
