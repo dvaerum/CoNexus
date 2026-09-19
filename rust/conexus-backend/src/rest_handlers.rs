@@ -1795,6 +1795,15 @@ pub async fn all_data(
         "file_metadata": file_metadata_data,
         "file_map": file_map,
         "timestamp": chrono::Utc::now().to_rfc3339(),
+        // A masked `auth_token: null` on every agent row is
+        // indistinguishable from "this agent genuinely has no token" --
+        // this flag lets the dashboard render an explicit "hidden, use
+        // a direct operator bearer to reveal" state instead of a
+        // silent blank, without changing WHO can see the real value
+        // (see `expose_tokens` above / `rest_principal::
+        // is_confirmed_operator_tier`'s own doc for why a forwarding-
+        // header caller never can).
+        "tokens_visible": expose_tokens,
     }))
     .into_response()
 }
@@ -3819,10 +3828,16 @@ pub async fn operator_events_status(
 ) -> Response {
     let connected = shared.operator_events.subscriber_count();
     if !resolved.confirmed_operator_tier {
-        return Json(json!({ "connected": connected })).into_response();
+        // An omitted `subscribers` key is indistinguishable from "no one
+        // is connected" -- `subscribers_visible: false` lets a caller
+        // (or the dashboard) tell "hidden, not confirmed-operator-tier"
+        // apart from "the array is genuinely empty".
+        return Json(json!({ "connected": connected, "subscribers_visible": false }))
+            .into_response();
     }
     Json(json!({
         "connected": connected,
+        "subscribers_visible": true,
         "subscribers": shared.operator_events.snapshot(chrono::Utc::now()),
     }))
     .into_response()
@@ -4436,6 +4451,35 @@ mod tests {
     // -----------------------------------------------------------
 
     #[tokio::test]
+    async fn all_data_tokens_visible_flag_matches_whether_tokens_are_actually_exposed() {
+        // A masked `auth_token: null` on every agent row is
+        // indistinguishable from "this agent has no token" -- the
+        // dashboard needs an explicit signal to tell the two apart.
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agents (token, agent_id, created_at, status, \
+             working_directory, color) VALUES \
+             ('tok-1', 'agent-1', '2026-01-01T00:00:00Z', 'active', '/tmp', '#abc')",
+            [],
+        )
+        .unwrap();
+        let shared = test_shared_state(conn).await;
+
+        let forwarding =
+            resolved_forwarding("op1", conexus_core::capability::ProjectRole::Operator);
+        let resp = all_data(State(shared.clone()), Extension(forwarding), query(&[])).await;
+        let json = body_json(resp).await;
+        assert_eq!(json["tokens_visible"], false);
+        assert!(json["agents"][0]["auth_token"].is_null());
+
+        let bearer = resolved_operator_bearer("bearer-tok");
+        let resp = all_data(State(shared), Extension(bearer), query(&[])).await;
+        let json = body_json(resp).await;
+        assert_eq!(json["tokens_visible"], true);
+        assert_eq!(json["agents"][0]["auth_token"], "tok-1");
+    }
+
+    #[tokio::test]
     async fn all_data_strips_aoe_session_id_even_when_present_in_db() {
         let conn = test_conn();
         conn.execute(
@@ -4738,6 +4782,13 @@ mod tests {
             body.get("subscribers").is_none(),
             "non-operator-tier caller must not receive the subscribers array at all, got: {body}"
         );
+        // An omitted `subscribers` key alone is indistinguishable from
+        // "the array is genuinely empty" -- the dashboard needs an
+        // explicit signal to tell "hidden" apart from "nobody's here".
+        assert_eq!(
+            body["subscribers_visible"], false,
+            "must explicitly say the array was hidden, not just omit it silently"
+        );
         let rendered = body.to_string();
         assert!(!rendered.contains("4647ab4bce4b7708"));
 
@@ -4746,9 +4797,20 @@ mod tests {
         // `is_confirmed_operator_tier`'s doc) -- must be redacted too.
         let resolved_op =
             resolved_forwarding("bob", conexus_core::capability::ProjectRole::Operator);
-        let resp_op = operator_events_status(State(shared), Extension(resolved_op)).await;
+        let resp_op = operator_events_status(State(shared.clone()), Extension(resolved_op)).await;
         let body_op = body_json(resp_op).await;
         assert!(body_op.get("subscribers").is_none());
+        assert_eq!(body_op["subscribers_visible"], false);
+
+        // A genuine confirmed-operator-tier caller sees the real array
+        // AND the flag correctly flips to true.
+        let bearer = resolved_operator_bearer("bearer-tok");
+        let resp_bearer = operator_events_status(State(shared), Extension(bearer)).await;
+        let body_bearer = body_json(resp_bearer).await;
+        assert_eq!(body_bearer["subscribers_visible"], true);
+        assert!(body_bearer["subscribers"]
+            .as_array()
+            .is_some_and(|a| !a.is_empty()));
     }
 
     #[tokio::test]
