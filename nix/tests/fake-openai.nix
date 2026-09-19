@@ -17,6 +17,13 @@
 { config, lib, pkgs, ... }:
 
 let
+  # F18 (pentest round 4, LOW, same class as F7): this fixture never
+  # imported the shared hardening baseline at all, defaulting to an
+  # unhardened root service -- same `// hardening` merge idiom as
+  # nix/module.nix / nix/vm.nix / nix/vm-dev.nix; see nix/hardening.nix
+  # for what each key defends against.
+  hardening = import ../hardening.nix;
+
   fakeServer = pkgs.writers.writePython3Bin "fake-openai" {
     libraries = [ ];
     flakeIgnore = [ "E501" "W391" ];
@@ -78,6 +85,9 @@ in {
       ExecStart = "${fakeServer}/bin/fake-openai";
       Restart = "on-failure";
       RestartSec = 2;
-    };
+      # Binds an unprivileged port (11434) and touches nothing else --
+      # no capability of any kind needed.
+      DynamicUser = true;
+    } // hardening;
   };
 }

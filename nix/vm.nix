@@ -129,6 +129,18 @@ let
 
   llmEndpointCheckUnit = "conexus-llm-endpoint-check.service";
 
+  # F18 (pentest round 4, LOW, same class as F7): this file never
+  # imported the shared hardening baseline at all -- confirmed live via
+  # `systemd-analyze security conexus-llm-endpoint-check.service` on a
+  # booted vm-dev VM: 9.6 UNSAFE, root, full stock CapabilityBoundingSet,
+  # NoNewPrivileges=no. Same `// hardening` merge idiom as
+  # nix/module.nix / nix/vm-dev.nix / nix/home-manager-module.nix; see
+  # nix/hardening.nix for what each key defends against. No per-key
+  # override needed here -- the unit only curls two http:// URLs and
+  # writes to its own journal/console, and hardening.nix's
+  # RestrictAddressFamilies already allows outbound AF_INET/AF_INET6.
+  hardening = import ./hardening.nix;
+
   # CoNexus Rust backend (Phase D1 step 5) — `null` when the caller
   # doesn't pass `craneLib`, which just means the `conexus@<name>.service` /
   # `conexus-router` units are omitted (see module.nix's
@@ -275,7 +287,11 @@ in
           TimeoutStartSec = 400;
           StandardOutput = "journal+console";
           StandardError = "journal+console";
-        };
+          # Pure outbound curl + its own stdout/journal -- no privilege
+          # of any kind needed, same idiom as vm-dev.nix's
+          # bootstrap-seed / dev-mode-banner units.
+          DynamicUser = true;
+        } // hardening;
         script = ''
           set -u
           rc=0
