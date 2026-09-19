@@ -25,6 +25,17 @@
 # (hardening.nix's "pid" hides /proc/cmdline, which the preload script
 # reads to pick a fixture bundle -- confirmed live: with a plain
 # `// hardening` merge the unit silently no-op'd instead of restoring).
+#
+# F18 (pentest round 4, LOW): the same gap resurfaced in a DIFFERENT
+# file that predated the convention -- nix/vm.nix's own
+# conexus-llm-endpoint-check.service (external-LLM-mode outbound probe)
+# never imported nix/hardening.nix at all. Confirmed live via
+# `systemd-analyze security conexus-llm-endpoint-check.service` on a
+# booted vm-dev VM: 9.6 UNSAFE, root, full stock CapabilityBoundingSet,
+# NoNewPrivileges=no. nix/tests/fake-openai.nix's fake-openai.service
+# (the VM-test embeddings stub, wired into every nixosTest under
+# nix/tests/) had the identical gap -- no hardening import, no `User=`
+# at all, defaulting to root. Both are covered here the same way.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -79,6 +90,21 @@ let
     };
     "single-tenant:conexus-router-bootstrap-seed" = {
       serviceConfig = singleTenantConfig.systemd.services.conexus-router-bootstrap-seed.serviceConfig;
+      overrides = [ ];
+    };
+    "vm.nix:conexus-llm-endpoint-check" = {
+      # vmDevCfg already builds nix/vm.nix with llm = external (see
+      # nix/vm-dev.nix's own import of ./vm.nix with llm = external),
+      # so the unit under test is reachable without a second nixosSystem
+      # eval.
+      serviceConfig = vmDevCfg.systemd.services.conexus-llm-endpoint-check.serviceConfig;
+      overrides = [ ];
+    };
+    "fake-openai:fake-openai" = {
+      # Reached via the same single-tenant nixosTest config used above --
+      # nix/tests/single-tenant.nix imports nix/tests/fake-openai.nix into
+      # nodes.machine.
+      serviceConfig = singleTenantConfig.systemd.services.fake-openai.serviceConfig;
       overrides = [ ];
     };
   };
