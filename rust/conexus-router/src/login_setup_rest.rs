@@ -69,7 +69,20 @@ fn query_param(raw_query: Option<&str>, name: &str) -> Option<String> {
 /// consumer -- both the login/setup and OIDC-flow routes sit outside
 /// the session gate for the identical reason.
 pub(crate) struct RequestMount {
-    canonical_path: String,
+    // Deliberately the RAW, un-canonicalized request path -- NOT
+    // `mount::canonical_path(raw_path)`. `external_path`/
+    // `external_prefix` need to see whether the client's OWN request
+    // arrived under `/conexus/...` or at the bare root to correctly
+    // detect the client-facing mount; `canonical_path` normalizes a
+    // root-arriving request INTO the `/conexus/...` shape for internal
+    // routing, which -- if reused here -- makes every request look
+    // like it arrived under the mount, always resolving the external
+    // prefix to `/conexus` even for a genuinely root-mounted caller.
+    // Found live: a real logged-in session hitting bare `/` got stuck
+    // in an infinite redirect loop with `/conexus/login`, because the
+    // `Set-Cookie`'s `Path=/conexus/` (minted via this same mis-fed
+    // path) is never sent by the browser back to a bare `/` request.
+    raw_path: String,
     is_trusted: bool,
     forwarded_prefix: Option<String>,
     forwarded_proto: Option<String>,
@@ -86,7 +99,7 @@ impl RequestMount {
     ) -> Self {
         let peer = peer_info(addr);
         RequestMount {
-            canonical_path: mount::canonical_path(raw_path),
+            raw_path: raw_path.to_string(),
             is_trusted: is_request_trusted(state, &peer),
             forwarded_prefix: header_str(headers, "x-forwarded-prefix").map(str::to_string),
             forwarded_proto: header_str(headers, "x-forwarded-proto").map(str::to_string),
@@ -97,7 +110,7 @@ impl RequestMount {
 
     pub(crate) fn external_path(&self, suffix: &str) -> String {
         mount::external_path(
-            &self.canonical_path,
+            &self.raw_path,
             self.is_trusted,
             self.forwarded_prefix.as_deref(),
             suffix,
@@ -767,6 +780,61 @@ mod http_tests {
 
     fn peer_addr() -> SocketAddr {
         "127.0.0.1:9999".parse().unwrap()
+    }
+
+    /// Regression for a real, live-reproduced redirect loop: a genuinely
+    /// root-arriving request (`raw_path = "/"` or `"/login"`, no
+    /// `/conexus/` prefix -- e.g. a deployment reached only via its own
+    /// bare public domain, with no path-scoping reverse proxy in front)
+    /// must compute a ROOT-scoped external path/cookie `Path`, not a
+    /// `/conexus/`-scoped one. Before the fix, `RequestMount` stored
+    /// `mount::canonical_path(raw_path)` (which normalizes a root
+    /// request INTO `/conexus/...` for internal routing) and reused
+    /// that already-canonicalized value for `external_path` too --
+    /// every request then looked like it "arrived under the mount",
+    /// so `external_path("/login")` always returned `/conexus/login`
+    /// and `external_path("")` (the cookie `Path`) always returned
+    /// `/conexus/`, even for a caller that genuinely hit bare `/login`.
+    /// Combined with a browser never sending a `Path=/conexus/`-scoped
+    /// cookie back to a bare `/` request, this produced an infinite
+    /// `/ -> /conexus/login?next=/ -> /` loop for every real user.
+    #[tokio::test]
+    async fn request_mount_external_path_is_root_scoped_for_a_genuinely_root_arriving_request() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let db_path = dir.path().join("mount_test.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conexus_db::schema::init_router_schema(&conn).unwrap();
+        let registry = ProjectRegistry::new(dir.path().join("projects.local.json"));
+        let sea_orm_db = sea_orm::Database::connect(format!("sqlite://{}", db_path.display()))
+            .await
+            .unwrap();
+        let state = RouterState::new(
+            conn,
+            sea_orm_db,
+            registry,
+            RateLimitConfig::resolve_from_process_env(),
+            EnsureConfig::from_env(|_| None),
+            test_state_config(),
+        );
+
+        // No `X-Forwarded-Prefix`, untrusted peer -- pure path-shape
+        // inference, matching the real live repro over the WireGuard-
+        // tunneled path (no reverse proxy declaring a trusted prefix).
+        let headers = HeaderMap::new();
+        let root_mount = RequestMount::resolve(&state, peer_addr(), "/login", &headers);
+        assert_eq!(root_mount.external_path("/login"), "/login");
+        assert_eq!(
+            root_mount.external_path(""),
+            "/",
+            "the session cookie's Path must be root-scoped for a root-arriving request"
+        );
+
+        // A genuinely `/conexus/`-prefixed request must still resolve
+        // to the `/conexus/`-scoped form -- this fix must not collapse
+        // the distinction the other way.
+        let tailnet_mount = RequestMount::resolve(&state, peer_addr(), "/conexus/login", &headers);
+        assert_eq!(tailnet_mount.external_path("/login"), "/conexus/login");
+        assert_eq!(tailnet_mount.external_path(""), "/conexus/");
     }
 
     async fn post(
