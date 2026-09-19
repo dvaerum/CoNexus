@@ -86,6 +86,14 @@ pub struct SharedState {
     /// one is worker-bearer-authed and keyed by `agent_id`, never
     /// reached from the operator dashboard's own doors.
     pub delivery_transport: crate::delivery_transport::DeliveryTransportHub,
+    /// The delivery scheduler's (ADR-0021/ADR-0026) per-worker ping
+    /// bookkeeping (backoff/cooldown state) -- one instance per backend
+    /// process, same scope as `delivery_transport` above. A separate
+    /// field from `delivery_transport` despite both living in the same
+    /// feature area: this one is scheduler-internal state, never
+    /// reached from a REST handler or `Tool::call`, only from
+    /// `crate::delivery_scheduler`'s own tick.
+    pub delivery_scheduler: crate::delivery_scheduler::SchedulerState,
     /// Phase G (sea-orm migration): the sea-orm connection repositories
     /// converted onto sea-orm use, opened ONCE at boot alongside `conn`
     /// above against the SAME underlying SQLite file -- see

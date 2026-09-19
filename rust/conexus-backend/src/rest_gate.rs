@@ -144,6 +144,7 @@ mod tests {
             project_dir: std::env::temp_dir(),
             operator_events: crate::operator_events::OperatorEventsHub::new(),
             delivery_transport: crate::delivery_transport::DeliveryTransportHub::new(),
+            delivery_scheduler: crate::delivery_scheduler::SchedulerState::new(),
             sea_orm_db,
         })
     }

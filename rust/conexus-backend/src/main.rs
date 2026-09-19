@@ -22,6 +22,8 @@ mod auth_gate;
 mod background_tasks;
 mod boot;
 mod delivery_gate;
+mod delivery_policy;
+mod delivery_scheduler;
 mod delivery_transport;
 mod instructions;
 mod json_sanitize;
@@ -145,6 +147,7 @@ async fn main() -> Result<()> {
         project_dir: cli.project_dir.clone(),
         operator_events: operator_events::OperatorEventsHub::new(),
         delivery_transport: delivery_transport::DeliveryTransportHub::new(),
+        delivery_scheduler: delivery_scheduler::SchedulerState::new(),
         sea_orm_db,
     });
 
@@ -385,6 +388,7 @@ mod tests {
             project_dir: std::env::temp_dir(),
             operator_events: operator_events::OperatorEventsHub::new(),
             delivery_transport: delivery_transport::DeliveryTransportHub::new(),
+            delivery_scheduler: delivery_scheduler::SchedulerState::new(),
             sea_orm_db,
         })
     }

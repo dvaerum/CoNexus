@@ -1042,6 +1042,10 @@ pub fn spawn_all(shared: &Arc<SharedState>) {
         shared.clone(),
         rag_indexing::DEFAULT_INTERVAL,
     ));
+    tokio::spawn(crate::delivery_scheduler::run_periodically(
+        shared.clone(),
+        crate::delivery_scheduler::DEFAULT_INTERVAL,
+    ));
 }
 
 #[cfg(test)]
@@ -1200,6 +1204,7 @@ mod subject_backfill_tests {
             project_dir: std::env::temp_dir(),
             operator_events: crate::operator_events::OperatorEventsHub::new(),
             delivery_transport: crate::delivery_transport::DeliveryTransportHub::new(),
+            delivery_scheduler: crate::delivery_scheduler::SchedulerState::new(),
             sea_orm_db,
         });
         (dir, shared)
@@ -1385,6 +1390,7 @@ mod claude_session_monitor_tests {
             project_dir,
             operator_events: crate::operator_events::OperatorEventsHub::new(),
             delivery_transport: crate::delivery_transport::DeliveryTransportHub::new(),
+            delivery_scheduler: crate::delivery_scheduler::SchedulerState::new(),
             sea_orm_db,
         });
         (dir, shared)
