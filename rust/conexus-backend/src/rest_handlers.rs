@@ -99,28 +99,23 @@ pub async fn prompts_catalog() -> Response {
 /// `GET /api/settings-schema` -- the settings-schema registry plus the
 /// caller's own tier flags, for the dashboard's Settings page to
 /// render policy toggles and know whether it may show secret values.
-/// Behind `rest_gate` (operator-tier only, matching Python's
-/// `Depends(require_operator_session)` + inline confirmed-tier gate).
+/// Behind `rest_gate` (any admitted forwarding operator/viewer role, or
+/// an operator-tier bearer -- never unauthenticated or a worker
+/// bearer). No blanket confirmed-operator-tier gate: this endpoint
+/// returns only structural metadata (setting keys/types/defaults/
+/// descriptions), never a setting's actual value, and its sibling
+/// `settings_data` (which DOES carry the values) already admits this
+/// exact caller shape with no such gate -- see its own doc. A prior
+/// version of this handler 403'd every `RestPrincipal::Forwarding`
+/// caller (i.e. every real dashboard session, since the router always
+/// proxies dashboard requests via a signed forwarding header, never a
+/// raw bearer -- `is_confirmed_operator_tier` only ever returns `true`
+/// for `RestPrincipal::OperatorBearer`), making the endpoint
+/// unreachable for every real user including genuine sysadmins;
+/// confirmed live against production before this fix. `confirmed_operator`
+/// stays in the response body below as an informational field the
+/// frontend may still use for other UI decisions.
 pub async fn settings_schema(Extension(resolved): Extension<ResolvedRestPrincipal>) -> Response {
-    // BUG FIX (found while researching PR 7): Python's real handler
-    // 403s the WHOLE response for a non-confirmed caller -- this gate
-    // was missing here since this endpoint's first PR (#852), which
-    // only surfaced `confirmed_operator` as an informational response
-    // field without ever checking it. A forwarding-header caller
-    // (never confirmed on REST, by PR 1's own design) could read the
-    // schema when Python would reject it. Reproduced live before this
-    // fix (200 for a forwarding-operator caller), confirmed 403 after.
-    if !resolved.confirmed_operator_tier {
-        return (
-            StatusCode::FORBIDDEN,
-            Json(json!({
-                "error": "forbidden",
-                "message": "The settings schema is operator-tier only. Use an \
-                    operator-tier session or bearer to read it.",
-            })),
-        )
-            .into_response();
-    }
     let schema: Vec<_> = SETTINGS_SCHEMA
         .iter()
         .map(|s| {
@@ -4650,6 +4645,62 @@ mod tests {
             .unwrap();
         assert_ne!(row["value"], "[redacted]");
         assert_eq!(row["value"], "true");
+    }
+
+    // -----------------------------------------------------------
+    // Bug (confirmed live against production, 2026-09-19):
+    // `settings_schema` blanket-403'd every caller whose
+    // `confirmed_operator_tier` is false. `is_confirmed_operator_tier`
+    // (see its own doc) only ever returns `true` for a real
+    // `RestPrincipal::OperatorBearer` -- NEVER for
+    // `RestPrincipal::Forwarding`, the identity every real
+    // browser/dashboard session becomes, since the router proxies
+    // every dashboard request via a signed forwarding header, never a
+    // raw bearer. That made this endpoint unreachable for every real
+    // dashboard user, including genuine sysadmins. The sibling
+    // endpoint `settings_data` (the ACTUAL setting VALUES) already has
+    // no such blanket gate -- gating the metadata (types/descriptions)
+    // more strictly than the values themselves was incoherent, since
+    // there is no secret in the schema to protect. Fixed to match
+    // `settings_data`'s posture: any admitted REST caller (`rest_gate`
+    // already restricts this route to operator-or-viewer forwarding
+    // roles or an operator bearer) can read the schema;
+    // `confirmed_operator` remains as an informational response field.
+    // -----------------------------------------------------------
+
+    #[tokio::test]
+    async fn settings_schema_is_readable_by_a_non_confirmed_forwarding_operator() {
+        let resolved = resolved_forwarding("op1", conexus_core::capability::ProjectRole::Operator);
+        assert!(!resolved.confirmed_operator_tier);
+        let resp = settings_schema(Extension(resolved)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        let schema = body["schema"].as_array().unwrap();
+        assert!(
+            schema
+                .iter()
+                .any(|s| s["key"] == "config_allow_worker_to_worker"),
+            "expected the real settings schema, got: {body}"
+        );
+        assert_eq!(body["caller"]["confirmed_operator"], false);
+    }
+
+    #[tokio::test]
+    async fn settings_schema_is_readable_by_a_non_confirmed_forwarding_viewer() {
+        let resolved = resolved_forwarding("alice", conexus_core::capability::ProjectRole::Viewer);
+        assert!(!resolved.confirmed_operator_tier);
+        let resp = settings_schema(Extension(resolved)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn settings_schema_is_readable_by_a_confirmed_operator_bearer() {
+        let resolved = resolved_operator_bearer("real-admin-bearer-token");
+        assert!(resolved.confirmed_operator_tier);
+        let resp = settings_schema(Extension(resolved)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert_eq!(body["caller"]["confirmed_operator"], true);
     }
 
     // -----------------------------------------------------------
