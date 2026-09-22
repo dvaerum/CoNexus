@@ -40,12 +40,24 @@ outlives the session that raised it. Each states what it is, its
 current state in the tree, and the concrete need that would justify
 finishing it.
 
-- [`capability-based-authz.md`](./proposals/capability-based-authz.md) — replace coarse role tiers with fine-grained `resource.verb` capabilities sourced from SSO groups + bundles. Foundation partially shipped; feature parked pending a per-group-permissions need.
+- [`capability-based-authz.md`](./proposals/capability-based-authz.md) — fine-grained `resource.verb` capabilities sourced from SSO groups + bundles, replacing coarse role tiers. Resolved by the Rust rewrite — ships in full.
+- [`security-authz-architecture-hardening.md`](./proposals/security-authz-architecture-hardening.md) — a multi-phase security/authz architecture review. Delivered.
+
+### [`learnings/`](./learnings/) — cross-cutting things learned the hard way
+
+One file per topic — table layout quirks, dashboard data-layer
+gotchas, shared test infra, migration-specific traps. Check here
+before re-deriving something.
+
+### [`upstream-issues/`](./upstream-issues/) — tracked upstream bugs
+
+Issues in a dependency (not this project's own code) worth a durable
+note while waiting on an upstream fix.
 
 ### [`audit/`](./audit/) — dated investigations
 
-Capture-what-we-learned reports from one-off investigations.
-Each file is dated and frozen — don't update in place, write a
+Capture-what-we-learned reports from one-off investigations, most
+dated in the filename. Frozen — don't update in place, write a
 new one if the topic resurfaces.
 
 ### [`mcd-example/`](./mcd-example/) — Main Context Document

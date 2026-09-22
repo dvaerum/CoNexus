@@ -152,7 +152,8 @@ conexus-router --port 5454
 
 The router creates the first operator on startup, then unsets both
 env vars in-process so they don't leak into spawned backend
-subprocesses (per agent.create_user → init_router_db).
+subprocesses (`bootstrap_operator_from_env` in
+`conexus-router/src/boot.rs`, which calls `identity::create_user`).
 
 ### CLI (ops fallback, subsequent operators)
 
@@ -166,8 +167,11 @@ echo "$NEW_PW" | conexus-cli router create-operator \
 ```
 
 After first boot, log in at `http://localhost:5454/conexus/login`.
-The session cookie is `conexus_session=<opaque>; HttpOnly; Secure;
-SameSite=Lax; Path=/conexus/`. Sessions live 30 days idle, sliding
+The session cookie is `conexus_session=<opaque>; HttpOnly;
+SameSite=Lax; Path=<mount prefix>` — `Secure` is added only over
+HTTPS or with `CONEXUS_REQUIRE_SECURE_COOKIES` set (plain-HTTP local
+dev, as above, gets no Secure flag); `Path` is `/conexus/` when
+router-mounted, `/` in single-tenant. Sessions live 30 days idle, sliding
 on every dashboard request; revoke immediately with a SQL `DELETE
 FROM sessions WHERE user_id = ...` against `router.db` (no
 `conexus-cli` subcommand for this exists yet — `router create-operator`

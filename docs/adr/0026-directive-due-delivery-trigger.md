@@ -157,16 +157,17 @@ the same way to a schedule the agent's own operator configured.
 
 ## Verification
 
-- `tests/test_delivery_scheduler_due_directives.py`: a connected-but-
-  never-polling worker's overdue directive is fired by `tick()` (the RED
-  case this ADR fixes); frame shape (`directive.data.prompt`,
-  `source == "schedule"`); a not-yet-due directive is not pushed and
-  `run_count` stays unchanged; a disconnected agent's directive row is
-  never read by `tick()` (protects offline-fire-once-on-reconnect); the
-  per-trigger `on_due_directives` toggle suppresses the new path; the
-  master `config_delivery_enabled` switch short-circuits before the
-  directive branch entirely.
-- Existing suites (`test_delivery_scheduler.py`, `test_delivery_policy.py`,
-  `test_scheduled_directive_firing.py`, `test_delivery_transport.py`,
-  `test_settings_schema.py`) remain green — no behavior change to the
-  paths they cover.
+The original Python verification suite (`tests/test_delivery_scheduler_
+due_directives.py` and its siblings `test_delivery_scheduler.py`,
+`test_delivery_policy.py`, `test_scheduled_directive_firing.py`,
+`test_delivery_transport.py`, `test_settings_schema.py`) pinned: a
+connected-but-never-polling worker's overdue directive firing on tick
+(the RED case this ADR fixes); frame shape (`directive.data.prompt`,
+`source == "schedule"`); a not-yet-due directive not pushed and
+`run_count` unchanged; a disconnected agent's directive row never read
+(protects offline-fire-once-on-reconnect); the per-trigger
+`on_due_directives` toggle and master `config_delivery_enabled` switch
+both suppressing the new path. Deleted along with the rest of the
+Python tree in the Rust migration — `collect_due_and_fire` is now
+called from `conexus-wakeloop::event_feed`'s own collector (see that
+crate's tests for the current coverage of this scenario set).

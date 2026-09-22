@@ -113,8 +113,10 @@ project-lifecycle/admin surface now lives entirely under
 
 PR-B (v4.0.0) renamed the top-level prefixes from
 `/__api` / `/__dashboard` / `/__dashboard/_next` to `/api` / `/app` /
-`/assets`. The old paths 308-redirect to the new ones during a 30-day
-grace period for external services and bookmarks.
+`/assets`. The 30-day redirect grace period this rename shipped with
+has since ended — the old `__`-prefixed paths are gone from real
+routing entirely (`rust/conexus-router/src/main.rs` mounts only
+`/api`/`/app`/`/assets`).
 
 The descriptor is Accept-negotiated: a browser (`Accept: text/html`)
 sees the existing 302 → `/conexus/app/`; everything else
@@ -132,6 +134,7 @@ operation.
   router can serve right now.
 - `current_default` names the version recommended for new clients
   (used to be `v1`; bump in lockstep with the major).
-- Old versions are removed only across a fork-major bump (current:
-  `3.x` accepts v1; `4.x` will still accept v1, with v2 alongside;
-  `5.x` may drop v1).
+- Old versions are removed only across a fork-major bump. Currently
+  at 5.x with only v1 defined (`API_MEDIA_TYPE` in
+  `rust/conexus-router/src/mcp_handler.rs`) — no v2 has shipped yet,
+  so this policy hasn't been exercised in practice.

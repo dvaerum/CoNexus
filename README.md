@@ -94,8 +94,11 @@ paths:
    operators after first boot.
 
 After first boot, navigate to `http://localhost:5454/conexus/login`
-to authenticate. The session cookie is HttpOnly + Secure +
-SameSite=Lax, scoped to `/conexus/`. Agent-side MCP traffic
+to authenticate. The session cookie is HttpOnly + SameSite=Lax,
+scoped to the deployment's mount prefix (`/conexus/` when
+router-mounted, `/` single-tenant) — Secure only over HTTPS or with
+`CONEXUS_REQUIRE_SECURE_COOKIES` set (plain-HTTP local dev, like the
+`localhost` example above, gets no Secure flag). Agent-side MCP traffic
 (`/conexus/mcp/<project>`) uses an `Authorization: Bearer
 <agent_token>` header sourced from the `agents` table — agents don't
 need to be aware of the operator login.
@@ -528,28 +531,6 @@ Traditional long-context agents are like giving someone your entire codebase, do
 - **Deterministic behavior** - Limited context means predictable outputs
 - **Audit trails** - Every agent action is logged and traceable
 - **Rollback capability** - Mistakes are isolated to specific tasks
-
-### The Cleanup Protocol: Keeping Your System Lean
-
-CoNexus enforces strict lifecycle management:
-
-**Maximum 10 Active Agents**
-- Hard limit prevents resource exhaustion
-- Forces thoughtful task allocation
-- Maintains system performance
-
-**Automatic Cleanup Rules**
-- Agent finishes task → Immediately terminated
-- Agent idle 60+ seconds → Killed and task reassigned
-- Need more than 10 agents → Least productive agents removed
-
-**Why This Matters**
-- **No zombie processes** eating resources
-- **Fresh context** for every task
-- **Predictable resource usage**
-- **Clean system state** always
-
-This isn't just housekeeping - it's fundamental to the security and performance benefits of the short-lived agent model.
 
 ### The Fundamental Principle
 

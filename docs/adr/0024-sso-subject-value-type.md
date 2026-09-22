@@ -4,6 +4,10 @@
 algorithm" bullet (and the proxy-header section's "same algorithm as
 OIDC's" reference to it), which had drifted from the code for six
 pentest rounds.
+**Update**: ported to Rust — `rust/conexus-router/src/sso_subject.rs`
+preserves the wire format, type-tag, legacy-fallback, and ambiguity
+logic below bit-for-bit (its own doc comment cites this file as its
+port target).
 **Date**: 2026-08-23
 **Builds on**: ADR-0013 (operator login — the `users` table this keys
 into), ADR-0015 (SSO via OIDC + proxy-header trust — the flow this sits

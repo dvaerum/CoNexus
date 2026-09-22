@@ -7,7 +7,7 @@ docstring holding it, and a regression test broad enough to catch the
 near-miss that prompted it.
 **Date**: 2026-08-24
 **Update**: ported to Rust — `conexus-core::principal::is_confirmed_operator_tier`
-(`rust/conexus-core/src/principal.rs:203`, MCP side) and
+(`rust/conexus-core/src/principal.rs:211`, MCP side) and
 `conexus-backend::rest_principal::is_confirmed_operator_tier`
 (`rust/conexus-backend/src/rest_principal.rs:198`, REST side) both
 preserve this exclusion bit-for-bit; the Links section below cites the

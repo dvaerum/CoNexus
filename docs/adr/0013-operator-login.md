@@ -36,8 +36,11 @@ Operators must log in to the dashboard. The router gains:
 - A `/var/lib/conexus/router.db` SQLite store for `users`,
   `sessions`, and `project_membership`.
 - A `POST /conexus/login` form that creates a server-side session
-  and sets an opaque `conexus_session` cookie (HttpOnly, Secure,
-  SameSite=Lax, Path=/conexus/).
+  and sets an opaque `conexus_session` cookie (HttpOnly, SameSite=Lax,
+  Path scoped to the deployment's mount prefix). Secure is added only
+  over HTTPS or with `CONEXUS_REQUIRE_SECURE_COOKIES` set — plain-HTTP
+  local dev gets no Secure flag (`conexus-router/src/boot.rs` warns at
+  startup when this applies to a non-loopback bind).
 - A `require_operator_session` aiohttp middleware that gates every
   dashboard mutation/read on a valid session cookie + project
   membership (for project-scoped paths).

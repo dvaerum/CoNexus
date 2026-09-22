@@ -26,14 +26,15 @@ status value that falls outside all four buckets. Reproduced the
 original repro shape (create 3, terminate 2) against current code: the
 Total card and the four buckets agree.
 
-## "System Online" sidebar indicator is hardcoded
+## Header's server-online dot is hardcoded
 
-The dashboard sidebar's online/offline indicator is hardcoded true
-upstream; the dashboard actually polls REST `/all-data`, which always
-succeeds because the router cold-starts the backend on demand
-regardless of whether anything is actually healthy. A real indicator
-needs a dedicated health endpoint backed by genuine systemd/process
-state, not "the aggregate endpoint didn't 500."
+The project chip in the dashboard header (`dashboard-header.tsx`,
+marked `CC-19: static server-online dot`) is a hardcoded-on indicator,
+not derived from real health; the dashboard actually polls REST
+`/all-data`, which always succeeds because the router cold-starts the
+backend on demand regardless of whether anything is actually healthy.
+A real indicator needs a dedicated health endpoint backed by genuine
+systemd/process state, not "the aggregate endpoint didn't 500."
 
 ## "Server Management" sidebar item is vestigial
 

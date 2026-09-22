@@ -107,17 +107,19 @@ secret classification (`_SECRET_SETTING_KEYS`, now bound to the schema's
 
 * **PR 2 (frontend):** consume `GET /api/settings-schema`, render via a
   type→widget registry, group data-driven, disable sysadmin widgets for
-  non-sysadmin callers, header/toast parity. Depends on this PR's
-  endpoint.
+  non-sysadmin callers, header/toast parity. **Shipped** —
+  `conexus/dashboard/components/dashboard/settings-dashboard.tsx` +
+  `lib/api/settings.ts` consume the endpoint.
 
 ## Verification
 
-* `tests/test_settings_schema.py` — the golden-default table (12 keys
-  byte-identical, the no-behaviour-change proof), the tier↔`_CONFIG_AOE_KEY_RE`
-  agreement invariant, `KNOWN_SETTING_KEYS` completeness, the
-  `SECRET_SETTING_KEYS` derivation, and the `GET /api/settings-schema`
-  endpoint (confirmed-operator 200 with 12 rows, non-confirmed 403,
-  unauthenticated 401, sysadmin caller block).
+The decision's test surface (the golden-default table, tier↔gate
+agreement invariant, `KNOWN_SETTING_KEYS` completeness,
+`SECRET_SETTING_KEYS` derivation, and the endpoint's auth matrix) was
+originally pinned in `tests/test_settings_schema.py`, since deleted
+along with the rest of the Python tree in the Rust migration; the
+equivalent coverage now lives in `rust/conexus-core/src/settings_schema.rs`
+and `rust/conexus-backend/src/rest_handlers.rs`'s own test modules.
 * The full existing suite is the repoint's guard: any worker-policy /
   retention / AoE gate that flipped behaviour would fail its existing
   test — none do.
