@@ -15,10 +15,10 @@ identically in `conexus-tools`' Rust catalog too.
 
 - `assign_task` — single-task mode uses `task_title`/`task_description`;
   bulk mode uses a `tasks` array.
-- `bulk_task_operations` — `operations[].type` includes `create`,
-  `update_status`, `update_priority`, `add_note`, `reassign`. The
-  `add_note` op takes a `notes` field; the `update_status` op takes a
-  `status` field (not `new_status`).
+- `bulk_task_operations` — `operations[].type` is
+  `update_status`/`update_priority`/`add_note`/`reassign` (no `create`
+  op exists). The `add_note` op takes a `content` field; the
+  `update_status` op takes a `status` field (not `new_status`).
 - `update_task_status` — takes `task_id` + `status`, and `status` is
   *required* even when the caller only wants to add a note via the
   same tool (no note-only mode).

@@ -207,7 +207,7 @@ now **two** separate implementations for the **two** identity types
 that need it, since `Principal` and `RestPrincipal` can't represent
 each other's admission shapes:
 
-* `conexus-core/src/principal.rs:203` — the MCP-side predicate, over
+* `conexus-core/src/principal.rs:211` — the MCP-side predicate, over
   `Principal`.
 * `conexus-backend/src/rest_principal.rs:198` — the REST-side
   predicate, over `RestPrincipal`.
@@ -348,9 +348,9 @@ cross-reference:
   `conexus-backend/src/rest_principal.rs`.
 * **"cookie session"** = `PrincipalKind::OperatorSession` (MCP side —
   proxied by the router as a `ForwardingHeader` to the backend) /
-  `GateIdentity` (`conexus-router/src/session_gate.rs:125`, the
+  `GateIdentity` (`conexus-router/src/session_gate.rs:124`, the
   router's own resolved cookie identity, evaluated by
-  `evaluate_session_gate`, `conexus-router/src/session_gate.rs:313`):
+  `evaluate_session_gate`, `conexus-router/src/session_gate.rs:318`):
   the dashboard's `conexus_session` cookie (ADR-0013).
 * **`RestPrincipal::OperatorBearer`** — the REST-only variant (see
   above) — not a `PrincipalKind` value, a per-agent manager-role
@@ -403,6 +403,6 @@ site, there is nothing left to cross-check.
 | `CatalogRole` | catalog-listing bucket for a *caller* | enum (3 variants) | `conexus-core/src/principal.rs:139` |
 | `is_operator_tier` | can this caller write project config | `fn -> bool` | `conexus-core/src/principal.rs:122` |
 | sysadmin | does this caller hold the wildcard cap | `Capabilities::Sysadmin` variant | `conexus-core/src/capability.rs:194` |
-| `is_confirmed_operator_tier` | may this caller see plaintext secrets | `fn -> bool` (×2: MCP + REST) | `conexus-core/src/principal.rs:203`, `conexus-backend/src/rest_principal.rs:198` |
+| `is_confirmed_operator_tier` | may this caller see plaintext secrets | `fn -> bool` (×2: MCP + REST) | `conexus-core/src/principal.rs:211`, `conexus-backend/src/rest_principal.rs:198` |
 | `Requirement` | what a tool demands of the caller | enum (4 shapes) | `conexus-auth/src/requirement.rs:98` |
-| `GateIdentity` | the router's own resolved cookie identity | struct | `conexus-router/src/session_gate.rs:125` |
+| `GateIdentity` | the router's own resolved cookie identity | struct | `conexus-router/src/session_gate.rs:124` |

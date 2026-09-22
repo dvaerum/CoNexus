@@ -53,9 +53,12 @@ The URL surface is identical in both modes.
 - One URL surface to test, document, and bookmark. Operators who started
   single-tenant and grew into multi-tenant don't have to update their
   bookmarks or `.mcp.json` files.
-- Today's two router bugs (SPA fallback `c1d85d9` and aiohttp trailing-slash
-  `ffd1c4a`) would have been one fix each rather than two — the router-less
-  path would have re-introduced the same bug classes in a second code path.
+- Today's two router bugs (a SPA-fallback bug and an aiohttp
+  trailing-slash bug, both in the now-deleted Python router — their
+  commit hashes no longer resolve after the Rust migration's history
+  squash) would have been one fix each rather than two — the
+  router-less path would have re-introduced the same bug classes in a
+  second code path.
 - Future "deploy at a different URL prefix" works the same way in both modes
   (Phase 4 sentinel substitution at install time).
 - The `multiTenant` option in home-manager stays a pure UI affordance — no
@@ -77,6 +80,7 @@ The URL surface is identical in both modes.
   plan — an ephemeral Claude Code plan-mode file, never committed to
   this repo, no longer available. This ADR is the durable record.
 - Phase 3 PR (when it ships) for the `multiTenant` toggle implementation.
-- Commit `c1d85d9` (router SPA fallback fix) and commit `ffd1c4a` (router
-  aiohttp trailing-slash fix) — concrete examples of the bug class this
-  decision prevents from doubling.
+- The router SPA-fallback fix and the router aiohttp trailing-slash
+  fix (both in the deleted Python router; see the note above) —
+  concrete examples of the bug class this decision prevents from
+  doubling.

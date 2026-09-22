@@ -68,6 +68,10 @@ Three modes:
   Discovery via `/.well-known/openid-configuration`. PKCE is mandatory
   (`code_challenge_method=S256`). id_token decode + signature
   validation via Authlib's JWS surface against the IdP's JWKS.
+  **Since superseded** by the Rust port's own choice, the
+  `openidconnect` crate (`rust/conexus-router/Cargo.toml`) — same
+  PKCE/discovery/JWKS shape, no dedicated ADR for the swap since the
+  library changed, not the design this ADR records.
 * **Routes**: `GET /conexus/sso/login` initiates the flow with a
   per-flow cookie binding the state + PKCE verifier to the browser;
   `GET /conexus/sso/callback` validates the cookie matches the

@@ -490,7 +490,6 @@ Once your local embeddings are working:
 
 - **Ollama Documentation**: https://ollama.ai/docs
 - **CoNexus README**: [README.md](../../README.md)
-- **Discord Community**: [Join for help](https://discord.gg/7Jm7nrhjGn)
 
 ---
 

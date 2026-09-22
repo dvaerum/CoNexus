@@ -55,10 +55,13 @@ frontend consumes it.
 
 3. **`GET /api/settings-schema`** (on `app/routers/settings.py`) returns
    `{schema: [spec-as-JSON…], caller: {sysadmin, confirmed_operator}}`.
-   Gated to a confirmed operator tier (403 otherwise), mirroring the
-   `/api/tokens` pattern. The `caller` block lets the frontend disable
-   sysadmin-tier widgets for a non-sysadmin operator without a second
-   round-trip.
+   Originally gated to a confirmed operator tier (403 otherwise),
+   mirroring the `/api/tokens` pattern — **since removed**: that gate
+   403'd every `RestPrincipal::Forwarding` caller, making the endpoint
+   unreachable for any real dashboard session (see
+   `rest_handlers.rs::settings_schema`'s own doc comment). The `caller`
+   block still lets the frontend disable sysadmin-tier widgets for a
+   non-sysadmin operator without a second round-trip.
 
 4. **HYBRID tier-enforcement.** The proven `_CONFIG_AOE_KEY_RE` sysadmin
    gate in `tools/project_settings_tools.py` stays the **enforcer** —

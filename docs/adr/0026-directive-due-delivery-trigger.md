@@ -46,10 +46,14 @@ on principle.
 
 Add `directive.due` as a new trigger on the existing delivery-transport
 background scheduler, reusing 100% of the existing SSE transport,
-connectivity registry, and background-loop wiring. **Zero changes to
-`aoe-bridge/` (Rust)** — it is deliberately policy-blind (ADR-0021:
-"conexus owns policy, the runtime owns delivery") and already just
-relays whatever frame arrives on the stream it subscribes to.
+connectivity registry, and background-loop wiring. At the time this
+decision was made, `aoe-bridge/` (Rust) needed no changes — it was
+policy-blind (ADR-0021: "conexus owns policy, the runtime owns
+delivery") and just relayed whatever frame arrived on the stream it
+subscribes to. `aoe-bridge/src/render.rs` has since grown a real
+`reason == "directive_due" || "poke_due"` branch to render a
+directive's prompt inline (see that file's own doc comments) — a later,
+separate change, not part of this decision.
 
 `tick()` gains a second, additive per-connected-agent step:
 `_fire_due_directives()` calls the SAME `collect_due_and_fire()` the
@@ -131,8 +135,10 @@ the same way to a schedule the agent's own operator configured.
 - No behavior change to the `wait_for_events`-native path:
   `collect_due_and_fire` and `_collect_scheduled_directive_events_for` are
   untouched; the new tick step is a second, unmodified caller.
-- Zero `aoe-bridge/` (Rust) changes — confirmed by design (policy-blind
-  relay, no branching on `reason` today).
+- Zero `aoe-bridge/` (Rust) changes at the time of this decision
+  (policy-blind relay, no branching on `reason` yet) — `render.rs` has
+  since gained a `directive_due`/`poke_due` render branch as a later,
+  separate change.
 
 **Negative / risks**
 - `data.prompt` is not skinny-redacted like the other three delivery

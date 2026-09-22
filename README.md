@@ -3,8 +3,6 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rinadelph/Agent-MCP)
 
 > 🚀 **Advanced Tool Notice**: This framework is designed for experienced AI developers who need sophisticated multi-agent orchestration capabilities. CoNexus requires familiarity with AI coding workflows, MCP protocols, and distributed systems concepts. We're actively working to improve documentation and ease of use. If you're new to AI-assisted development, consider starting with simpler tools and returning when you need advanced multi-agent capabilities.
->
-> 💬 **Join the Community**: Connect with us on [Discord](https://discord.gg/7Jm7nrhjGn) to get help, share experiences, and collaborate with other developers building multi-agent systems.
 
 Multi-Agent Collaboration Protocol for coordinated AI software development.
 
@@ -137,7 +135,7 @@ an explicit version-pinned `Accept` header — see
 Once a manager agent is connected, these MCP tools are the most
 common entry points. The dashboard's Tools tab is the canonical
 inventory (descriptions and arg schemas are generated from
-`conexus/tools/*`).
+`rust/conexus-tools/src/*`).
 
 **Agent management** — `register_agent` (mints a token + `.mcp.json`
 snippet to paste into the user's own claude — conexus no longer
@@ -335,7 +333,7 @@ AUTO --worker --memory
 ```
 
 Once a worker connects, the dashboard's agents list switches it from
-"PENDING" (registered but never connected) to "ONLINE" — that's the
+"OFFLINE" (registered but never connected) to "ONLINE" — that's the
 signal the worker's claude is wired up and the bearer is being
 honoured by the MCP server.
 
@@ -665,7 +663,7 @@ Verify all workers are initialized with the `--worker` flag for proper coordinat
 3. Reinstall dashboard dependencies
 
 **"Memory queries returning stale data"**  
-Run memory garbage collection through the dashboard or restart with `--refresh-memory`.
+Restart the affected project's backend (`systemctl --user restart conexus@<project>`) to force a fresh read.
 
 ## Documentation
 
@@ -683,7 +681,6 @@ straight to the most common entry points:
 ## Community and Support
 
 **Get Help**
-- [Discord Community](https://discord.gg/7Jm7nrhjGn) - Active developer discussions
 - [GitHub Issues](https://github.com/dvaerum/CoNexus/issues) - Bug reports and features (this fork; see [CONTRIBUTING.md](CONTRIBUTING.md) for the upstream/fork split)
 - [Discussions](https://github.com/dvaerum/CoNexus/discussions) - Share your experiences
 

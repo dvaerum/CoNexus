@@ -211,9 +211,9 @@ walkthrough.
 
 A handful of legacy `--admin-token-*` / `--system-token-*` CLI flags
 existed transitionally between Phase 2 Wave 1b and `retire-system-
-token` Wave 3; they're all gone. Spawned agents receive their token
-via the `MCP_AGENT_TOKEN` env var stamped into the tmux session by
-`create_agent` — no global token file is written anywhere.
+token` Wave 3; they're all gone, along with the tmux-spawn model that
+once stamped a token into a spawned session — no global token file is
+written anywhere.
 
 ---
 
@@ -560,7 +560,6 @@ npm run dev
 3. **Suggest Features** - Shape the future of AI collaboration
 
 ### Stay Connected
-- **[Discord Community](https://discord.gg/7Jm7nrhjGn)** - Daily discussions and support
 - **[GitHub](https://github.com/dvaerum/CoNexus)** - Source code and issue tracking (this fork)
 - **[Documentation](../README.md)** - Comprehensive guides and references
 
