@@ -53,6 +53,11 @@ let
     ProtectHome = true;
     ReadWritePaths = [ cfg.stateDir cfg.runtimeDir ];
   };
+
+  # Shared ExecStart/ExecStartPre construction — see nix/conexus-exec.nix's
+  # own module doc for why this is a plain function file (mirroring
+  # hardening.nix's role) rather than a shared options module.
+  conexusExec = import ./conexus-exec.nix { inherit lib pkgs; };
 in {
   options.services.conexus = {
     enable = lib.mkEnableOption "conexus (multi-tenant router + per-project backends)";
@@ -221,14 +226,15 @@ in {
         # system bus, which requires root or polkit grants. Root
         # is the path of least friction inside a single-purpose VM.
         AmbientCapabilities = [ ];
-        ExecStart =
-          "${cfg.conexusRouterPackage}/bin/conexus-router "
-          + "--port ${toString cfg.routerPort} "
-          + "--projects-file ${cfg.stateDir}/projects.local.json "
-          + "--sock-dir ${cfg.runtimeDir} "
-          + "--dashboard-dir ${pkgs'.conexusDashboard}/share/conexus-dashboard "
-          + "--external-url ${lib.escapeShellArg cfg.externalUrl} "
-          + "--idle-sec 14400";
+        ExecStart = conexusExec.routerExecStart {
+          routerPackage = cfg.conexusRouterPackage;
+          port = cfg.routerPort;
+          projectsFile = "${cfg.stateDir}/projects.local.json";
+          sockDir = cfg.runtimeDir;
+          dashboardPackage = pkgs'.conexusDashboard;
+          externalUrl = cfg.externalUrl;
+          idleSec = 14400;
+        };
         Restart = "on-failure";
         RestartSec = 10;
       } // systemHardening;
@@ -296,21 +302,13 @@ in {
           "CONEXUS_PROJECTS_FILE=${cfg.stateDir}/projects.local.json"
           "CONEXUS_SOCK_DIR=${cfg.runtimeDir}"
         ];
-        # F015 v4: generate the per-project HMAC key in the unit
-        # ExecStartPre (not the router) so EVERY path that starts
-        # the unit guarantees the file exists. Owning key generation
-        # in the unit ExecStartPre makes the file a unit-lifecycle
-        # invariant: present whenever the unit is starting, regardless
-        # of who triggered the start (manual, on-failure restart, the
-        # router's lazy-spawn).
-        # F015 v6: coreutils does NOT ship `sh` — the original v4
-        # interpolation (``${pkgs.coreutils}/bin/sh``) failed with
-        # ``status=203/EXEC`` on every backend start. ``runtimeShell``
-        # resolves to the bash/dash/POSIX shell appropriate for the
-        # platform. ``head`` and ``chmod`` ARE in coreutils.
+        # F015 v4/v6 (HMAC key generation, `runtimeShell` over
+        # coreutils' missing `sh`): see nix/conexus-exec.nix's own doc
+        # comment on `hmacSeedExecStartPre` — same logic, shared with
+        # nix/home-manager-module.nix's identical unit.
         ExecStartPre = [
-          "${pkgs.runtimeShell} -c 'test -f \"$RUNTIME_DIRECTORY/forwarding_hmac\" || { ${pkgs.coreutils}/bin/head -c 32 /dev/urandom > \"$RUNTIME_DIRECTORY/forwarding_hmac\" && ${pkgs.coreutils}/bin/chmod 600 \"$RUNTIME_DIRECTORY/forwarding_hmac\"; }'"
-          "${pkgs.coreutils}/bin/rm -f ${cfg.runtimeDir}/%i/backend.sock"
+          conexusExec.hmacSeedExecStartPre
+          (conexusExec.staleSocketExecStartPre cfg.runtimeDir)
         ];
         ExecStart = "${cfg.conexusLauncherPackage}/bin/conexus-launcher %i";
         Restart = "on-failure";

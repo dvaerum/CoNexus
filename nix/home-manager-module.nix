@@ -125,6 +125,11 @@ let
   # home-blocking sandbox would crash-loop the units.
   hardening = import ./hardening.nix;
 
+  # Shared ExecStart/ExecStartPre construction — see nix/conexus-exec.nix's
+  # own module doc for why this is a plain function file (mirroring
+  # hardening.nix's role) rather than a shared options module.
+  conexusExec = import ./conexus-exec.nix { inherit lib pkgs; };
+
   # ── Single-tenant ExecStartPre seed ───────────────────────────────
   # When the module is configured for N=1 (`multiTenant = false` +
   # `singleProject = {…}`), we seed ~/.config/conexus/projects.local.json
@@ -779,8 +784,8 @@ in {
           # the tree).
           RuntimeDirectoryPreserve = "yes";
           ExecStartPre = [
-            "${pkgs.runtimeShell} -c 'test -f \"$RUNTIME_DIRECTORY/forwarding_hmac\" || { ${pkgs.coreutils}/bin/head -c 32 /dev/urandom > \"$RUNTIME_DIRECTORY/forwarding_hmac\" && ${pkgs.coreutils}/bin/chmod 600 \"$RUNTIME_DIRECTORY/forwarding_hmac\"; }'"
-            "${pkgs.coreutils}/bin/rm -f %t/conexus/%i/backend.sock"
+            conexusExec.hmacSeedExecStartPre
+            (conexusExec.staleSocketExecStartPre "%t/conexus")
           ];
           ExecStart = "${cfg.conexusLauncherPackage}/bin/conexus-launcher %i";
           Restart = "on-failure";
@@ -891,22 +896,16 @@ in {
           ExecStartPre = lib.mkIf (!cfg.multiTenant) [
             "${singleProjectSeedScript}"
           ];
-          ExecStart =
-            let
-              commonFlags =
-                "--port ${toString cfg.router.port} "
-                + "--projects-file %h/.config/conexus/projects.local.json "
-                + "--sock-dir %t/conexus "
-                + "--dashboard-dir ${cfg.dashboard.package}/share/conexus-dashboard "
-                + "--external-url ${lib.escapeShellArg cfg.router.externalUrl} "
-                + "--idle-sec ${toString cfg.router.idleSec}";
-            in
-            if cfg.multiTenant then
-              "${cfg.conexusRouterPackage}/bin/conexus-router " + commonFlags
-            else
-              "${cfg.conexusRouterPackage}/bin/conexus-router " + commonFlags + " "
-              + "--single-tenant ${lib.escapeShellArg cfg.singleProject.name} "
-              + "--single-workspace ${lib.escapeShellArg cfg.singleProject.workspace}";
+          ExecStart = conexusExec.routerExecStart {
+            routerPackage = cfg.conexusRouterPackage;
+            port = cfg.router.port;
+            projectsFile = "%h/.config/conexus/projects.local.json";
+            sockDir = "%t/conexus";
+            dashboardPackage = cfg.dashboard.package;
+            externalUrl = cfg.router.externalUrl;
+            idleSec = cfg.router.idleSec;
+            singleProject = if cfg.multiTenant then null else cfg.singleProject;
+          };
           Restart = "on-failure";
           RestartSec = 10;
           # Defense-in-depth ceiling on the SIGTERM → exit window,
