@@ -1,14 +1,8 @@
 # CoNexus
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rinadelph/Agent-MCP)
-
 > 🚀 **Advanced Tool Notice**: This framework is designed for experienced AI developers who need sophisticated multi-agent orchestration capabilities. CoNexus requires familiarity with AI coding workflows, MCP protocols, and distributed systems concepts. We're actively working to improve documentation and ease of use. If you're new to AI-assisted development, consider starting with simpler tools and returning when you need advanced multi-agent capabilities.
 
 Multi-Agent Collaboration Protocol for coordinated AI software development.
-
-<div align="center">
-  <img src="assets/images/agent-network-viz.png" alt="Agent Network Visualization" width="600">
-</div>
 
 Think **Obsidian for your AI agents** - a living knowledge graph where multiple AI agents collaborate through shared context, intelligent task management, and real-time visualization. Watch your codebase evolve as specialized agents work in parallel, never losing context or stepping on each other's work.
 
@@ -32,17 +26,9 @@ Multiple specialized agents work simultaneously on different parts of your codeb
 
 **Persistent Knowledge Graph**  
 
-<div align="center">
-  <img src="assets/images/memory-bank.png" alt="Memory Bank Interface" width="800">
-</div>
-
 Your project's entire context lives in a searchable, persistent memory bank. Agents query this shared knowledge to understand requirements, architectural decisions, and implementation details. Nothing gets lost between sessions.
 
 **Intelligent Task Management**  
-
-<div align="center">
-  <img src="assets/images/agent-fleet.png" alt="Agent Fleet Management" width="800">
-</div>
 
 Monitor every agent's status, assigned tasks, and recent activity. The system automatically manages task dependencies, prevents conflicts, and ensures work flows smoothly from planning to implementation.
 
