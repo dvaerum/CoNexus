@@ -104,6 +104,14 @@ in {
   # the `router.impl` A/B flip between them were retired.
   routerExecStart = units."conexus-router".Service.ExecStart;
   backendExecStart = units."conexus@".Service.ExecStart;
+  # The forwarding_hmac key-generation + stale-socket-removal logic
+  # (PRs #214/#216/#217, F015 v3/v4/v6) — since nix/conexus-exec.nix's
+  # extraction, this is real evaluated output of shared logic rather
+  # than literal text in home-manager-module.nix, so a source-text
+  # grep can no longer pin it; consumed by
+  # nix/tests/checks/home-manager-module-units.sh.
+  backendExecStartPre = units."conexus@".Service.ExecStartPre;
+  routerExecStartPre = units."conexus-router".Service.ExecStartPre or [ ];
   routerEnvironment = units."conexus-router".Service.Environment;
 
   # RuntimeDirectoryPreserve regression guard (live incident,

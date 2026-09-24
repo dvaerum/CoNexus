@@ -105,102 +105,100 @@ if ! grep -qP 'RuntimeDirectory\s*=\s*"conexus/%i"' <<<"$BLOCK"; then
   fail=1
 fi
 
-# test_backend_template_generates_forwarding_hmac:
-# The per-project backend unit's ExecStartPre must include a script
-# that creates `forwarding_hmac` from /dev/urandom when missing.
+# test_backend_template_references_shared_hmac_seed_logic:
+# The per-project backend unit's ExecStartPre must reference the
+# shared forwarding_hmac generator + stale-socket-cleanup helpers
+# from nix/conexus-exec.nix, not a re-inlined or missing copy.
 #
-# The NixOS module ships exactly this; the home-manager template
-# must mirror it. The drift caused real deploys to crash-loop with
-# `--forwarding-hmac-in` pointing at a non-existent file.
-if ! grep -qF 'forwarding_hmac' <<<"$BLOCK"; then
-  echo 'FAIL: home-manager-module.nix: "conexus@" service must contain an' \
-    'ExecStartPre that generates the forwarding_hmac key file. The' \
-    'NixOS module gained this in PR #214 (F015 v4); the home-manager' \
-    'template was never updated, causing backend crash-loop with' \
+# Since that extraction (2026-09-24), the actual generator SHELL
+# TEXT (head -c 32 /dev/urandom, chmod 600, runtimeShell, the
+# idempotent test -f guard, the backend.sock rm -f) is no longer
+# literal text in this file — it lives in nix/conexus-exec.nix and is
+# proven correct there (see the real-evaluation tier below), which
+# ALSO proves it for nix/module.nix's identical consumption. This
+# structural check only pins that home-manager-module.nix still
+# WIRES that shared logic in, rather than silently dropping it.
+if ! grep -qF 'conexusExec.hmacSeedExecStartPre' <<<"$BLOCK"; then
+  echo 'FAIL: home-manager-module.nix: "conexus@" service must wire in' \
+    'conexusExec.hmacSeedExecStartPre (nix/conexus-exec.nix). The' \
+    'NixOS module gained this key-generation logic in PR #214 (F015' \
+    'v4); dropping it here reopens the exact crash-loop it fixed:' \
     "Error: Invalid value for '--forwarding-hmac-in': File '...'" \
     'does not exist.' >&2
   fail=1
 fi
 
-# The generator must read from /dev/urandom (head -c 32). Match the
-# head invocation that produces 32 bytes.
-if ! grep -qP 'head\s+-c\s+32\s+/dev/urandom' <<<"$BLOCK"; then
-  echo 'FAIL: home-manager-module.nix: forwarding_hmac generator must use' \
-    '`head -c 32 /dev/urandom` (32 raw bytes). The NixOS module'"'"'s' \
-    'pattern is the reference; bytes are binary and must NOT be' \
-    'stripped or transformed (see PR #217).' >&2
-  fail=1
-fi
-
-# The mode must be 0600 — set via chmod after creation.
-if ! grep -qP 'chmod\s+600' <<<"$BLOCK"; then
-  echo 'FAIL: home-manager-module.nix: forwarding_hmac must be chmod 600' \
-    'after creation; the key is sensitive material.' >&2
-  fail=1
-fi
-
-# test_backend_template_uses_runtime_shell_for_execstartpre:
-# The ExecStartPre script that generates forwarding_hmac must use
-# `pkgs.runtimeShell`, not `${pkgs.coreutils}/bin/sh`.
-#
-# PR #216 (F015 v6): coreutils does NOT ship `sh`. The original
-# F015 v4 used `${pkgs.coreutils}/bin/sh` and the unit failed every
-# start with `status=203/EXEC`. The fix is `pkgs.runtimeShell`.
-hmac_lines="$(grep -F 'forwarding_hmac' <<<"$BLOCK" || true)"
-if [ -z "$hmac_lines" ]; then
-  echo "FAIL: forwarding_hmac line not found (other check catches this)" >&2
-  fail=1
-else
-  if ! grep -qF 'pkgs.runtimeShell' <<<"$hmac_lines"; then
-    echo 'FAIL: home-manager-module.nix: the ExecStartPre that generates' \
-      'forwarding_hmac must invoke `${pkgs.runtimeShell}`. Using' \
-      '`${pkgs.coreutils}/bin/sh` fails with 203/EXEC because coreutils' \
-      'does not ship sh (PR #216 / F015 v6).' >&2
-    fail=1
-  fi
-fi
-
-# Defense in depth: the bad pattern from F015 v4 must NOT appear
-# in any non-comment line.
-bad_lines="$(grep -F '${pkgs.coreutils}/bin/sh' <<<"$BLOCK" | grep -vP '^\s*#' || true)"
-if [ -n "$bad_lines" ]; then
-  echo 'FAIL: home-manager-module.nix: ${pkgs.coreutils}/bin/sh in the' \
-    '"conexus@" service breaks every start with status=203/EXEC.' \
-    'Use ${pkgs.runtimeShell} instead (PR #216 / F015 v6).' \
-    "Bad lines: $bad_lines" >&2
-  fail=1
-fi
-
-# test_backend_template_generator_is_idempotent:
-# The forwarding_hmac generator must be a no-op if the file already
-# exists (the router caches the bytes in memory; rotating the key on
-# every restart would break the cache invariant — see commit
-# 862e594).
-#
-# The pattern is `test -f <path> || { generate; }` — only create
-# when missing.
-if ! grep -qP 'test\s+-f\s+[^|]*forwarding_hmac' <<<"$BLOCK"; then
-  echo 'FAIL: home-manager-module.nix: forwarding_hmac generator must be' \
-    'idempotent — guard with `test -f <path>/forwarding_hmac ||' \
-    '{ generate; }`. Without the guard, every restart rotates the' \
-    "key and invalidates the router's in-memory cache." >&2
-  fail=1
-fi
-
-# test_backend_template_keeps_socket_cleanup:
-# The pre-existing ExecStartPre that removes a stale backend.sock
-# must still be present alongside the new forwarding_hmac generator.
-#
-# Adding the HMAC generator must not regress the socket cleanup that
-# existed before this fix.
-if ! grep -qP 'rm\s+-f[^"]*backend\.sock' <<<"$BLOCK"; then
+if ! grep -qF 'conexusExec.staleSocketExecStartPre' <<<"$BLOCK"; then
   echo 'FAIL: home-manager-module.nix: "conexus@" service must still' \
-    'remove a stale backend.sock in ExecStartPre. The HMAC-generator' \
-    'addition must not regress the existing socket cleanup.' >&2
+    'remove a stale backend.sock via' \
+    'conexusExec.staleSocketExecStartPre in ExecStartPre.' >&2
   fail=1
 fi
 
 if [ "$fail" -ne 0 ]; then
+  exit 1
+fi
+
+# ── Real evaluation: the shared ExecStartPre logic's actual content ──
+#
+# Proves the properties PRs #214/#216/#217 fixed (32 raw urandom
+# bytes, chmod 600, pkgs.runtimeShell not coreutils' missing /bin/sh,
+# an idempotent test -f guard, the socket cleanup) against
+# nix/conexus-exec.nix's real evaluated output directly — the actual
+# source of truth for both modules now, per the same tier structure
+# as nix/tests/checks/module-package-set.sh.
+if ! command -v nix >/dev/null 2>&1; then
+  echo "SKIP: nix is not available on PATH (real-evaluation tier skipped)"
+  echo "PASS: home-manager-module-units (structural tier only)"
+  exit 0
+fi
+
+CONEXUS_EXEC="$REPO_ROOT/nix/conexus-exec.nix"
+eval_json=$(NIX_CONFIG="experimental-features = nix-command flakes" \
+  timeout 300 nix eval --impure --json --expr \
+  "let e = import $CONEXUS_EXEC { pkgs = (builtins.getFlake \"$REPO_ROOT\").inputs.nixpkgs.legacyPackages.\${builtins.currentSystem}; lib = (builtins.getFlake \"$REPO_ROOT\").inputs.nixpkgs.lib; }; in { hmac = e.hmacSeedExecStartPre; socket = e.staleSocketExecStartPre \"/run/conexus\"; }") \
+  || { echo "FAIL: nix eval of nix/conexus-exec.nix failed" >&2; exit 1; }
+
+hmac_line=$(jq -r '.hmac' <<<"$eval_json")
+socket_line=$(jq -r '.socket' <<<"$eval_json")
+
+if [[ "$hmac_line" != *"forwarding_hmac"* ]]; then
+  echo "FAIL: nix/conexus-exec.nix: hmacSeedExecStartPre must reference " \
+    "forwarding_hmac. Rendered value: $hmac_line" >&2
+  exit 1
+fi
+if [[ "$hmac_line" != *"head -c 32 /dev/urandom"* ]]; then
+  echo "FAIL: nix/conexus-exec.nix: hmacSeedExecStartPre must use " \
+    "head -c 32 /dev/urandom (32 raw bytes, PR #217). Rendered value: " \
+    "$hmac_line" >&2
+  exit 1
+fi
+if [[ "$hmac_line" != *"chmod 600"* ]]; then
+  echo "FAIL: nix/conexus-exec.nix: hmacSeedExecStartPre must chmod 600 " \
+    "the key file. Rendered value: $hmac_line" >&2
+  exit 1
+fi
+# `pkgs.runtimeShell` is already EVALUATED by this point (a real
+# store path like `/nix/store/.../bash-5.3p15/bin/bash`), so the
+# identifier "runtimeShell" itself never appears in rendered output —
+# check the actual property PR #216 fixed instead: the interpreter is
+# NOT coreutils' own (nonexistent) /bin/sh.
+if [[ "$hmac_line" != "/nix/store/"*"-c "* ]] || [[ "$hmac_line" == *"coreutils"*"/bin/sh"* ]]; then
+  echo "FAIL: nix/conexus-exec.nix: hmacSeedExecStartPre must run under a " \
+    "real shell (pkgs.runtimeShell), not coreutils' missing /bin/sh " \
+    "(PR #216 / F015 v6). Rendered value: $hmac_line" >&2
+  exit 1
+fi
+if [[ "$hmac_line" != *'test -f'* ]]; then
+  echo "FAIL: nix/conexus-exec.nix: hmacSeedExecStartPre must guard key " \
+    "generation with an idempotent test -f check (commit 862e594) — " \
+    "without it every restart rotates the key and invalidates the " \
+    "router's in-memory cache. Rendered value: $hmac_line" >&2
+  exit 1
+fi
+if [[ "$socket_line" != *"rm -f"* ]] || [[ "$socket_line" != *"backend.sock"* ]]; then
+  echo "FAIL: nix/conexus-exec.nix: staleSocketExecStartPre must rm -f " \
+    "a stale backend.sock. Rendered value: $socket_line" >&2
   exit 1
 fi
 

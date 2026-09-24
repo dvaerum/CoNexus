@@ -145,7 +145,20 @@ let
   # in doubt we overwrite — single-tenant mode is the operator's
   # explicit declaration that the file should contain exactly one
   # entry.
-  singleProjectSeedScript = lib.mkIf (!cfg.multiTenant) (
+  # NOT wrapped in `lib.mkIf` here — `mkIf` is only meaningful when
+  # its result flows into the module system's own config-merge (e.g.
+  # the `ExecStartPre` assignment below, which DOES wrap it in
+  # `lib.mkIf (!cfg.multiTenant) [...]`); on a plain `let`-bound
+  # helper like this it produces a raw `{ _type = "if"; ... }`
+  # attrset that crashes the moment it's string-interpolated,
+  # UNCONDITIONALLY regardless of which branch would apply (found
+  # live, 2026-09-24 — `multiTenant = false` had never actually been
+  # evaluated end-to-end before). The real conditional gating already
+  # happens correctly at the ExecStartPre site below, whose own
+  # `mkIf` protects this script's `cfg.singleProject.*` references
+  # from ever being forced when `multiTenant = true` (where
+  # `singleProject` is `null`).
+  singleProjectSeedScript =
     pkgs.writeShellScript "conexus-single-tenant-seed" ''
       set -euo pipefail
       cfg_dir="''${XDG_CONFIG_HOME:-$HOME/.config}/conexus"
@@ -161,8 +174,7 @@ let
       fi
       echo "$desired" > "$file.new"
       mv "$file.new" "$file"
-    ''
-  );
+    '';
 
 in {
   imports = [

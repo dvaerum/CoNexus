@@ -89,27 +89,12 @@ extract_router_environment_block() {
   }'
 }
 
-# _extract_router_exec_start(): return the router service's
-# `ExecStart = ...;` raw nix source, where the flag-shaped config
-# surface (`--port`, `--projects-file`, etc.) lives.
-extract_router_exec_start() {
-  local block="$1"
-  awk -v b="$block" '
-  BEGIN {
-    start = index(b, "ExecStart =")
-    rest = substr(b, start)
-    end_idx = index(rest, "Restart = ")
-    print substr(rest, 1, end_idx - 1)
-  }'
-}
-
 ROUTER_BLOCK="$(extract_router_service_block "$TEXT")"
 if [ "$ROUTER_BLOCK" = "___MARKER_NOT_FOUND___" ]; then
   echo "FAIL: could not find '\"conexus-router\" = lib.mkIf' in nix/home-manager-module.nix" >&2
   exit 1
 fi
 ENV_BLOCK="$(extract_router_environment_block "$ROUTER_BLOCK")"
-EXEC_START="$(extract_router_exec_start "$ROUTER_BLOCK")"
 
 fail=0
 
@@ -176,23 +161,44 @@ for var_name in "CONEXUS_ROUTER_DB" "CONEXUS_DEFAULT_WORKSPACE"; do
   fi
 done
 
+if [ "$fail" -ne 0 ]; then
+  exit 1
+fi
+
+# ── Real evaluation: the flag-shaped config surface ───────────────────
+#
 # test_router_exec_start_passes_required_flag, parametrized over:
 #   --port --projects-file --sock-dir --dashboard-dir --external-url --idle-sec
 # Config surface that IS a real CLI flag on `conexus-router` (see its
 # own `Cli` struct doc). Each MUST appear in the router unit's
 # ExecStart.
+#
+# Since nix/conexus-exec.nix's extraction (2026-09-24), this string is
+# built by shared logic rather than being literal text in
+# home-manager-module.nix, so a source-text grep can no longer pin it
+# — a real `nix eval` via the shared harness proves the actual
+# rendered value instead (same tier structure as
+# nix/tests/checks/module-package-set.sh).
+if ! command -v nix >/dev/null 2>&1; then
+  echo "SKIP: nix is not available on PATH (real-evaluation tier skipped)"
+  echo "PASS: home-manager-module-env (structural tier only)"
+  exit 0
+fi
+
+HARNESS="$REPO_ROOT/nix/tests/eval-home-manager-module.nix"
+router_exec_start=$(NIX_CONFIG="experimental-features = nix-command flakes" \
+  timeout 300 nix eval --impure --raw --expr \
+  "(import $HARNESS { pkgs = (builtins.getFlake \"$REPO_ROOT\").inputs.nixpkgs.legacyPackages.\${builtins.currentSystem}; src = \"$REPO_ROOT\"; }).routerExecStart") \
+  || { echo "FAIL: nix eval of routerExecStart failed" >&2; exit 1; }
+
 for flag_name in "--port" "--projects-file" "--sock-dir" "--dashboard-dir" "--external-url" "--idle-sec"; do
-  if ! grep -qF -- "$flag_name" <<<"$EXEC_START"; then
-    echo "FAIL: home-manager-module.nix: conexus-router ExecStart must pass " \
-      "$flag_name (real CLI flag on conexus-router; missing it " \
-      "makes the unit fall back to conexus-router's own compiled-in " \
-      "default)." >&2
-    fail=1
+  if [[ "$router_exec_start" != *"$flag_name"* ]]; then
+    echo "FAIL: home-manager-module.nix: conexus-router's real rendered " \
+      "ExecStart must pass $flag_name (real CLI flag on conexus-router; " \
+      "missing it makes the unit fall back to conexus-router's own " \
+      "compiled-in default). Rendered value: $router_exec_start" >&2
+    exit 1
   fi
 done
-
-if [ "$fail" -ne 0 ]; then
-  exit 1
-fi
 
 echo "PASS: home-manager-module-env"
