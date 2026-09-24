@@ -168,6 +168,9 @@ connected-but-never-polling worker's overdue directive firing on tick
 (protects offline-fire-once-on-reconnect); the per-trigger
 `on_due_directives` toggle and master `config_delivery_enabled` switch
 both suppressing the new path. Deleted along with the rest of the
-Python tree in the Rust migration — `collect_due_and_fire` is now
-called from `conexus-wakeloop::event_feed`'s own collector (see that
-crate's tests for the current coverage of this scenario set).
+Python tree in the Rust migration; the current coverage lives in
+`rust/conexus-backend/src/delivery_scheduler.rs` (`tick()`, the direct
+Rust port of this ADR's `tick()` step) and its own test module —
+`collect_due_and_fire` is also called from
+`conexus-wakeloop::event_feed`'s collector for the wait-loop-native
+path this ADR's `tick()` step is additive to.
