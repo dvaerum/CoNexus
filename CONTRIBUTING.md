@@ -7,7 +7,9 @@ deployment-related changes that previously lived as an out-of-tree
 patch series in [nixos-developer-system].
 
 If you're here because something is broken, file an issue. If you're
-here to fix it, read on.
+here to fix it, read on. See [`AGENTS.md`](AGENTS.md) for standing
+requirements that apply across sessions and contributors, not just
+this file's own one-time setup instructions.
 
 The original upstream `CONTRIBUTING.md` is preserved in git history at
 sha `13d98b2` if you want the generic OSS-onboarding view.
