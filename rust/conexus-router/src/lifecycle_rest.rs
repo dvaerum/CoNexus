@@ -101,17 +101,34 @@ pub async fn health_handler(State(state): State<Arc<RouterState>>) -> Response {
 /// capability check at all (every authenticated caller can list the
 /// projects visible to THEM; `visible_project_names` does the actual
 /// scoping).
+///
+/// **Found-and-fixed bug**: single-tenant mode's session-gate
+/// middleware takes the `PassThrough` branch (`bypasses_operator_gate`
+/// -- there's no second tenant to gate against) and never inserts a
+/// `GateIdentity` extension at all. A mandatory `Extension<GateIdentity>`
+/// extractor 500s on a missing extension by axum's own default -- this
+/// handler always 500'd under single-tenant mode, for every caller,
+/// before this fix. `identity` is `Option`al now; absent means
+/// single-tenant PassThrough, and `visible_project_names` already has
+/// its own `bypasses_operator_gate(...) || is_sysadmin` branch that
+/// sees every project regardless of `is_sysadmin`/`caller_user_id` --
+/// the `false`/`None` defaults below are inert on that path, not a
+/// weakening.
 pub async fn list_projects_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    identity: Option<Extension<GateIdentity>>,
 ) -> Response {
     let conn = state.conn.lock().await;
+    let (is_sysadmin, caller_user_id) = match &identity {
+        Some(Extension(identity)) => (identity.is_sysadmin, Some(identity.user.user_id.as_str())),
+        None => (false, None),
+    };
     match project_reads::list_projects_response(
         &conn,
         &state.registry,
         state.mcp_handler_config.single_tenant_name.as_deref(),
-        identity.is_sysadmin,
-        Some(identity.user.user_id.as_str()),
+        is_sysadmin,
+        caller_user_id,
     ) {
         Ok(resp) => resp.into_response(),
         Err(e) => HandlerResponse::from(e).into_response(),
@@ -779,9 +796,14 @@ pub async fn alias_usage_handler(
 /// Revisit only if a real production request-volume measurement
 /// shows the per-request systemctl fan-out is a genuine bottleneck --
 /// not assumed speculatively.
+///
+/// **Found-and-fixed bug**: same class as `list_projects_handler`'s
+/// own fix above -- a mandatory `Extension<GateIdentity>` 500s under
+/// single-tenant mode's `PassThrough` gate outcome, which never
+/// inserts one. `identity` is `Option`al now for the same reason.
 pub async fn overview_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    identity: Option<Extension<GateIdentity>>,
 ) -> Response {
     let single_tenant_name = state.mcp_handler_config.single_tenant_name.as_deref();
     let rows = match state.registry.list() {
@@ -789,13 +811,17 @@ pub async fn overview_handler(
         Err(e) => return HandlerResponse::from(GateError::from(e)).into_response(),
     };
     let names: Vec<String> = rows.iter().map(|r| r.name.clone()).collect();
+    let (is_sysadmin, caller_user_id) = match &identity {
+        Some(Extension(identity)) => (identity.is_sysadmin, Some(identity.user.user_id.as_str())),
+        None => (false, None),
+    };
     let visible = {
         let conn = state.conn.lock().await;
         project_reads::visible_project_names(
             &conn,
             single_tenant_name,
-            identity.is_sysadmin,
-            Some(&identity.user.user_id),
+            is_sysadmin,
+            caller_user_id,
             &names,
         )
     };

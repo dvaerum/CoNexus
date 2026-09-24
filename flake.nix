@@ -269,7 +269,10 @@
       };
       homeModules.conexus = self.homeModules.default;
 
-      # ── NixOS module (legacy, used by VM tests only) ────────────
+      # ── NixOS module ─────────────────────────────────────────────
+      # Kept at feature parity with the home-manager module (ADR-0029,
+      # AGENTS.md) — no longer VM-test-only. `nix/tests/module-parity.nix`
+      # proves it at runtime against the real, shipped module.
       nixosModules.default = ./nix/module.nix;
       nixosModules.conexus = ./nix/module.nix;
 
@@ -321,6 +324,16 @@
         # full server end-to-end without a browser. See
         # ./nix/tests/event-driven-coord.nix.
         vm-event-driven-coord = import ./nix/tests/event-driven-coord.nix {
+          inherit pkgs lib self;
+          craneLib = crane.mkLib pkgs;
+        };
+        # PR3 of the nix/module.nix parity work (see AGENTS.md, PR1 =
+        # 8e8d9165, PR2 = 8f526ba3): imports the REAL module.nix
+        # directly (unlike the tests above, which hand-roll their own
+        # config mirroring it) and proves multiTenant/singleProject,
+        # sso.proxyHeader, and daemonAgents all work at runtime, not
+        # just that they evaluate. See ./nix/tests/module-parity.nix.
+        vm-module-parity = import ./nix/tests/module-parity.nix {
           inherit pkgs lib self;
           craneLib = crane.mkLib pkgs;
         };

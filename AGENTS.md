@@ -26,5 +26,5 @@ the same change — not deferred to "later" or a follow-up.**
 Full design rationale, and what's genuinely shareable between the two
 module shapes vs. what has to stay split (home-manager's `%h`/`%t`
 systemd specifiers and `config.xdg.*` vs. NixOS's `cfg.stateDir`/
-`users.users`/`security.polkit`), is being written up as an ADR under
-`docs/adr/` alongside the parity work itself.
+`users.users`/`security.polkit`), is recorded in
+[`docs/adr/0029-nixos-home-manager-module-parity.md`](docs/adr/0029-nixos-home-manager-module-parity.md).
