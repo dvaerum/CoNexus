@@ -230,6 +230,20 @@ export function agentsApi(core: ApiClient) {
       })
     },
 
+    // Mint a fresh bearer token, invalidating the old one immediately —
+    // the backend was wired for this (POST /api/agents/{id}/rotate-token,
+    // conexus-backend::rest_handlers::rotate_agent_token) but no UI
+    // control ever called it. Same response shape as registerAgent's
+    // agent_token field. PR D: cookie auth.
+    rotateAgentToken(
+      agentId: string,
+    ): Promise<{ success: boolean; agent_id: string; agent_token: string; message: string }> {
+      return core.request(`/agents/${encodeURIComponent(agentId)}/rotate-token`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+    },
+
     // Disconnect / Reconnect — pause or resume an agent's monitoring loop
     // WITHOUT terminating it or revoking its token. Disconnect sets
     // auto_event_loop OFF (its wait_for_events starts returning

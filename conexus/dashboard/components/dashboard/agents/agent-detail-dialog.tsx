@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Copy, Pencil, Send, Trash2 } from "lucide-react"
+import { Copy, KeyRound, Pencil, Send, Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -81,6 +81,7 @@ export const AgentDetailDialog = ({
   onTerminate,
   onPurge,
   onSendDirective,
+  onRotateToken,
 }: {
   agent: Agent | null
   open: boolean
@@ -96,12 +97,22 @@ export const AgentDetailDialog = ({
   onTerminate?: () => void
   onPurge?: () => void
   onSendDirective?: () => void
+  // Unlike the others, this does NOT close the dialog — it stays open
+  // so the freshly minted token (the return value) can be revealed and
+  // copied in place, same idea as Register Agent's own reveal-on-mint.
+  onRotateToken?: () => Promise<string | undefined>
 }) => {
   const [revealToken, setRevealToken] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copiedToken, setCopiedToken] = useState(false)
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<ClientTab>('claude-code')
+  const [rotating, setRotating] = useState(false)
+  // Overrides `agent.auth_token` immediately after a rotation, since the
+  // `agent` prop won't reflect the new token until the next all-data
+  // refetch catches up — the operator needs to copy it NOW, not after a
+  // refresh.
+  const [rotatedToken, setRotatedToken] = useState<string | null>(null)
   // Hook must run unconditionally (before the `if (!agent)` early return
   // below), so pass a safe empty id when there's no agent yet — that
   // resolves to an empty task list.
@@ -128,6 +139,7 @@ export const AgentDetailDialog = ({
       setCopied(false)
       setCopiedToken(false)
       setCopiedSnippet(null)
+      setRotatedToken(null)
     }
   }, [open])
 
@@ -147,8 +159,28 @@ export const AgentDetailDialog = ({
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // The rotated token (once minted) takes over from the stale prop
+  // value everywhere a token is displayed or copied — the snippets
+  // below too, so the operator can grab an up-to-date .mcp.json
+  // without leaving the dialog after rotating.
+  const displayToken = rotatedToken ?? agent.auth_token
+
+  const handleRotateToken = async () => {
+    if (!onRotateToken || rotating) return
+    setRotating(true)
+    try {
+      const newToken = await onRotateToken()
+      if (newToken) {
+        setRotatedToken(newToken)
+        setRevealToken(true)
+      }
+    } finally {
+      setRotating(false)
+    }
+  }
+
   const mcpUrl = deriveMcpUrl()
-  const snippetToken = agent.auth_token || ''
+  const snippetToken = displayToken || ''
 
   const handleTabChange = (value: string) => {
     const next = value as ClientTab
@@ -380,12 +412,12 @@ export const AgentDetailDialog = ({
               Token
             </Label>
             <div className="flex items-start gap-2 flex-wrap">
-              {agent.auth_token ? (
+              {displayToken ? (
                 <>
                   <code className="font-mono text-xs [overflow-wrap:anywhere] flex-1 min-w-0">
                     {revealToken
-                      ? agent.auth_token
-                      : `...${agent.auth_token.slice(-4)}`}
+                      ? displayToken
+                      : `...${displayToken.slice(-4)}`}
                   </code>
                   <Button
                     variant="ghost"
@@ -399,7 +431,7 @@ export const AgentDetailDialog = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      navigator.clipboard.writeText(agent.auth_token || '')
+                      navigator.clipboard.writeText(displayToken || '')
                       setCopiedToken(true)
                       setTimeout(() => setCopiedToken(false), 1500)
                     }}
@@ -415,7 +447,26 @@ export const AgentDetailDialog = ({
               ) : (
                 <span className="text-muted-foreground italic">none</span>
               )}
+              {onRotateToken && agent.agent_id !== 'Admin' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRotateToken}
+                  disabled={rotating}
+                  className="h-6 px-2 text-xs flex-shrink-0"
+                  title="Mint a fresh token, invalidating the current one immediately"
+                >
+                  <KeyRound className="h-3 w-3 mr-1" />
+                  {rotating ? 'Rotating…' : 'Rotate'}
+                </Button>
+              )}
             </div>
+            {rotatedToken && (
+              <p className="text-xs text-amber-600">
+                New token minted — the old one no longer works. Copy this
+                one into the user&apos;s config before closing this dialog.
+              </p>
+            )}
           </div>
 
           {/* Group 5: MCP-onboarding tabs ------------------------------

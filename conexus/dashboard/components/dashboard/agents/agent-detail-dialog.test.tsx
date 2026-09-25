@@ -162,10 +162,54 @@ describe("<AgentDetailDialog>", () => {
         onTerminate={() => {}}
         onPurge={() => {}}
         onSendDirective={() => {}}
+        onRotateToken={async () => "unused"}
       />,
     )
-    for (const name of [/Send directive/, /^Edit$/, /Terminate/, /Purge/]) {
+    for (const name of [/Send directive/, /^Edit$/, /Terminate/, /Purge/, /Rotate/]) {
       expect(screen.queryByRole("button", { name })).toBeNull()
     }
+  })
+
+  it("has no Rotate control when onRotateToken isn't wired", () => {
+    render(
+      <AgentDetailDialog
+        agent={agent}
+        open
+        onOpenChange={() => {}}
+        onTaskClick={() => {}}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: /Rotate/ })).toBeNull()
+  })
+
+  it("rotating a token reveals the fresh one and updates every MCP snippet", async () => {
+    const onRotateToken = vi.fn().mockResolvedValue("fedcba9876543210fedcba9876543210")
+    render(
+      <AgentDetailDialog
+        agent={agent}
+        open
+        onOpenChange={() => {}}
+        onTaskClick={() => {}}
+        onRotateToken={onRotateToken}
+      />,
+    )
+    // Starts masked, showing the OLD token's suffix.
+    expect(screen.getByText("...cdef")).toBeTruthy()
+
+    await setupUser().click(screen.getByRole("button", { name: /Rotate/ }))
+
+    expect(onRotateToken).toHaveBeenCalledTimes(1)
+    // Auto-revealed with the NEW token — no extra Reveal click needed.
+    await waitFor(() =>
+      expect(
+        screen.getByText("fedcba9876543210fedcba9876543210"),
+      ).toBeTruthy(),
+    )
+    expect(screen.queryByText(agent.auth_token!)).toBeNull()
+    // The Claude Code tab's snippets pick up the new token too, without
+    // needing the parent's all-data refetch to land first.
+    expect(
+      screen.getAllByText(/Bearer fedcba9876543210fedcba9876543210/).length,
+    ).toBeGreaterThan(0)
   })
 })

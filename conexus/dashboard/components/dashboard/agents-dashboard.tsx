@@ -257,6 +257,22 @@ export function AgentsDashboard() {
     }
   }, [])
 
+  // Rotate token — the backend endpoint (POST /api/agents/{id}/rotate-token)
+  // existed with no UI control anywhere to call it (user report). Returns
+  // the fresh token so AgentDetailDialog can show it immediately, rather
+  // than waiting on the next all-data refetch to catch up.
+  const handleRotateToken = useCallback(async (agentId: string) => {
+    try {
+      const res = await apiClient.rotateAgentToken(agentId)
+      scheduleDashboardRefresh()
+      toastSuccess(`Agent "${agentId}" token rotated — the old token is now invalid.`)
+      return res.agent_token
+    } catch (error) {
+      toastError(error, `Failed to rotate token for ${agentId}`)
+      return undefined
+    }
+  }, [])
+
   const handleDisconnectAll = async () => {
     try {
       await apiClient.disconnectAllAgents()
@@ -519,6 +535,14 @@ export function AgentsDashboard() {
             if (!agent) return
             detailDialog.close()
             handleSendDirective(agent.agent_id)
+          }}
+          onRotateToken={() => {
+            const agent = detailDialog.data
+            if (!agent) return Promise.resolve(undefined)
+            // Deliberately does NOT close the dialog like the other
+            // handlers above — the operator needs to see + copy the
+            // freshly minted token immediately, in place.
+            return handleRotateToken(agent.agent_id)
           }}
         />
 
