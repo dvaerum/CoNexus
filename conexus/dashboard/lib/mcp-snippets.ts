@@ -101,8 +101,23 @@ export function buildSnippetBlocks(tab: ClientTab, token: string, url: string): 
           content: `claude mcp add --transport http ${name} ${url} --header "Authorization: Bearer ${t}"`,
         },
         {
-          title: 'JSON',
-          note: 'Paste into ~/.claude.json under `mcpServers` (user-scope) or `projects["<cwd>"].mcpServers` (project-scope).',
+          title: '.mcp.json',
+          note: 'Project-root .mcp.json — the portable, git-shareable format Claude Code reads automatically for anyone working in that directory. Same shape the Register Agent dialog’s own snippet uses.',
+          content: [
+            '{',
+            '  "mcpServers": {',
+            `    "${name}": {`,
+            '      "type": "http",',
+            `      "url": "${url}",`,
+            `      "headers": {"Authorization": "Bearer ${t}"}`,
+            '    }',
+            '  }',
+            '}',
+          ].join('\n'),
+        },
+        {
+          title: '~/.claude.json fragment',
+          note: 'Paste into ~/.claude.json under `mcpServers` (user-scope) or `projects["<cwd>"].mcpServers` (project-scope) — for adding this server without a shared .mcp.json file.',
           content: [
             '"' + name + '": {',
             '  "type": "http",',

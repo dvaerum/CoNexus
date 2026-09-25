@@ -63,9 +63,21 @@ describe("buildSnippetBlocks", () => {
   })
 
   it("declares Streamable HTTP transport for the Claude Code tab", () => {
-    const [cli, json] = buildSnippetBlocks("claude-code", TOKEN, URL)
+    const [cli, mcpJson, claudeJson] = buildSnippetBlocks("claude-code", TOKEN, URL)
     expect(cli!.content).toContain("claude mcp add --transport http conexus")
-    expect(json!.content).toContain('"type": "http"')
+    expect(mcpJson!.content).toContain('"type": "http"')
+    expect(claudeJson!.content).toContain('"type": "http"')
+  })
+
+  it("offers a project-root .mcp.json block for Claude Code, matching the Register Agent snippet's own shape", () => {
+    const blocks = buildSnippetBlocks("claude-code", TOKEN, URL)
+    const mcpJsonBlock = blocks.find((b) => b.title === ".mcp.json")
+    expect(mcpJsonBlock, "no .mcp.json block found for claude-code tab").toBeTruthy()
+    // Same top-level shape as the Register Agent dialog's own
+    // server-built snippet: { "mcpServers": { "conexus": { ... } } }.
+    expect(mcpJsonBlock!.content).toContain('"mcpServers": {')
+    expect(mcpJsonBlock!.content).toContain(`"conexus": {`)
+    expect(mcpJsonBlock!.content).toContain(`"url": "${URL}"`)
   })
 
   it("uses each client's own config schema (not one shape for all)", () => {
