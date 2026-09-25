@@ -16,7 +16,7 @@ use crate::agent_communication_tools::{
     BroadcastAdminMessageTool, FetchEventsSinceTool, GetAgentMessagesTool, SendAgentMessageTool,
     WaitForEventsTool,
 };
-use crate::agent_roster_tools::ViewAgentsTool;
+use crate::agent_roster_tools::{UpdateAgentProfileTool, ViewAgentsTool};
 use crate::agent_tools::GetSystemPromptTool;
 use crate::assign_task_tools::{AssignTaskTool, CreateSelfTaskTool};
 use crate::file_management_tools::{CheckFileStatusTool, UpdateFileStatusTool};
@@ -45,7 +45,7 @@ use crate::utility_tools::TestTool;
 // compile-time `static` array (needs a named `static`, not an inline
 // `&[...]` literal, since the array's elements aren't const-promotable
 // through a non-const fn body).
-static ALL_TOOLS: [ToolDescriptor; 49] = [
+static ALL_TOOLS: [ToolDescriptor; 50] = [
     ToolDescriptor::of::<ViewProjectSettingsTool>(),
     ToolDescriptor::of::<UpdateProjectSettingsTool>(),
     ToolDescriptor::of::<DeleteProjectSettingsTool>(),
@@ -68,6 +68,7 @@ static ALL_TOOLS: [ToolDescriptor; 49] = [
     ToolDescriptor::of::<TestTool>(),
     ToolDescriptor::of::<GetSystemPromptTool>(),
     ToolDescriptor::of::<ViewAgentsTool>(),
+    ToolDescriptor::of::<UpdateAgentProfileTool>(),
     ToolDescriptor::of::<CheckFileStatusTool>(),
     ToolDescriptor::of::<UpdateFileStatusTool>(),
     ToolDescriptor::of::<ViewFileMetadataTool>(),
@@ -276,6 +277,7 @@ mod tests {
                 "test",
                 "get_system_prompt",
                 "view_agents",
+                "update_agent_profile",
                 "check_file_status",
                 "update_file_status",
                 "view_file_metadata",
