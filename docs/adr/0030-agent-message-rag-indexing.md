@@ -1,6 +1,6 @@
 # ADR 0030: Index agent-to-agent messages into RAG, scoped strictly to sender/recipient
 
-**Status**: Proposed, 2026-09-25.
+**Status**: Accepted, implemented 2026-09-25.
 **Date**: 2026-09-25.
 **Builds on**: `rag_repository::search_similar`'s `source_type_filter` +
 over-fetch mechanism (already used to scope "markdown"/"context"
@@ -179,7 +179,20 @@ tool already denies them.
 
 ## Status of implementation
 
-Not yet built. This ADR is the design record to review before PR work
-starts (schema/migration for the new `source_type`, background-indexer
-wiring, `search_similar` call-site update in `rag_tools.rs`, and
-TDD-covered scoping tests mirroring ADR-0027's own test suite shape).
+Implemented 2026-09-25:
+- `background_tasks.rs::rag_indexing` gained a third always-on scan
+  step (agent_messages, mirroring `"context"`'s treatment), each
+  message becoming one `ScannedSource` with `metadata =
+  {"sender_id", "recipient_id"}`, its own `last_indexed_agent_message`
+  watermark (BL-R31-1 failure-capping included, same as the other two
+  source types).
+- `rag_tools.rs::drop_unowned_message_chunks` -- the post-search
+  filter, applied right after `drop_unowned_task_chunks` in
+  `query_rag_system`'s vector-search stage. A `None` `requesting_agent_
+  id` (no agent-bearer identity) or a chunk with no metadata both drop
+  closed (deny by default), not open.
+- TDD coverage: 6 unit tests for the retrieval filter (own-sent,
+  own-received, neither, no-caller, no-metadata, non-message-chunk
+  passthrough) plus one indexer end-to-end test asserting the metadata
+  actually lands in `rag_chunks` and the watermark/hash meta keys are
+  written. Full workspace suite green (2,000+ tests) after the change.

@@ -564,6 +564,41 @@ fn drop_unowned_task_chunks(
         .collect()
 }
 
+/// ADR-0030: scopes `source_type = "agent_message"` chunks to their
+/// real sender/recipient -- a message chunk is visible to `caller`
+/// iff `caller` is its `sender_id` OR its `recipient_id`, read
+/// straight off the chunk's own `metadata` (written once, at index
+/// time, by `conexus_backend::background_tasks::rag_indexing` --
+/// see that module's own doc). No DB round-trip needed (unlike
+/// `drop_unowned_task_chunks`'s task-ownership lookup): the two
+/// columns that decide visibility are baked into the chunk itself and
+/// never change after the message is sent. A caller with no
+/// `agent_id` at all (e.g. an operator-session principal) sees no
+/// `agent_message` chunks -- there's no "operator" sender/recipient
+/// value to match against, matching `get_agent_messages`'s own
+/// agent-only scope for this data.
+fn drop_unowned_message_chunks(
+    results: Vec<RagSearchResult>,
+    requesting_agent_id: Option<&str>,
+) -> Vec<RagSearchResult> {
+    results
+        .into_iter()
+        .filter(|r| {
+            if r.chunk.source_type != "agent_message" {
+                return true;
+            }
+            let Some(caller) = requesting_agent_id else {
+                return false;
+            };
+            let Some(meta) = &r.chunk.metadata else {
+                return false;
+            };
+            meta.get("sender_id").and_then(Value::as_str) == Some(caller)
+                || meta.get("recipient_id").and_then(Value::as_str) == Some(caller)
+        })
+        .collect()
+}
+
 /// The 5-stage pipeline: live context -> live tasks -> vector search
 /// -> token-budgeted assembly -> chat completion. Port of
 /// `query_rag_system` (the `ask_project_rag`-only call shape; the
@@ -642,6 +677,8 @@ async fn query_rag_system(
                         can_view_all_tasks,
                         include_foreign,
                     );
+                    vector_results =
+                        drop_unowned_message_chunks(vector_results, requesting_agent_id);
                 }
             }
         }
@@ -1122,6 +1159,66 @@ mod tests {
             },
             distance: 0.1,
         }
+    }
+
+    fn message_chunk_result(source_ref: &str, sender_id: &str, recipient_id: &str) -> RagSearchResult {
+        RagSearchResult {
+            chunk: conexus_db::RagChunkRow {
+                chunk_id: 1,
+                source_type: "agent_message".to_string(),
+                source_ref: source_ref.to_string(),
+                chunk_text: "text".to_string(),
+                indexed_at: NOW.to_string(),
+                metadata: Some(serde_json::json!({
+                    "sender_id": sender_id,
+                    "recipient_id": recipient_id,
+                })),
+            },
+            distance: 0.1,
+        }
+    }
+
+    #[test]
+    fn drop_unowned_message_chunks_keeps_non_message_chunks_unconditionally() {
+        let results = vec![chunk_result("markdown", "README.md")];
+        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn drop_unowned_message_chunks_keeps_a_message_the_caller_sent() {
+        let results = vec![message_chunk_result("msg-1", "a1", "a2")];
+        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn drop_unowned_message_chunks_keeps_a_message_the_caller_received() {
+        let results = vec![message_chunk_result("msg-1", "a2", "a1")];
+        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn drop_unowned_message_chunks_drops_a_message_between_two_other_agents() {
+        let results = vec![message_chunk_result("msg-1", "a2", "a3")];
+        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn drop_unowned_message_chunks_drops_everything_for_a_callerless_principal() {
+        let results = vec![message_chunk_result("msg-1", "a1", "a2")];
+        let filtered = drop_unowned_message_chunks(results, None);
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn drop_unowned_message_chunks_drops_a_message_chunk_with_no_metadata() {
+        let mut result = message_chunk_result("msg-1", "a1", "a2");
+        result.chunk.metadata = None;
+        let filtered = drop_unowned_message_chunks(vec![result], Some("a1"));
+        assert!(filtered.is_empty());
     }
 
     #[tokio::test]

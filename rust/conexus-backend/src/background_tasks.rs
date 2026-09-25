@@ -451,6 +451,12 @@ mod rag_indexing {
         /// Rust-authored timestamp in this codebase already uses).
         mod_time: f64,
         hash: String,
+        /// ADR-0030: `agent_message` chunks carry `{"sender_id":
+        /// ..., "recipient_id": ...}` here so `rag_tools::
+        /// drop_unowned_message_chunks` can scope retrieval without a
+        /// second DB round-trip. `None` for every other source_type
+        /// (markdown/context carry no per-chunk ownership).
+        metadata: Option<serde_json::Value>,
     }
 
     fn sha256_hex(content: &str) -> String {
@@ -542,16 +548,25 @@ mod rag_indexing {
             .get("last_indexed_context")
             .cloned()
             .unwrap_or_else(|| epoch_iso.to_string());
+        // ADR-0030.
+        let last_msg_watermark = meta
+            .get("last_indexed_agent_message")
+            .cloned()
+            .unwrap_or_else(|| epoch_iso.to_string());
         let last_md_epoch = chrono::DateTime::parse_from_rfc3339(&last_md_watermark)
             .map(|dt| dt.timestamp() as f64)
             .unwrap_or(0.0);
         let last_ctx_epoch = chrono::DateTime::parse_from_rfc3339(&last_ctx_watermark)
             .map(|dt| dt.timestamp() as f64)
             .unwrap_or(0.0);
+        let last_msg_epoch = chrono::DateTime::parse_from_rfc3339(&last_msg_watermark)
+            .map(|dt| dt.timestamp() as f64)
+            .unwrap_or(0.0);
 
         let mut sources: Vec<ScannedSource> = Vec::new();
         let mut max_md_epoch = last_md_epoch;
         let mut max_ctx_epoch = last_ctx_epoch;
+        let mut max_msg_epoch = last_msg_epoch;
 
         // 1. Markdown files -- gated the same way Python's own
         // DISABLE_AUTO_INDEXING flag does, resolved fresh each cycle
@@ -585,6 +600,7 @@ mod rag_indexing {
                     content,
                     mod_time: mod_epoch,
                     hash,
+                    metadata: None,
                 });
             }
         }
@@ -613,6 +629,50 @@ mod rag_indexing {
                 content,
                 mod_time: row_epoch,
                 hash,
+                metadata: None,
+            });
+        }
+
+        // 2b. Agent messages (ADR-0030) -- always scanned, both modes
+        // (same "always on" treatment as project context; there's no
+        // per-message equivalent of CONEXUS_DISABLE_AUTO_INDEXING).
+        // Each message becomes its own chunk carrying sender_id/
+        // recipient_id in `metadata` -- `rag_tools::
+        // drop_unowned_message_chunks` is the ONLY place that
+        // ownership is ever consulted; content is embedded/chunked
+        // exactly like every other source.
+        use conexus_db::entity::message::{Column as MessageColumn, Entity as MessageEntity};
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+        let message_rows = MessageEntity::find()
+            .filter(MessageColumn::Timestamp.gt(last_msg_watermark.clone()))
+            .order_by_asc(MessageColumn::Timestamp)
+            .all(sea_orm_db)
+            .await?;
+        for row in &message_rows {
+            let row_epoch = chrono::DateTime::parse_from_rfc3339(&row.timestamp)
+                .map(|dt| dt.timestamp() as f64)
+                .unwrap_or(last_msg_epoch);
+            if row_epoch > max_msg_epoch {
+                max_msg_epoch = row_epoch;
+            }
+            let content = format!(
+                "From: {}\nTo: {}\nSubject: {}\n{}",
+                row.sender_id,
+                row.recipient_id,
+                row.subject.as_deref().unwrap_or(""),
+                row.message_content
+            );
+            let hash = sha256_hex(&content);
+            sources.push(ScannedSource {
+                source_type: "agent_message",
+                source_ref: row.message_id.clone(),
+                content,
+                mod_time: row_epoch,
+                hash,
+                metadata: Some(serde_json::json!({
+                    "sender_id": row.sender_id,
+                    "recipient_id": row.recipient_id,
+                })),
             });
         }
 
@@ -633,6 +693,7 @@ mod rag_indexing {
                 &meta,
                 last_md_watermark_epoch_pair(last_md_epoch, max_md_epoch, auto_indexing_disabled),
                 (last_ctx_epoch, max_ctx_epoch),
+                (last_msg_epoch, max_msg_epoch),
                 &[],
                 &[],
             )
@@ -732,7 +793,7 @@ mod rag_indexing {
                     &source.source_ref,
                     &[conexus_db::NewChunk {
                         chunk_text: &entry.text,
-                        metadata: None,
+                        metadata: source.metadata.as_ref(),
                         embedding: Some(embedding),
                     }],
                     &now_iso,
@@ -779,6 +840,7 @@ mod rag_indexing {
             &meta,
             last_md_watermark_epoch_pair(last_md_epoch, max_md_epoch, auto_indexing_disabled),
             (last_ctx_epoch, max_ctx_epoch),
+            (last_msg_epoch, max_msg_epoch),
             &failed_refs,
             &fully_embedded_refs,
         )
@@ -844,6 +906,7 @@ mod rag_indexing {
         _meta: &std::collections::HashMap<String, String>,
         markdown: Option<(f64, f64)>,
         context: (f64, f64),
+        agent_message: (f64, f64),
         failed_refs: &[(&str, f64)],
         fully_embedded_refs: &[(&str, f64)],
     ) -> anyhow::Result<()> {
@@ -865,6 +928,18 @@ mod rag_indexing {
             .unwrap_or_default()
             .to_rfc3339();
         conexus_db::rag_repository::set_meta(&guard, "context", Some(&ctx_iso), None)?;
+
+        // ADR-0030: same "always scanned, capped by BL-R31-1 failures"
+        // treatment as context -- watermark key is
+        // "last_indexed_agent_message" (matches the source_type
+        // string exactly, same convention every other watermark key
+        // here already follows).
+        let (msg_last, msg_max) = agent_message;
+        let msg_capped = cap("agent_message", msg_last, msg_max);
+        let msg_iso = chrono::DateTime::<chrono::Utc>::from_timestamp(msg_capped as i64, 0)
+            .unwrap_or_default()
+            .to_rfc3339();
+        conexus_db::rag_repository::set_meta(&guard, "agent_message", Some(&msg_iso), None)?;
         Ok(())
     }
 
@@ -1755,6 +1830,69 @@ mod rag_indexing_tests {
         assert!(meta.contains_key("last_indexed_context"));
         assert!(meta.contains_key("hash_markdown_notes.md"));
         assert!(meta.contains_key("hash_context_config_deploy_target"));
+
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn indexes_an_agent_message_with_sender_and_recipient_in_metadata() {
+        // ADR-0030.
+        let (_dir, conn, sea_orm_db) = test_db(true).await;
+        let project_dir = tempfile::tempdir().unwrap();
+        {
+            let guard = conn.lock().await;
+            guard
+                .execute(
+                    "INSERT INTO agent_messages (message_id, sender_id, recipient_id, \
+                     message_content, message_type, priority, timestamp, delivered, read, \
+                     subject, parent_message_id) \
+                     VALUES ('msg-1', 'alice', 'bob', 'hello bob', 'text', 'normal', \
+                     '2026-01-01T00:00:00Z', 0, 0, 'greeting', NULL)",
+                    [],
+                )
+                .unwrap();
+        }
+
+        let (base_url, server) = embed_server().await;
+        let pairs = embed_env(&base_url);
+        let get_env = env(&pairs
+            .iter()
+            .map(|(k, v)| (*k, v.as_str()))
+            .collect::<Vec<_>>());
+
+        let report = run_indexing_cycle(
+            &conn,
+            &sea_orm_db,
+            project_dir.path(),
+            &get_env,
+            chrono::Utc::now(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(report.sources_scanned, 1);
+        assert_eq!(report.sources_failed, 0);
+
+        let guard = conn.lock().await;
+        let (source_type, metadata_json): (String, Option<String>) = guard
+            .query_row(
+                "SELECT source_type, metadata FROM rag_chunks WHERE source_ref = 'msg-1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(source_type, "agent_message");
+        let metadata: serde_json::Value =
+            serde_json::from_str(&metadata_json.expect("metadata must be set")).unwrap();
+        assert_eq!(metadata["sender_id"], "alice");
+        assert_eq!(metadata["recipient_id"], "bob");
+        drop(guard);
+
+        let meta = conexus_db::rag_repository::get_all_meta(&sea_orm_db)
+            .await
+            .unwrap();
+        assert!(meta.contains_key("last_indexed_agent_message"));
+        assert!(meta.contains_key("hash_agent_message_msg-1"));
 
         server.abort();
     }
