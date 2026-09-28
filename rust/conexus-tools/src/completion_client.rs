@@ -62,6 +62,17 @@ static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .expect("reqwest client with a plain timeout always builds")
 });
 
+/// The process-wide chat-completion HTTP client, for callers (e.g.
+/// [`crate::message_suggestions`]) that need to hit a DIFFERENT path
+/// on the same host than [`CompletionClient::chat`]'s own
+/// `/chat/completions` -- reusing one connection pool rather than
+/// spinning up a second `reqwest::Client` (and a second, possibly
+/// inconsistent, timeout) for what is still logically the same
+/// deployment's LLM endpoint.
+pub(crate) fn http_client() -> &'static reqwest::Client {
+    &HTTP_CLIENT
+}
+
 pub(crate) fn env_nonempty(get_env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<String> {
     get_env(key)
         .map(|v| v.trim().to_string())
@@ -143,11 +154,26 @@ impl CompletionClient {
     /// `max_tokens`, when given, caps the completion length -- needed
     /// by callers with a small, fixed output budget (e.g. a one-line
     /// subject suggestion); `None` leaves the provider's own default.
+    ///
+    /// `think`, when `Some`, sets Ollama's `"think"` request field --
+    /// the switch reasoning models (Qwen3, DeepSeek-R1, ...) use to
+    /// skip their hidden chain-of-thought phase. Found live: with a
+    /// small `max_tokens` budget, a reasoning model spends the ENTIRE
+    /// budget on `reasoning` and never emits real `content` -- silent
+    /// empty-string output, not an error, so this went unnoticed until
+    /// subject-gen actually started running (ADR-0031 turned it on by
+    /// default; previously the whole call path was dead). `None`
+    /// omits the field entirely -- callers with a large/no `max_tokens`
+    /// budget (RAG's own chat call has room for both phases) are
+    /// unaffected either way, so they pass `None` rather than
+    /// asserting an opinion this module has no business having for
+    /// them.
     pub async fn chat(
         &self,
         messages: &[(&str, &str)],
         temperature: f64,
         max_tokens: Option<u32>,
+        think: Option<bool>,
     ) -> Result<String, ChatError> {
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
         let messages_json: Vec<Value> = messages
@@ -161,6 +187,9 @@ impl CompletionClient {
         });
         if let Some(max_tokens) = max_tokens {
             body["max_tokens"] = json!(max_tokens);
+        }
+        if let Some(think) = think {
+            body["think"] = json!(think);
         }
         let resp = HTTP_CLIENT
             .post(&url)
@@ -302,6 +331,77 @@ mod tests {
         (format!("http://{addr}"), handle)
     }
 
+    /// Like [`spawn_fake_chat_server`], but hands the raw received
+    /// request bytes back through the returned `JoinHandle` instead of
+    /// discarding them -- needed to assert on the request BODY (does
+    /// it carry a `"think"` field, and what value) rather than just
+    /// the parsed response.
+    async fn spawn_fake_chat_server_capturing_request(
+        status: u16,
+        body: &'static str,
+    ) -> (String, tokio::task::JoinHandle<String>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let n = socket.read(&mut buf).await.unwrap_or(0);
+            let request = String::from_utf8_lossy(&buf[..n]).to_string();
+            let response = format!(
+                "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = socket.write_all(response.as_bytes()).await;
+            let _ = socket.shutdown().await;
+            request
+        });
+        (format!("http://{addr}"), handle)
+    }
+
+    #[tokio::test]
+    async fn chat_omits_the_think_field_when_not_specified() {
+        let (base_url, handle) = spawn_fake_chat_server_capturing_request(
+            200,
+            r#"{"choices":[{"message":{"content":"ok"}}]}"#,
+        )
+        .await;
+        let client = CompletionClient {
+            base_url,
+            api_key: "test".to_string(),
+            model: "test-model".to_string(),
+        };
+        client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap();
+        let request = handle.await.unwrap();
+        assert!(!request.contains("\"think\""), "request was: {request}");
+    }
+
+    #[tokio::test]
+    async fn chat_sends_think_false_when_specified() {
+        let (base_url, handle) = spawn_fake_chat_server_capturing_request(
+            200,
+            r#"{"choices":[{"message":{"content":"ok"}}]}"#,
+        )
+        .await;
+        let client = CompletionClient {
+            base_url,
+            api_key: "test".to_string(),
+            model: "test-model".to_string(),
+        };
+        client
+            .chat(&[("user", "hi")], 0.4, Some(32), Some(false))
+            .await
+            .unwrap();
+        let request = handle.await.unwrap();
+        assert!(
+            request.contains("\"think\":false"),
+            "request was: {request}"
+        );
+    }
+
     #[tokio::test]
     async fn chat_parses_the_openai_compatible_response_shape() {
         let (base_url, handle) =
@@ -312,7 +412,7 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        let answer = client.chat(&[("user", "hi")], 0.4, None).await.unwrap();
+        let answer = client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap();
         assert_eq!(answer, "the answer");
         handle.await.unwrap();
     }
@@ -326,7 +426,7 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        let answer = client.chat(&[("user", "hi")], 0.4, None).await.unwrap();
+        let answer = client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap();
         assert_eq!(answer, "");
         handle.await.unwrap();
     }
@@ -339,7 +439,7 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        let err = client.chat(&[("user", "hi")], 0.4, None).await.unwrap_err();
+        let err = client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap_err();
         assert!(err.to_string().contains("500"));
         handle.await.unwrap();
     }

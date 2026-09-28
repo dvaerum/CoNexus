@@ -248,3 +248,47 @@ Implemented 2026-09-28:
   identically against unmodified `main`), not fixed here per the
   policy of not making unrelated host/infra changes as a side effect
   of an unrelated code change.
+
+## Addendum: subject-gen's on-by-default flip surfaced a real, separate bug
+
+Deploying the above to IT-03743 and testing subject-gen end-to-end
+(now that it actually runs, for the first time ever in this project)
+surfaced a genuine defect this ADR's config unification did not
+create, but did expose: `qwen3:1.7b` (the model subject-gen defaults
+to reusing) is a REASONING model. Called through the shared
+OpenAI-compatible `/v1/chat/completions` path with
+`MAX_COMPLETION_TOKENS = 32`, it spends its entire token budget on
+hidden `reasoning` output and never emits real `content` -- silently
+empty every time, degrading to the old truncated-body-preview
+fallback with no visible error. Verified directly against the real
+`big-test-server-01` server:
+
+- The OpenAI-compat `/v1/chat/completions` endpoint does NOT forward
+  Ollama's `"think"` field at all -- setting it has zero effect there.
+- Appending the documented Qwen3 `/no_think` directive to the prompt
+  also has no effect over that endpoint.
+- Raising the token budget to 200 doesn't reliably fix it either --
+  this model can reason at length even for a trivial 6-word task and
+  still never reach a real answer within a generous budget.
+- Ollama's OWN native endpoint, `/api/chat`, DOES honor `"think":
+  false` correctly (confirmed via direct `curl`) -- the compat layer
+  is the gap, not the model or the request field.
+
+**Fix**: `message_suggestions::suggest_subject` now bypasses
+`completion_client::CompletionClient::chat`'s portable `/v1` path
+entirely for this one seam, calling Ollama's native `/api/chat`
+directly (`ollama_native_chat_no_think`, `ollama_native_chat_url`)
+with `"think": false`. This is intentionally NOT a portable,
+provider-agnostic client -- Ollama's native API is Ollama-specific,
+which is fine here because subject-gen has always been documented as
+"always wants a LOCAL Ollama endpoint" (this module's own original
+doc, predating this ADR). RAG's own chat call is unaffected and stays
+on the portable `/v1` path -- it passes no `max_tokens` cap, so the
+reasoning model has room for both the thinking phase and the real
+answer either way; this problem is specific to small, fixed-budget
+completions, of which subject-gen is the only one in this codebase.
+
+Verified against the real deployed server: the exact request shape
+`ollama_native_chat_no_think` builds now returns real subject text
+(`"Deploy to staging failed with timeout"`) instead of an empty
+string, confirmed via direct `curl` before deploying the fix.

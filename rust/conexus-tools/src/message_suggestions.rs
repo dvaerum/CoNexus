@@ -34,8 +34,10 @@
 //! discipline as every other external-service module in this crate
 //! (parallel-test-safety).
 
-use crate::completion_client::{self, CompletionClient};
+use crate::completion_client;
 use crate::context_window::resolve_subject_input_chars;
+use serde::Deserialize;
+use serde_json::json;
 
 const SYSTEM_PROMPT: &str = "Summarize the user's message in 6 words or fewer as an email-style \
      subject line. Return only the subject text, no quotes, no prefix, no punctuation at the \
@@ -98,12 +100,93 @@ fn truncate(subject: &str) -> String {
     out
 }
 
+/// Ollama's own `/api/chat` response shape -- `{"message": {"content":
+/// ...}, "done": ..., ...}`, distinct from the OpenAI-compatible
+/// `{"choices": [...]}` shape [`crate::completion_client`] parses.
+#[derive(Deserialize)]
+struct OllamaChatResponse {
+    message: OllamaChatMessage,
+}
+#[derive(Deserialize)]
+struct OllamaChatMessage {
+    content: Option<String>,
+}
+
+/// `base_url` is `CONEXUS_LLM_BASE_URL`-shaped
+/// (`http://host:port/v1`, an OpenAI-compatible path) -- strips a
+/// trailing `/v1` to reach Ollama's OWN api root, `http://host:port`,
+/// then appends `/api/chat`. A `base_url` that doesn't end in `/v1`
+/// (an unusual override) is used as-is plus `/api/chat` -- best
+/// effort, matches this module's own "always assumes Ollama" design.
+fn ollama_native_chat_url(base_url: &str) -> String {
+    let trimmed = base_url.trim_end_matches('/');
+    let root = trimmed.strip_suffix("/v1").unwrap_or(trimmed);
+    format!("{root}/api/chat")
+}
+
+/// One non-streaming call to Ollama's native `/api/chat`, with
+/// `"think": false` -- see [`suggest_subject`]'s own doc for why this
+/// bypasses [`crate::completion_client::CompletionClient::chat`]'s
+/// portable `/v1` path entirely. Returns `None` on any failure
+/// (transport, non-2xx, bad shape, or empty/null content) -- matches
+/// `suggest_subject`'s own "degrade to None, never propagate" contract.
+async fn ollama_native_chat_no_think(
+    base_url: &str,
+    model: &str,
+    user_content: &str,
+) -> Option<String> {
+    let url = ollama_native_chat_url(base_url);
+    let body = json!({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ],
+        "stream": false,
+        "think": false,
+        "options": {
+            "temperature": TEMPERATURE,
+            "num_predict": MAX_COMPLETION_TOKENS,
+        },
+    });
+    let resp = completion_client::http_client()
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let parsed: OllamaChatResponse = resp.json().await.ok()?;
+    parsed.message.content
+}
+
 /// Ask the configured model for a one-line subject.
 ///
 /// Returns `None` when: subject-gen is disabled
 /// ([`subject_gen_enabled`]); the HTTP call fails for any reason; or
 /// the model returns an empty/whitespace-only completion. Returns the
 /// (trimmed, length-capped) subject string otherwise.
+///
+/// Talks to Ollama's OWN `/api/chat` endpoint, NOT the shared
+/// OpenAI-compatible `/v1/chat/completions` path [`CompletionClient::
+/// chat`] uses -- found live, verified directly against this
+/// deployment's real server: a reasoning model (`qwen3:1.7b`, which
+/// subject-gen defaults to reusing) spends its entire completion-token
+/// budget on hidden chain-of-thought and never emits real `content`
+/// when called through the `/v1` compat layer -- silently empty
+/// output, not an error, and NEITHER of the two documented suppression
+/// mechanisms (`think: false` in the request body, appending
+/// `/no_think` to the prompt) has any effect there; the compat layer
+/// doesn't forward `think` at all. Ollama's native `/api/chat` DOES
+/// honor `"think": false` (confirmed with a real curl call against
+/// `big-test-server-01`), so this one seam bypasses the shared client
+/// entirely for it. This is scoped to subject-gen specifically because
+/// it already only ever targets Ollama by design (this module's own
+/// doc); RAG's own chat call is unaffected (no token-budget cap, so
+/// the reasoning model has room for both phases either way) and stays
+/// on the portable `/v1` path.
 pub async fn suggest_subject(
     get_env: impl Fn(&str) -> Option<String>,
     content: &str,
@@ -123,20 +206,7 @@ pub async fn suggest_subject(
         content.to_string()
     };
 
-    let client = CompletionClient {
-        base_url,
-        api_key: "ollama".to_string(),
-        model,
-    };
-
-    let raw = client
-        .chat(
-            &[("system", SYSTEM_PROMPT), ("user", &content)],
-            TEMPERATURE,
-            Some(MAX_COMPLETION_TOKENS),
-        )
-        .await
-        .ok()?;
+    let raw = ollama_native_chat_no_think(&base_url, &model, &content).await?;
 
     let out = truncate(&raw);
     if out.is_empty() {
@@ -208,6 +278,30 @@ mod tests {
     }
 
     #[test]
+    fn ollama_native_chat_url_strips_the_v1_suffix() {
+        assert_eq!(
+            ollama_native_chat_url("http://localhost:11434/v1"),
+            "http://localhost:11434/api/chat"
+        );
+    }
+
+    #[test]
+    fn ollama_native_chat_url_handles_a_trailing_slash() {
+        assert_eq!(
+            ollama_native_chat_url("http://localhost:11434/v1/"),
+            "http://localhost:11434/api/chat"
+        );
+    }
+
+    #[test]
+    fn ollama_native_chat_url_falls_back_when_base_url_has_no_v1_suffix() {
+        assert_eq!(
+            ollama_native_chat_url("http://localhost:11434"),
+            "http://localhost:11434/api/chat"
+        );
+    }
+
+    #[test]
     fn truncate_trims_and_strips_matching_quotes() {
         assert_eq!(truncate("  \"Deploy failed\"  "), "Deploy failed");
     }
@@ -267,7 +361,7 @@ mod tests {
             let mut buf = [0u8; 8192];
             let _ = socket.read(&mut buf).await;
             let body =
-                r#"{"choices":[{"message":{"content":"  \"Deploy failed on staging\"  "}}]}"#;
+                r#"{"message":{"content":"  \"Deploy failed on staging\"  "}}"#;
             let resp = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),
@@ -307,7 +401,7 @@ mod tests {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut buf = [0u8; 8192];
             let _ = socket.read(&mut buf).await;
-            let body = r#"{"choices":[{"message":{"content":"   "}}]}"#;
+            let body = r#"{"message":{"content":"   "}}"#;
             let resp = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),

@@ -760,6 +760,7 @@ async fn query_rag_system(
             &[("system", SYSTEM_PROMPT_GENERAL), ("user", &user_message)],
             0.4,
             None,
+            None,
         )
         .await
         .map(flag_suspicious_completion)
