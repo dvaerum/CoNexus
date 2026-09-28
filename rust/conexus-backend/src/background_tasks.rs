@@ -1314,13 +1314,27 @@ mod subject_backfill_tests {
     }
 
     #[tokio::test]
-    async fn model_unconfigured_is_a_no_op() {
+    async fn subject_gen_disabled_is_a_no_op() {
+        // ADR-0031: subject-gen defaults ON (reusing the chat model),
+        // so an EMPTY env no longer means "off" the way it did before
+        // that ADR -- it now means "call the real defaults," which is
+        // environment-dependent (whatever's listening on
+        // localhost:11434, if anything) and not a deterministic test.
+        // The actual "should this run at all" switch is now
+        // CONEXUS_ENABLE_SUBJECT_GEN; deliberately disabling it here is
+        // what keeps this test hermetic.
         let (_dir, shared) = test_shared().await;
         {
             let conn = shared.conn.lock().await;
             seed_root(&conn, "m1", "admin", "hello there");
         }
-        let titled = backfill_null_subjects(&shared, env(&[]), 25).await.unwrap();
+        let titled = backfill_null_subjects(
+            &shared,
+            env(&[("CONEXUS_ENABLE_SUBJECT_GEN", "false")]),
+            25,
+        )
+        .await
+        .unwrap();
         assert_eq!(titled, 0);
     }
 

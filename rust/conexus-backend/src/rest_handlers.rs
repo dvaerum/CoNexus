@@ -2349,6 +2349,10 @@ pub async fn create_message(
                 &now,
             )
             .await;
+            crate::server::publish_messages_dashboard_change(
+                &shared,
+                "broadcast_message_via_dashboard",
+            );
         }
         return match outcome {
             Ok((sent_count, _)) => {
@@ -2463,6 +2467,7 @@ pub async fn create_message(
                 &now,
             )
             .await;
+            crate::server::publish_messages_dashboard_change(&shared, "sent_message_via_dashboard");
             SingleSendOutcome::Sent
         }
         Err(e) => e,
@@ -2632,6 +2637,7 @@ pub async fn patch_message(
                 &now,
             )
             .await;
+            crate::server::publish_messages_dashboard_change(&shared, "updated_message");
             true
         }
         None => false,
@@ -2709,6 +2715,10 @@ pub async fn delete_message(
                 &now,
             )
             .await;
+            crate::server::publish_messages_dashboard_change(
+                &shared,
+                "deleted_message_via_dashboard",
+            );
             true
         }
         None => false,
@@ -5083,6 +5093,175 @@ mod tests {
         .await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
+
+    // -----------------------------------------------------------
+    // Found live (2026-09-28): dvv reported the dashboard's Messages
+    // page "sometimes" needing a manual refresh to see a change. Traced
+    // to these 3 hand-rolled message REST routes never publishing a
+    // dashboard-change notification at all -- unlike an agent's
+    // send_agent_message MCP tool call, which routes through
+    // dispatch_rest_tool's publish_dashboard_change and DOES notify.
+    // Reproduced directly in the project's own disposable dev VM
+    // (nix run .#vm-dev, not the live deployment): composed a message
+    // via the dashboard's own "New Message" UI in one tab, a second
+    // tab watching the SAME Messages page never updated without a
+    // manual refresh. These four tests pin the fix
+    // (publish_messages_dashboard_change) at the handler level.
+    // -----------------------------------------------------------
+
+    #[tokio::test]
+    async fn create_message_single_send_publishes_a_dashboard_change_notification() {
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agents (token, agent_id, created_at, status, \
+             working_directory, color) VALUES \
+             ('tok-alice', 'alice', '2026-01-01T00:00:00Z', 'active', '/tmp', '#abc')",
+            [],
+        )
+        .unwrap();
+        let shared = test_shared_state(conn).await;
+        let mut sub = shared
+            .operator_events
+            .subscribe(None, "2026-01-01T00:00:00Z");
+        let resolved = resolved_operator_bearer("dummy-token");
+        let resp = create_message(
+            State(shared),
+            Extension(resolved),
+            Bytes::from(
+                serde_json::to_vec(&json!({
+                    "recipient_id": "alice",
+                    "message_content": "hello alice",
+                }))
+                .unwrap(),
+            ),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let notification = sub
+            .receiver
+            .try_recv()
+            .expect("create_message must publish a dashboard-change notification");
+        assert_eq!(
+            notification["method"],
+            json!("notifications/resources/updated")
+        );
+        assert_eq!(notification["params"]["uri"], json!("conexus://messages"));
+    }
+
+    #[tokio::test]
+    async fn create_message_broadcast_publishes_a_dashboard_change_notification() {
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agents (token, agent_id, created_at, status, \
+             working_directory, color) VALUES \
+             ('tok-alice', 'alice', '2026-01-01T00:00:00Z', 'active', '/tmp', '#abc')",
+            [],
+        )
+        .unwrap();
+        let shared = test_shared_state(conn).await;
+        let mut sub = shared
+            .operator_events
+            .subscribe(None, "2026-01-01T00:00:00Z");
+        let resolved = resolved_operator_bearer("dummy-token");
+        let resp = create_message(
+            State(shared),
+            Extension(resolved),
+            Bytes::from(
+                serde_json::to_vec(&json!({
+                    "recipient_id": "*",
+                    "message_content": "attention everyone",
+                }))
+                .unwrap(),
+            ),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let notification = sub
+            .receiver
+            .try_recv()
+            .expect("broadcast create_message must publish a dashboard-change notification");
+        assert_eq!(
+            notification["method"],
+            json!("notifications/resources/updated")
+        );
+        assert_eq!(notification["params"]["uri"], json!("conexus://messages"));
+    }
+
+    #[tokio::test]
+    async fn patch_message_publishes_a_dashboard_change_notification() {
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agents (token, agent_id, created_at, status, \
+             working_directory, color) VALUES \
+             ('tok-alice', 'alice', '2026-01-01T00:00:00Z', 'active', '/tmp', '#abc')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO agent_messages (message_id, sender_id, recipient_id, \
+             message_content, message_type, priority, timestamp, delivered, read) \
+             VALUES ('m1', 'alice', 'admin', 'hi', 'text', 'normal', \
+             '2026-01-01T00:00:00Z', 0, 0)",
+            [],
+        )
+        .unwrap();
+        let shared = test_shared_state(conn).await;
+        let mut sub = shared
+            .operator_events
+            .subscribe(None, "2026-01-01T00:00:00Z");
+        let resolved = resolved_operator_bearer("dummy-token");
+        let resp = patch_message(
+            Path("m1".to_string()),
+            State(shared),
+            Extension(resolved),
+            Bytes::from(serde_json::to_vec(&json!({"read": true})).unwrap()),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let notification = sub
+            .receiver
+            .try_recv()
+            .expect("patch_message must publish a dashboard-change notification");
+        assert_eq!(
+            notification["method"],
+            json!("notifications/resources/updated")
+        );
+        assert_eq!(notification["params"]["uri"], json!("conexus://messages"));
+    }
+
+    #[tokio::test]
+    async fn delete_message_publishes_a_dashboard_change_notification() {
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agent_messages (message_id, sender_id, recipient_id, \
+             message_content, message_type, priority, timestamp, delivered, read) \
+             VALUES ('m1', 'alice', 'admin', 'hi', 'text', 'normal', \
+             '2026-01-01T00:00:00Z', 0, 0)",
+            [],
+        )
+        .unwrap();
+        let shared = test_shared_state(conn).await;
+        let mut sub = shared
+            .operator_events
+            .subscribe(None, "2026-01-01T00:00:00Z");
+        let resolved = resolved_operator_bearer("dummy-token");
+        let resp = delete_message(Path("m1".to_string()), State(shared), Extension(resolved)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let notification = sub
+            .receiver
+            .try_recv()
+            .expect("delete_message must publish a dashboard-change notification");
+        assert_eq!(
+            notification["method"],
+            json!("notifications/resources/updated")
+        );
+        assert_eq!(notification["params"]["uri"], json!("conexus://messages"));
+    }
+
 
     // -----------------------------------------------------------
     // PF-R14-1 (ported from `tests/router/test_sec_r14_messages_query_

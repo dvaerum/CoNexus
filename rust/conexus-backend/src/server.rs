@@ -419,6 +419,32 @@ fn publish_dashboard_change(shared: &Arc<SharedState>, tool_name: &str, result: 
     }));
 }
 
+/// Sibling to [`publish_dashboard_change`] for `rest_handlers.rs`'s
+/// small set of HAND-ROLLED message REST routes (`create_message`/
+/// `patch_message`/`delete_message`) -- these write to
+/// `message_repository` directly rather than going through
+/// `conexus_auth::dispatch`/`dispatch_rest_tool`, so they never passed
+/// through the tool-name allowlist above and never published a
+/// dashboard-change notification at all. Found live (2026-09-28):
+/// composing/marking-read/deleting a message from the dashboard's own
+/// UI never surfaced to a second open tab/session without a manual
+/// refresh, while the identical mutation done via an agent's
+/// `send_agent_message` MCP tool call DID (that path routes through
+/// `dispatch_rest_tool` above). No `tool_name`/`ToolResult` gating
+/// here -- callers only invoke this from their own already-verified
+/// success path, so gating on an artificial "tool name" would just be
+/// a second, parallel place to keep in sync with reality. `action_type`
+/// is a free-form label for the notification payload only (mirrors the
+/// `action_type` field `publish_dashboard_change` sends, not tied to
+/// any tool-name allowlist).
+pub(crate) fn publish_messages_dashboard_change(shared: &Arc<SharedState>, action_type: &str) {
+    shared.operator_events.publish(serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/resources/updated",
+        "params": {"uri": "conexus://messages", "action_type": action_type},
+    }));
+}
+
 pub(crate) async fn dispatch_rest_tool(
     shared: &Arc<SharedState>,
     tool_name: &str,
