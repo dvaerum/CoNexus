@@ -134,6 +134,7 @@ export function TasksDashboard() {
       assignment: 'all',
       createdBy: '',
     },
+    storageKey: 'conexus.filters.tasks',
   })
   const { searchTerm, priorityFilter, statusFilter, assignment, createdBy } = filters
 

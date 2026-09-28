@@ -114,6 +114,7 @@ export function MemoriesDashboard() {
   // covers filter fields, not sort order).
   const { filters, setFilter } = useFilters<{ searchTerm: string }>({
     initial: { searchTerm: '' },
+    storageKey: 'conexus.filters.memories',
   })
   const { searchTerm } = filters
   const [sortBy, setSortBy] = useState<string>('updated_at')

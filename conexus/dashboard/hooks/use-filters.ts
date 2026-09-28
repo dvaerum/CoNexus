@@ -1,6 +1,51 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+
+/**
+ * `sessionStorage` read for a `useFilters` persistence key — tolerant
+ * of every failure mode: no `window` (SSR/prerender), storage
+ * disabled (private browsing in some browsers), a missing key, or a
+ * value that no longer matches `T`'s current shape (an app update
+ * added/removed a filter field since the value was written). Any of
+ * these degrade to `null` — the caller falls back to `initial` — never
+ * throws, since a corrupt/stale persisted filter must not break the
+ * page.
+ *
+ * Only keys already present on `initial` are copied over from the
+ * parsed value — this is what makes the "shape drift" case safe: an
+ * old persisted blob with a field the current build no longer
+ * declares is silently dropped instead of leaking an unknown field
+ * into `T`, and a new field the current build added but the old blob
+ * never had just falls through to `initial`'s value for that key.
+ */
+function readPersistedFilters<T extends object>(
+  storageKey: string,
+  initial: T,
+): T | null {
+  if (typeof window === "undefined") return null
+  let raw: string | null
+  try {
+    raw = window.sessionStorage.getItem(storageKey)
+  } catch {
+    return null
+  }
+  if (!raw) return null
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== "object" || parsed === null) return null
+  const merged = { ...initial }
+  for (const key of Object.keys(initial) as (keyof T)[]) {
+    if (key in parsed) {
+      merged[key] = (parsed as Record<keyof T, T[keyof T]>)[key]
+    }
+  }
+  return merged
+}
 
 /**
  * Generic filter state machine — the lone owner of the
@@ -40,6 +85,7 @@ import { useCallback, useMemo, useState } from "react"
  *     const { filters, setFilter, clearAll, isActive } = useFilters<Filters>({
  *       initial: { from: "", to: "", q: "" },
  *       onReset: () => setCurrentOffset(0),  // optional
+ *       storageKey: "conexus.filters.messages",  // optional
  *     })
  *
  *     // Single-field update — fires onReset.
@@ -84,10 +130,28 @@ import { useCallback, useMemo, useState } from "react"
  *     with explicit index. The ``object`` bound accepts both shapes
  *     and the per-field value type is still preserved via the
  *     ``<K extends keyof T>`` parameter on ``setFilter``.
+ *
+ *   * ``storageKey``, when given, persists `filters` to
+ *     `sessionStorage` under that key — restored on mount (before the
+ *     first paint, via `useState`'s lazy initializer, so there's no
+ *     flash of the default filters before the persisted ones apply)
+ *     and written on every change (`setFilter`/`clearAll`). This is
+ *     the fix for "a refresh, or navigating to another dashboard page
+ *     and back, loses whatever filter I had set" — `sessionStorage`
+ *     survives both (a page reload and an in-tab route change both
+ *     keep the same browsing session), while still clearing on tab
+ *     close (`localStorage` would instead leak a stale filter into a
+ *     future, unrelated session — deliberately not used here). Each
+ *     consumer needs its OWN key (e.g. `"conexus.filters.tasks"`,
+ *     `"conexus.filters.messages"`) — sharing one key across pages
+ *     would cross-contaminate unrelated filter shapes. Omit
+ *     `storageKey` for a consumer that doesn't want persistence (rare;
+ *     every real dashboard page wants it).
  */
 export function useFilters<T extends object>({
   initial,
   onReset,
+  storageKey,
 }: {
   /** Start state. Also the target of `clearAll` and the baseline for `isActive`. */
   initial: T
@@ -97,6 +161,11 @@ export function useFilters<T extends object>({
    * pagination cursor; tasks- and agents-dashboard don't pass one.
    */
   onReset?: () => void
+  /**
+   * Optional `sessionStorage` key. When given, `filters` is restored
+   * from (and persisted to) that key — see the design notes above.
+   */
+  storageKey?: string
 }): {
   /** The current filter snapshot. */
   readonly filters: T
@@ -117,7 +186,22 @@ export function useFilters<T extends object>({
    */
   readonly isActive: boolean
 } {
-  const [filters, setFilters] = useState<T>(initial)
+  const [filters, setFilters] = useState<T>(() =>
+    storageKey ? (readPersistedFilters(storageKey, initial) ?? initial) : initial,
+  )
+
+  // Persist on every change. A plain effect (not folded into
+  // setFilter/clearAll) so ANY path that ends up calling `setFilters`
+  // stays in sync with storage automatically, present or future.
+  useEffect(() => {
+    if (!storageKey || typeof window === "undefined") return
+    try {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(filters))
+    } catch {
+      // Storage disabled/full -- filters still work in-memory for this
+      // session, just without persistence. Never throw over this.
+    }
+  }, [filters, storageKey])
 
   // Stable identity so consumers can pass it down to memoised children
   // without busting their memo on every render.

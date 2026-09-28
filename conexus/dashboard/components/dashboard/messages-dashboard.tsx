@@ -93,6 +93,7 @@ export function MessagesDashboard() {
       q: "",
     },
     onReset: () => setCurrentOffset(0),
+    storageKey: "conexus.filters.messages",
   })
 
   // Per-row selection (message_id set). Cleared after every refresh

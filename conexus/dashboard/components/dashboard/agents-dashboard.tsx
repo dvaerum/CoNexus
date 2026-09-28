@@ -69,6 +69,7 @@ export function AgentsDashboard() {
     statusFilter: string
   }>({
     initial: { searchTerm: '', statusFilter: 'all' },
+    storageKey: 'conexus.filters.agents',
   })
   const { searchTerm, statusFilter } = filters
   // Five row-action dialogs use the live-lookup useDialog<T> hook

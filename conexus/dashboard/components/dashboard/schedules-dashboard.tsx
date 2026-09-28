@@ -34,6 +34,7 @@ import { FormDialog } from "@/components/dashboard/shared/form-dialog"
 import { AgentSelect } from "@/components/dashboard/shared/agent-select"
 import { FilterField } from "@/components/dashboard/shared/filter-field"
 import { DataTablePage } from "@/components/dashboard/shared/data-table-page"
+import { useFilters } from "@/hooks/use-filters"
 import type { Column } from "@/components/dashboard/shared/responsive-data-table"
 import { toastError, toastSuccess } from "@/components/ui/toast"
 import { apiClient, type Schedule } from "@/lib/api"
@@ -103,8 +104,18 @@ export function SchedulesDashboard() {
   const [floor, setFloor] = useState<number>(60)
   const [maxPerAgent, setMaxPerAgent] = useState<number>(10)
 
-  const [agentFilter, setAgentFilter] = useState<string>("all")
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  // Filter state — owned by the shared useFilters hook (matches
+  // Agents/Tasks/Messages/Memories). No onReset: schedules-dashboard
+  // has no pagination cursor, filter changes just re-run the
+  // client-side filter pass below.
+  const { filters, setFilter } = useFilters<{
+    agentFilter: string
+    statusFilter: StatusFilter
+  }>({
+    initial: { agentFilter: "all", statusFilter: "all" },
+    storageKey: "conexus.filters.schedules",
+  })
+  const { agentFilter, statusFilter } = filters
 
   // create/edit modal
   const [formOpen, setFormOpen] = useState(false)
@@ -405,7 +416,7 @@ export function SchedulesDashboard() {
   const filterBar = (
     <>
       <FilterField label="Agent">
-        <Select value={agentFilter} onValueChange={setAgentFilter}>
+        <Select value={agentFilter} onValueChange={(v) => setFilter("agentFilter", v)}>
           <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by agent">
             <SelectValue placeholder="All agents" />
           </SelectTrigger>
@@ -419,7 +430,7 @@ export function SchedulesDashboard() {
       </FilterField>
       <FilterField label="Status">
         <Select value={statusFilter}
-                onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                onValueChange={(v) => setFilter("statusFilter", v as StatusFilter)}>
           <SelectTrigger className="w-full sm:w-[160px]" aria-label="Filter by status">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
