@@ -161,21 +161,23 @@ async fn config_allow_worker_view_foreign_tasks(db: &sea_orm::DatabaseConnection
         .unwrap_or(true)
 }
 
-/// Why [`query_rag_system`] failed to produce an answer. Both variants
-/// render to the IDENTICAL generic `Failed` message at the tool
-/// boundary (SD-R9-1: never leak provider detail to a worker) --
-/// kept as a real enum, not a bare error unit, so the two call sites
-/// that construct it can each log a distinctly-worded `eprintln!`
-/// before discarding the real error (this workspace still has no
-/// logging/tracing crate -- see `project_settings_tools`'s own note --
-/// so this matches the plain-`eprintln!` convention already used
-/// elsewhere, e.g. `conexus-backend::server.rs`'s `log_failed_tool_
-/// result`). No live behavioral difference between variants today.
+/// Why [`query_rag_system`] failed to produce an answer. Renders to
+/// the generic `Failed` message at the tool boundary (SD-R9-1: never
+/// leak provider detail to a worker) -- kept as a real type, not a
+/// bare error unit, so its one call site can log a distinctly-worded
+/// `eprintln!` before discarding the real error (this workspace still
+/// has no logging/tracing crate -- see `project_settings_tools`'s own
+/// note -- so this matches the plain-`eprintln!` convention already
+/// used elsewhere, e.g. `conexus-backend::server.rs`'s
+/// `log_failed_tool_result`).
+///
+/// Only one variant now: `completion_client::resolve` became
+/// infallible once the OpenAI cloud-provider branch (the only source
+/// of a resolution-time config error) was removed -- a chat-completion
+/// failure can now only happen at the actual HTTP-call stage.
 #[derive(Debug)]
-enum RagQueryError {
-    CompletionNotConfigured,
-    CompletionUnavailable,
-}
+struct RagQueryError;
+
 
 const SYSTEM_PROMPT_GENERAL: &str = "You are an AI assistant answering questions about a software project. \
 Use the provided context, which may include recently updated live data (like project context keys or tasks) and information retrieved from an indexed knowledge base (like documentation or code summaries), to answer the user's query. \
@@ -749,20 +751,10 @@ async fn query_rag_system(
     let user_message = assemble_user_message(&combined_context_str, query_text, &nonce);
 
     // --- 5. Chat completion ---
-    let client = completion_client::resolve_from_process_env().map_err(|e| {
-        // SD-R9-1: the caller-facing message stays the identical
-        // generic string either way (see RagQueryError's own doc) --
-        // but unlike the earlier draft of this port, the real detail
-        // is no longer discarded before it could ever reach a log.
-        // Matches Python's own `logger.error(..., exc_info=True)`
-        // half of this fix, which the original `map_err(|_| ...)`
-        // here silently dropped.
-        eprintln!(
-            "{}",
-            rag_completion_error_log_line("completion client unavailable", &e)
-        );
-        RagQueryError::CompletionNotConfigured
-    })?;
+    // `resolve` is infallible now (no more OpenAI-key-without-model
+    // config error) -- the only remaining failure mode is the actual
+    // HTTP call below.
+    let client = completion_client::resolve_from_process_env();
     client
         .chat(
             &[("system", SYSTEM_PROMPT_GENERAL), ("user", &user_message)],
@@ -776,7 +768,7 @@ async fn query_rag_system(
                 "{}",
                 rag_completion_error_log_line("chat completion failed", &e)
             );
-            RagQueryError::CompletionUnavailable
+            RagQueryError
         })
 }
 
@@ -1055,7 +1047,7 @@ mod tests {
 
     // ── query_rag_system -- degrade paths (no completion provider) ───
     //
-    // With no OPENAI_API_KEY / OLLAMA endpoint reachable in the test
+    // With no Ollama endpoint reachable in the test
     // sandbox, an empty knowledge base + no live matches returns the
     // "no relevant information" success text WITHOUT ever needing a
     // real completion call -- proving the empty-context early-return

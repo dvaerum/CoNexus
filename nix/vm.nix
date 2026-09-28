@@ -1,4 +1,13 @@
-{ config, lib, pkgs, modulesPath, src ? null, mode ? "multi", craneLib ? null, ... }@vmArgs:
+{
+  config,
+  lib,
+  pkgs,
+  modulesPath,
+  src ? null,
+  mode ? "multi",
+  craneLib ? null,
+  ...
+}@vmArgs:
 # NixOS configuration consumed by `lib.nixosSystem`. `mode` is a
 # vestigial parameter kept only for caller signature compatibility
 # (nix/vm-dev.nix passes `mode = "multi"` explicitly) — it no longer
@@ -48,31 +57,31 @@
 #
 #     llm                    "internal" (default) | "external"
 #     llmHost                "10.0.2.2"
-#     llmChatPort            11435               (llama-cpp)
+#     llmPort                11434               (ollama -- chat + embeddings, one shared endpoint)
 #     llmChatModel           "qwen2.5:3b-instruct"
-#     llmEmbeddingPort       11434               (ollama)
 #     llmEmbeddingModel      "qwen3-embedding:0.6b"
 #     llmEmbeddingDimension  1024
 #
-# Which env var drives which endpoint (see the module docstrings in
-# conexus/external/{completion,embedding}_service.py — the seams
-# resolve INDEPENDENTLY, no Python change is needed here):
+# ADR-0031: chat and embedding share ONE base URL now (`llmHost:
+# llmPort`), not two independently-portable endpoints -- matches the
+# Rust port's `completion_client`/`embedding_client` both resolving
+# `CONEXUS_LLM_BASE_URL`. (Pre-ADR-0031, this file deliberately split
+# them onto two ports so a developer could point chat at a
+# llama.cpp instance and embeddings at Ollama simultaneously; that
+# capability is intentionally dropped, not preserved elsewhere --
+# the real deployment this VM mirrors already runs both off the same
+# Ollama instance.)
 #
-#   CONEXUS_LLM_BASE_URL → chat / completion  (llmChatPort)
-#   OPENAI_BASE_URL        → embeddings         (llmEmbeddingPort)
+#   CONEXUS_LLM_BASE_URL → chat + embeddings + subject-gen, all three
+#   CONEXUS_CHAT_MODEL   → chat/completion model name
+#   CONEXUS_EMBEDDING_MODEL / CONEXUS_EMBEDDING_DIMENSION → embedding model/dimension
 #
-# `OPENAI_API_KEY` must be non-empty in external mode. It is the
-# switch BOTH seams branch on, and core/config.py's
-# `os.environ.setdefault` fallback block (config.py ~:233) only
-# fires when it is unset — leaving it unset would silently re-point
-# everything at the in-guest 127.0.0.1:11434 that external mode
-# does not run. Because setting it also SKIPS that block's
-# embedding defaults, external mode must state
-# CONEXUS_EMBEDDING_MODEL / _DIMENSION explicitly, or the
-# constants freeze to the OpenAI cloud fallbacks
-# (text-embedding-3-large / 1536) that ollama does not serve.
-# `OPENAI_MODEL` is likewise mandatory: `completion_client()`
-# raises CompletionConfigError when a key is set without it.
+# No provider-switch sentinel needed anymore (`OPENAI_API_KEY` used to
+# be the required non-empty value that selected the OpenAI-shaped
+# client and suppressed the in-guest-ollama default) -- the OpenAI
+# cloud-provider branch is gone from both Rust clients, so setting
+# `CONEXUS_LLM_BASE_URL` is sufficient on its own to redirect away
+# from the in-guest default.
 
 let
   # `mode` used to select between the multi-tenant router shape and a
@@ -98,31 +107,27 @@ let
   # nix/vm-dev.nix overrides at its `import ./vm.nix { … }` call site.
   llm = vmArgs.llm or "internal";
   llmHost = vmArgs.llmHost or "10.0.2.2";
-  llmChatPort = vmArgs.llmChatPort or 11435;
+  llmPort = vmArgs.llmPort or 11434;
   llmChatModel = vmArgs.llmChatModel or "qwen2.5:3b-instruct";
-  llmEmbeddingPort = vmArgs.llmEmbeddingPort or 11434;
   llmEmbeddingModel = vmArgs.llmEmbeddingModel or "qwen3-embedding:0.6b";
   llmEmbeddingDimension = vmArgs.llmEmbeddingDimension or 1024;
 
   internalLlm =
-    if llm == "internal" then true
-    else if llm == "external" then false
-    else throw "nix/vm.nix: llm must be \"internal\" or \"external\", got \"${toString llm}\"";
+    if llm == "internal" then
+      true
+    else if llm == "external" then
+      false
+    else
+      throw "nix/vm.nix: llm must be \"internal\" or \"external\", got \"${toString llm}\"";
 
-  chatBaseUrl = "http://${llmHost}:${toString llmChatPort}/v1";
-  embeddingBaseUrl = "http://${llmHost}:${toString llmEmbeddingPort}/v1";
+  llmBaseUrl = "http://${llmHost}:${toString llmPort}/v1";
 
   # Applied to whichever unit actually runs conexus (the lazily
   # spawned `conexus@` backends). The router is a pure proxy and never
   # embeds or completes, so it needs none of this.
   externalLlmEnvironment = {
-    # Non-empty sentinel: selects the OpenAI-shaped client on both
-    # seams and suppresses the in-guest-ollama setdefault fallback.
-    # Neither endpoint checks it.
-    OPENAI_API_KEY = "external";
-    OPENAI_BASE_URL = embeddingBaseUrl;
-    CONEXUS_LLM_BASE_URL = chatBaseUrl;
-    OPENAI_MODEL = llmChatModel;
+    CONEXUS_LLM_BASE_URL = llmBaseUrl;
+    CONEXUS_CHAT_MODEL = llmChatModel;
     CONEXUS_EMBEDDING_MODEL = llmEmbeddingModel;
     CONEXUS_EMBEDDING_DIMENSION = toString llmEmbeddingDimension;
   };
@@ -153,10 +158,14 @@ let
   # flake.nix's vmDev once did) produces a VM with no working router at all,
   # not a degraded-but-functional one.
   conexusPkgsForVm =
-    if craneLib == null then null
-    else import ./conexus.nix { inherit pkgs lib craneLib; src = src; };
-  conexusLauncher =
-    if conexusPkgsForVm == null then null else conexusPkgsForVm.conexusLauncher;
+    if craneLib == null then
+      null
+    else
+      import ./conexus.nix {
+        inherit pkgs lib craneLib;
+        src = src;
+      };
+  conexusLauncher = if conexusPkgsForVm == null then null else conexusPkgsForVm.conexusLauncher;
   conexusRouterWrapper =
     if conexusPkgsForVm == null then null else conexusPkgsForVm.conexusRouterWrapper;
 in
@@ -178,7 +187,8 @@ in
       password = "root";
       hashedPassword = lib.mkForce null;
     };
-  } // lib.optionalAttrs internalLlm {
+  }
+  // lib.optionalAttrs internalLlm {
     # Override DynamicUser=yes — systemd's per-service state-dir
     # bind-mount of /var/lib/private/ollama onto /var/lib/ollama
     # collides with our 9p mountpoint (Device or resource busy).
@@ -217,7 +227,10 @@ in
     enable = internalLlm;
     host = "127.0.0.1";
     port = 11434;
-    loadModels = lib.optionals internalLlm [ "qwen3-embedding:0.6b" "qwen3:1.7b" ];
+    loadModels = lib.optionals internalLlm [
+      "qwen3-embedding:0.6b"
+      "qwen3:1.7b"
+    ];
   };
 
   systemd.services = lib.mkMerge [
@@ -239,8 +252,19 @@ in
         # Drop nearly all the hardening — it both bind-mounts on top of
         # /var/lib/ollama (collides with our 9p mount) and strips the
         # caps that let root override the in-guest VFS perm check.
-        AmbientCapabilities = lib.mkForce [ "CAP_DAC_OVERRIDE" "CAP_DAC_READ_SEARCH" "CAP_CHOWN" "CAP_FOWNER" ];
-        CapabilityBoundingSet = lib.mkForce [ "CAP_DAC_OVERRIDE" "CAP_DAC_READ_SEARCH" "CAP_CHOWN" "CAP_FOWNER" "CAP_NET_BIND_SERVICE" ];
+        AmbientCapabilities = lib.mkForce [
+          "CAP_DAC_OVERRIDE"
+          "CAP_DAC_READ_SEARCH"
+          "CAP_CHOWN"
+          "CAP_FOWNER"
+        ];
+        CapabilityBoundingSet = lib.mkForce [
+          "CAP_DAC_OVERRIDE"
+          "CAP_DAC_READ_SEARCH"
+          "CAP_CHOWN"
+          "CAP_FOWNER"
+          "CAP_NET_BIND_SERVICE"
+        ];
         PrivateUsers = lib.mkForce false;
         PrivateTmp = lib.mkForce false;
         ProtectSystem = lib.mkForce false;
@@ -271,7 +295,10 @@ in
         wantedBy = [ "multi-user.target" ];
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
-        path = [ pkgs.curl pkgs.coreutils ];
+        path = [
+          pkgs.curl
+          pkgs.coreutils
+        ];
         serviceConfig = {
           Type = "oneshot";
           # Stay "active" after success so units that `requires` it
@@ -291,7 +318,8 @@ in
           # of any kind needed, same idiom as vm-dev.nix's
           # bootstrap-seed / dev-mode-banner units.
           DynamicUser = true;
-        } // hardening;
+        }
+        // hardening;
         script = ''
           set -u
           rc=0
@@ -321,19 +349,17 @@ in
             return 1
           }
 
-          probe "${chatBaseUrl}/models" "chat/completion (${llmChatModel})" || true
-          probe "${embeddingBaseUrl}/models" "embeddings (${llmEmbeddingModel})" || true
+          probe "${llmBaseUrl}/models" "chat + embeddings (${llmChatModel} / ${llmEmbeddingModel})" || true
 
           if [ "$rc" -ne 0 ]; then
             echo "" >&2
             echo "============================================================" >&2
             echo "!! conexus: EXTERNAL LLM MODE — host endpoint unreachable" >&2
-            echo "!!   chat:       ${chatBaseUrl}" >&2
-            echo "!!   embeddings: ${embeddingBaseUrl}" >&2
+            echo "!!   llm: ${llmBaseUrl}" >&2
             echo "!!" >&2
             echo "!! ${llmHost} is qemu user-mode's alias for the HOST's" >&2
             echo "!! loopback: it only works while the host is actually" >&2
-            echo "!! serving these ports. Start them on the host, or" >&2
+            echo "!! serving this port. Start it on the host, or" >&2
             echo "!! rebuild this VM with llm = \"internal\" to run ollama" >&2
             echo "!! inside the guest (costs ~2 GB more guest RAM)." >&2
             echo "!!" >&2
@@ -384,7 +410,12 @@ in
     };
   };
 
-  environment.systemPackages = with pkgs; [ curl jq htop vim ];
+  environment.systemPackages = with pkgs; [
+    curl
+    jq
+    htop
+    vim
+  ];
 
   virtualisation = {
     # internal: 4096 — `loadModels` keeps ~1.6 GB of weights resident
@@ -406,8 +437,12 @@ in
     diskSize = if internalLlm then 8192 else 4096;
     graphics = false;
     forwardPorts = [
-      { from = "host"; host.address = "127.0.0.1"; host.port = 5454;
-        guest.port = inVmHostPort; }
+      {
+        from = "host";
+        host.address = "127.0.0.1";
+        host.port = 5454;
+        guest.port = inVmHostPort;
+      }
     ];
     # 9p source path is a shell var the wrapper sets just before
     # exec'ing this VM's run-script; "$CONEXUS_OLLAMA_DIR" is the

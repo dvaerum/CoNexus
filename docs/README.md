@@ -11,7 +11,7 @@ For operators standing up the router, the dashboard, or a
 per-project backend.
 
 - [`getting-started.md`](./operator/getting-started.md) — install, first-boot bootstrap (wizard / env vars / CLI), env-var reference, your first multi-agent project walkthrough.
-- [`local-embeddings-guide.md`](./operator/local-embeddings-guide.md) — running the embeddings stack against a local Ollama instead of OpenAI.
+- [`local-embeddings-guide.md`](./operator/local-embeddings-guide.md) — running CoNexus's local Ollama-backed chat/embedding/subject-gen stack.
 - [`vm.md`](./operator/vm.md) — the NixOS VM the project ships for end-to-end testing against a production-shaped deployment.
 
 ### [`integrations/`](./integrations/) — connecting external clients

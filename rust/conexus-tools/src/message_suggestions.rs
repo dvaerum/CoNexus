@@ -5,26 +5,38 @@
 //! module asks a local Ollama (or any OpenAI `/v1`-compatible)
 //! endpoint to produce a one-line summary of the body.
 //!
-//! Deliberately does NOT reuse [`crate::completion_client::resolve`]
-//! (this crate's RAG-facing completion resolver) even though both end
-//! up talking to an OpenAI-shaped `/chat/completions` endpoint --
-//! Python's own module doc explains why: this module always wants a
-//! LOCAL Ollama endpoint regardless of whatever provider RAG
-//! embeddings/completions are configured with for this deploy, so the
-//! two config surfaces (`CONEXUS_SUBJECT_MODEL`/`CONEXUS_LLM_BASE_URL`
-//! here vs. `OPENAI_API_KEY`/`OLLAMA_MODEL` there) are kept genuinely
-//! separate. [`crate::completion_client::CompletionClient`] itself
-//! (the struct + its `chat()` method) IS reused directly -- only the
-//! *resolution* is bespoke.
+//! ADR-0031: reuses [`crate::completion_client`]'s config surface
+//! directly now (`CONEXUS_CHAT_MODEL`/`CONEXUS_LLM_BASE_URL`) via
+//! `CONEXUS_SUBJECT_MODEL`, which now defaults to the SAME model as
+//! chat completion (`qwen3:1.7b`) rather than requiring its own
+//! separately-configured model name -- previously this module
+//! deliberately kept its config surface (`CONEXUS_SUBJECT_MODEL`)
+//! separate from RAG's (`OPENAI_API_KEY`/`OLLAMA_MODEL`) so a
+//! deployment's chat-completion PROVIDER choice couldn't silently
+//! change subject-gen's behavior underneath it; now that there is only
+//! one provider (no more OpenAI cloud branch) and one shared base URL,
+//! that separation no longer buys anything, so subject-gen reuses the
+//! already-warm chat model unless overridden.
+//!
+//! Enablement and model choice are two independent questions now
+//! (previously conflated into one: "is `CONEXUS_SUBJECT_MODEL` set at
+//! all"). [`subject_gen_enabled`] answers "should this feature run at
+//! all" (`CONEXUS_ENABLE_SUBJECT_GEN`, default **on** -- unlike chat/
+//! embedding, which are required subsystems, this is the one optional
+//! feature of the three, but its cost is now zero extra config to turn
+//! on: no model name to type, it just reuses the chat model). The
+//! model name itself ([`resolve_subject_model`]) always has a real
+//! value, the same way `CONEXUS_CHAT_MODEL`/`CONEXUS_EMBEDDING_MODEL`
+//! do -- "unset" is no longer a magic "feature off" sentinel for any
+//! of the three model vars.
 //!
 //! Same "explicit `get_env` lookup, not a hidden `std::env::var` read"
 //! discipline as every other external-service module in this crate
 //! (parallel-test-safety).
 
-use crate::completion_client::CompletionClient;
+use crate::completion_client::{self, CompletionClient};
 use crate::context_window::resolve_subject_input_chars;
 
-const DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
 const SYSTEM_PROMPT: &str = "Summarize the user's message in 6 words or fewer as an email-style \
      subject line. Return only the subject text, no quotes, no prefix, no punctuation at the \
      end.";
@@ -39,10 +51,29 @@ fn env_nonempty(get_env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<
         .filter(|v| !v.is_empty())
 }
 
-/// True when `CONEXUS_SUBJECT_MODEL` is set (non-empty) -- no model
-/// configured means nothing to generate with.
-pub fn subject_model_configured(get_env: &impl Fn(&str) -> Option<String>) -> bool {
-    env_nonempty(get_env, "CONEXUS_SUBJECT_MODEL").is_some()
+/// Whether subject-gen should run at all. Default **on** -- explicit
+/// falsy values (`0`/`false`/`no`, case-insensitive) turn it off; any
+/// other value (including unset) leaves it on. Same recognized-values
+/// convention as `CONEXUS_DISABLE_AUTO_INDEXING`
+/// (`background_tasks::rag_indexing`), just inverted polarity (this
+/// one is an ENABLE flag defaulting on, not a DISABLE flag defaulting
+/// off) -- the feature this flag gates is genuinely optional (RAG
+/// works fine without a generated subject; the fallback body-preview
+/// truncation is a legitimate steady state, not a degraded error),
+/// unlike chat/embedding, which have no such flag because they aren't
+/// optional.
+pub fn subject_gen_enabled(get_env: &impl Fn(&str) -> Option<String>) -> bool {
+    !env_nonempty(get_env, "CONEXUS_ENABLE_SUBJECT_GEN")
+        .is_some_and(|v| matches!(v.to_ascii_lowercase().as_str(), "0" | "false" | "no"))
+}
+
+/// The model subject-gen calls -- `CONEXUS_SUBJECT_MODEL` if set,
+/// else whatever `CONEXUS_CHAT_MODEL` resolves to (reuse, not a
+/// separate default) -- always a real value, never "unset means off"
+/// (see module doc).
+fn resolve_subject_model(get_env: &impl Fn(&str) -> Option<String>) -> String {
+    env_nonempty(get_env, "CONEXUS_SUBJECT_MODEL")
+        .unwrap_or_else(|| completion_client::resolve(get_env).model)
 }
 
 /// Trim whitespace, strip enclosing quotes, collapse internal
@@ -67,19 +98,21 @@ fn truncate(subject: &str) -> String {
     out
 }
 
-/// Ask the configured Ollama model for a one-line subject.
+/// Ask the configured model for a one-line subject.
 ///
-/// Returns `None` when: `CONEXUS_SUBJECT_MODEL` is unset; the HTTP
-/// call fails for any reason; or the model returns an empty /
-/// whitespace-only completion. Returns the (trimmed, length-capped)
-/// subject string otherwise.
+/// Returns `None` when: subject-gen is disabled
+/// ([`subject_gen_enabled`]); the HTTP call fails for any reason; or
+/// the model returns an empty/whitespace-only completion. Returns the
+/// (trimmed, length-capped) subject string otherwise.
 pub async fn suggest_subject(
     get_env: impl Fn(&str) -> Option<String>,
     content: &str,
 ) -> Option<String> {
-    let model = env_nonempty(&get_env, "CONEXUS_SUBJECT_MODEL")?;
-    let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
-        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+    if !subject_gen_enabled(&get_env) {
+        return None;
+    }
+    let model = resolve_subject_model(&get_env);
+    let base_url = completion_client::resolve(&get_env).base_url;
 
     // Head-truncate so the input can never overflow the model's
     // context window -- see context_window's own module doc.
@@ -127,24 +160,51 @@ mod tests {
     }
 
     #[test]
-    fn model_unconfigured_by_default() {
-        assert!(!subject_model_configured(&env(&[])));
+    fn subject_gen_enabled_by_default() {
+        assert!(subject_gen_enabled(&env(&[])));
     }
 
     #[test]
-    fn model_configured_when_set_nonempty() {
-        assert!(subject_model_configured(&env(&[(
-            "CONEXUS_SUBJECT_MODEL",
+    fn subject_gen_disabled_when_explicitly_turned_off() {
+        for falsy in ["0", "false", "FALSE", "no", "No"] {
+            assert!(
+                !subject_gen_enabled(&env(&[("CONEXUS_ENABLE_SUBJECT_GEN", falsy)])),
+                "expected {falsy:?} to disable subject-gen"
+            );
+        }
+    }
+
+    #[test]
+    fn subject_gen_stays_enabled_for_any_other_value() {
+        assert!(subject_gen_enabled(&env(&[(
+            "CONEXUS_ENABLE_SUBJECT_GEN",
+            "1"
+        )])));
+        assert!(subject_gen_enabled(&env(&[(
+            "CONEXUS_ENABLE_SUBJECT_GEN",
+            "yes"
+        )])));
+    }
+
+    #[test]
+    fn subject_model_defaults_to_the_chat_model_when_unset() {
+        assert_eq!(resolve_subject_model(&env(&[])), "qwen3:1.7b");
+    }
+
+    #[test]
+    fn subject_model_honours_its_own_explicit_override() {
+        assert_eq!(
+            resolve_subject_model(&env(&[("CONEXUS_SUBJECT_MODEL", "qwen2.5:3b-instruct")])),
             "qwen2.5:3b-instruct"
-        )])));
+        );
     }
 
     #[test]
-    fn whitespace_only_model_env_counts_as_unconfigured() {
-        assert!(!subject_model_configured(&env(&[(
-            "CONEXUS_SUBJECT_MODEL",
-            "   "
-        )])));
+    fn subject_model_reuses_an_explicit_chat_model_override_when_its_own_is_unset() {
+        assert_eq!(
+            resolve_subject_model(&env(&[("CONEXUS_CHAT_MODEL", "llama3:8b")])),
+            "llama3:8b"
+        );
     }
 
     #[test]
@@ -172,8 +232,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn suggest_subject_is_none_when_the_model_is_unconfigured() {
-        let out = suggest_subject(env(&[]), "hello world").await;
+    async fn suggest_subject_is_none_when_disabled() {
+        let out = suggest_subject(
+            env(&[("CONEXUS_ENABLE_SUBJECT_GEN", "false")]),
+            "hello world",
+        )
+        .await;
         assert_eq!(out, None);
     }
 

@@ -14,7 +14,13 @@
 #      /app/only-project/<section>  (W1 redirect; decision #9).
 #   3. /app/only-project/ → 200 (sanity: the configured project's
 #      URL is unaffected).
-{ pkgs, lib, self, craneLib, ... }:
+{
+  pkgs,
+  lib,
+  self,
+  craneLib,
+  ...
+}:
 
 let
   ports = import ./_ports.nix;
@@ -50,8 +56,9 @@ let
   # real ``pkgs.writeText`` derivation built from ``builtins.toJSON``
   # sidesteps shell/systemd escaping entirely; nothing about this file
   # is one-off imperative munging anymore.
-  projectsSeedFile = pkgs.writeText "projects.local.json"
-    (builtins.toJSON { ${singleName} = singleWorkspace; });
+  projectsSeedFile = pkgs.writeText "projects.local.json" (
+    builtins.toJSON { ${singleName} = singleWorkspace; }
+  );
   # R8-F2 regression guard: merge the real shared hardening subset
   # (single source of truth for all 6 production call sites — see
   # nix/hardening.nix) into these two hand-rolled test units, exactly
@@ -70,14 +77,13 @@ let
   # nix/module.nix's `forwarding_hmac` key-file pattern (search that
   # file for "F015 v4"), except this value is a fixed, publicly-known
   # CI sentinel rather than `/dev/urandom` output.
-  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env"
-    "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
+  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env" "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
 in
 pkgs.testers.nixosTest {
   name = "conexus-single-tenant";
 
   nodes.machine = { config, pkgs, ... }: {
-    imports = [ ./fake-openai.nix ];
+    imports = [ ./fake-llm.nix ];
 
     virtualisation = {
       memorySize = 1536;
@@ -91,11 +97,11 @@ pkgs.testers.nixosTest {
       uid = 1500;
       createHome = true;
     };
-    users.groups.testuser = {};
+    users.groups.testuser = { };
 
     systemd.services."conexus@" = {
       description = "CoNexus backend — project %i";
-      after = [ "fake-openai.service" ];
+      after = [ "fake-llm.service" ];
       serviceConfig = {
         Type = "simple";
         User = "testuser";
@@ -103,8 +109,7 @@ pkgs.testers.nixosTest {
         Environment = [
           "HOME=/home/testuser"
           "XDG_RUNTIME_DIR=/run/user/1500"
-          "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
-          "OPENAI_API_KEY=fake"
+          "CONEXUS_LLM_BASE_URL=http://127.0.0.1:11434/v1"
           "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
           "CONEXUS_EMBEDDING_DIMENSION=1024"
           # R8-F2 discovery: the backend resolves a forwarded operator-
@@ -154,7 +159,8 @@ pkgs.testers.nixosTest {
         '';
         Restart = "on-failure";
         RestartSec = 5;
-      } // hardening;
+      }
+      // hardening;
     };
 
     # `conexus-router` (Rust) — the sole router implementation now
@@ -192,13 +198,18 @@ pkgs.testers.nixosTest {
         # fine regardless of which uid wrote it (systemd/PID 1 loads
         # EnvironmentFile= as root before conexus-router's own exec).
         DynamicUser = true;
-      } // hardening;
+      }
+      // hardening;
     };
 
     systemd.services.conexus-router = {
       description = "CoNexus router (single-tenant test)";
       wantedBy = [ "multi-user.target" ];
-      after = [ "fake-openai.service" "network.target" "conexus-router-bootstrap-seed.service" ];
+      after = [
+        "fake-llm.service"
+        "network.target"
+        "conexus-router-bootstrap-seed.service"
+      ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
         CONEXUS_ROUTER_DB = "/home/testuser/.config/conexus/router.db";
@@ -272,7 +283,8 @@ pkgs.testers.nixosTest {
           + "--single-workspace ${singleWorkspace}";
         Restart = "on-failure";
         RestartSec = 5;
-      } // hardening;
+      }
+      // hardening;
     };
 
     security.polkit.enable = true;
@@ -288,13 +300,16 @@ pkgs.testers.nixosTest {
       });
     '';
 
-    environment.systemPackages = [ pkgs.curl pkgs.jq ];
+    environment.systemPackages = [
+      pkgs.curl
+      pkgs.jq
+    ];
     networking.firewall.enable = false;
   };
 
   testScript = ''
     start_all()
-    machine.wait_for_unit("fake-openai.service")
+    machine.wait_for_unit("fake-llm.service")
     machine.wait_for_unit("conexus-router.service")
     machine.wait_for_open_port(${toString ports.routerPort})
 

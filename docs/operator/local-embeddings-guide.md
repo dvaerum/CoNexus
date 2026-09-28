@@ -43,33 +43,25 @@ When you compare these vectors, "cat" and "dog" would be very similar (high scor
 
 ## Why Use Local Models?
 
-### Cost Comparison
-
-| Provider | Cost per 1M tokens | Monthly (typical) |
-|----------|-------------------|-------------------|
-| OpenAI (text-embedding-3-large) | $0.13 | $10-50+ |
-| **Ollama (local)** | **$0.00** | **$0.00** |
-
-### Benefits of Local Embeddings
+CoNexus's RAG stack (chat completion, embeddings, and subject-gen) is
+Ollama-only — there is no cloud-provider alternative to compare
+against (ADR-0031 removed the OpenAI cloud branch entirely). The
+"why local" case is really "why these defaults exist":
 
 1. **💰 Zero Cost**: No API fees, ever
 2. **🔒 Privacy**: Your code never leaves your machine
-3. **⚡ Speed**: ~37ms per text (faster than API calls)
+3. **⚡ Speed**: ~37ms per text (once warmed up)
 4. **📡 Offline**: Works without internet connection
 5. **🎯 Control**: Full control over model selection
 
-### When to Use OpenAI vs Local
+### Hardware guidance
 
-**Use OpenAI if:**
-- You're just testing CoNexus briefly
-- You already have OpenAI credits
-- You need absolute best quality (minor difference)
-
-**Use Local Models if:**
-- You want to save money long-term ✅
-- You care about privacy ✅
-- You have decent hardware (8GB+ RAM) ✅
-- You're doing development work ✅
+- 8GB+ RAM: comfortable for the default models (`qwen3:1.7b` chat,
+  `qwen3-embedding:0.6b` embedding — ~1.6GB combined).
+- No GPU required: both defaults are small enough for CPU-only
+  inference at usable latency (see Performance Benchmarks below); a
+  GPU (NVIDIA/AMD/Apple Silicon) speeds things up further but isn't
+  needed to get started.
 
 ---
 
@@ -190,27 +182,23 @@ plain `export` in a dev shell, a systemd `Environment=`/
 `EnvironmentFile=` line, or (for the Nix/home-manager deployment path)
 the `services.conexus.*` module options.
 
-The provider switch is presence/absence of a non-empty `OPENAI_API_KEY`
-— leave it **unset entirely** and Ollama is used; set it to a real
-OpenAI key and OpenAI is used instead. `OPENAI_API_KEY` is NOT a
-sentinel you set to `"ollama"` — any non-empty value (including the
-literal string `"ollama"`) routes through the OpenAI branch, which
-reads a completely different set of variables (`OPENAI_BASE_URL`, not
-`CONEXUS_LLM_BASE_URL`) and would silently try to reach OpenAI's
-real cloud endpoint with a garbage key. There is no separate
-`EMBEDDING_PROVIDER`/`EMBEDDING_PROVIDERS` fallback-chain variable —
-this is a single either/or switch, not a chain (see
+ADR-0031: there is no provider switch anymore — chat, embedding, and
+subject-gen all resolve the same way, against ONE shared endpoint
+(`CONEXUS_LLM_BASE_URL`). See
 [`docs/operator/getting-started.md`](getting-started.md#environment-variables)
-for the authoritative table).
+for the authoritative table.
 
 ### Step 1: Set the local-Ollama variables
 
 ```bash
-unset OPENAI_API_KEY                                    # must be UNSET, not "ollama" — see above
 export CONEXUS_LLM_BASE_URL=http://localhost:11434/v1  # Ollama's OpenAI-compatible endpoint
 export CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
 export CONEXUS_EMBEDDING_DIMENSION=1024               # must match the embedding model
 ```
+
+All three lines above are already the compiled-in defaults — you only
+need to set them explicitly if you're pointing at a non-default host,
+port, or model.
 
 ### Step 2: Verify Configuration
 
@@ -222,8 +210,9 @@ inspect.
 **Important**:
 - CoNexus itself doesn't need an Anthropic key — that's your MCP
   client's (e.g. Claude Code's) own concern, not this server's.
-- Only embeddings/RAG run through this switch; it has no effect on
-  which chat model your MCP client uses for its own reasoning.
+- `CONEXUS_LLM_BASE_URL` is shared by chat completion, embeddings, AND
+  subject-gen — it has no effect on which chat model your MCP client
+  uses for its own reasoning.
 
 ---
 
@@ -266,17 +255,9 @@ project.
 | Batch (10 texts) | 375ms | 37.5ms avg per text |
 | **Throughput** | **~27 texts/sec** | Consistent |
 
-### Comparison with OpenAI
-
-| Metric | Ollama (Local) | OpenAI (Cloud) |
-|--------|----------------|----------------|
-| Average latency | 37ms | 200-500ms |
-| Cost per 1M tokens | $0.00 | $0.13 |
-| Requires internet | No | Yes |
-| Privacy | 100% local | Data sent to OpenAI |
-| Quality | Excellent | Excellent+ |
-
-**Bottom Line**: Local is faster AND free, with minimal quality difference.
+**Bottom Line**: 37ms average latency, zero cost, fully offline —
+these numbers are what "local-only" (the only supported mode) looks
+like in practice.
 
 ---
 
@@ -388,16 +369,18 @@ ollama serve
 
 ### Q: Do I still need an OpenAI API key?
 
-**A**: No, not for embeddings — CoNexus itself doesn't touch your
-MCP client's own LLM key (e.g. Claude Code's `ANTHROPIC_API_KEY`,
-which is that client's concern, not this server's).
+**A**: No — CoNexus has no OpenAI integration at all (ADR-0031 removed
+the cloud-provider branch entirely). It also doesn't touch your MCP
+client's own LLM key (e.g. Claude Code's `ANTHROPIC_API_KEY`, which is
+that client's concern, not this server's).
 
-### Q: Can I use both local and OpenAI embeddings, with a fallback?
+### Q: Can I use a cloud provider instead of local Ollama?
 
-**A**: No — the provider switch (`OPENAI_API_KEY` set vs. unset) is a
-single either/or choice, not a fallback chain. There is no
-`EMBEDDING_PROVIDERS`-style variable; if Ollama is down, requests
-fail rather than silently falling back to OpenAI.
+**A**: Not today — CoNexus is Ollama-only (any Ollama-compatible
+`/v1/chat/completions` + `/v1/embeddings` server works, not
+specifically Ollama itself). A generic external-provider mechanism
+(e.g. OpenRouter) is a possible future addition, deliberately deferred
+rather than built alongside the OpenAI-removal work — see ADR-0031.
 
 ### Q: Which model is best for me?
 
@@ -456,15 +439,13 @@ ollama pull qwen3-embedding:0.6b
 
 ### Q: Can I use multiple models simultaneously?
 
-**A**: Yes, but one at a time per CoNexus instance. Change `OLLAMA_MODEL` in `.env` to switch models.
+**A**: Yes, but one at a time per CoNexus instance. Change `CONEXUS_CHAT_MODEL` (chat) or `CONEXUS_EMBEDDING_MODEL` (embeddings) to switch.
 
 ### Q: What's the quality difference vs OpenAI?
 
-**A**:
-- OpenAI: ~95% accuracy (subjective)
-- Qwen3-embedding: ~92% accuracy (subjective)
-- **For most use cases**: The difference is negligible
-- **For critical search**: OpenAI might have a slight edge
+**A**: Not applicable — CoNexus has no OpenAI path to compare against
+(ADR-0031). `qwen3-embedding:0.6b`'s own real-world numbers are in the
+Performance Benchmarks section above.
 
 ---
 
@@ -517,8 +498,7 @@ ollama pull qwen3-embedding:0.6b
 # Start service
 ollama serve
 
-# Configure the environment (no .env file — see "Configuring CoNexus" above)
-unset OPENAI_API_KEY
+# Configure the environment (no .env file — see "Configuring CoNexus" above; these are already the compiled-in defaults)
 export CONEXUS_LLM_BASE_URL=http://localhost:11434/v1
 export CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
 export CONEXUS_EMBEDDING_DIMENSION=1024

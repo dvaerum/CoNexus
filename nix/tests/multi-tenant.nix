@@ -36,7 +36,13 @@
 #
 # Mirror counterpart: ./single-tenant.nix (same harness, opposite
 # toggle assertions).
-{ pkgs, lib, self, craneLib, ... }:
+{
+  pkgs,
+  lib,
+  self,
+  craneLib,
+  ...
+}:
 
 let
   ports = import ./_ports.nix;
@@ -61,14 +67,13 @@ let
   # nix/module.nix's `forwarding_hmac` key-file pattern (search that
   # file for "F015 v4"), except this value is a fixed, publicly-known
   # CI sentinel rather than `/dev/urandom` output.
-  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env"
-    "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
+  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env" "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
 in
 pkgs.testers.nixosTest {
   name = "conexus-multi-tenant";
 
   containers.machine = { config, pkgs, ... }: {
-    imports = [ ./fake-openai.nix ];
+    imports = [ ./fake-llm.nix ];
 
     # No `virtualisation.memorySize`/`cores`/`diskSize` here — those are
     # QEMU-vm-only options (nixos/modules/virtualisation/qemu-vm.nix);
@@ -81,13 +86,13 @@ pkgs.testers.nixosTest {
       uid = 1500;
       createHome = true;
     };
-    users.groups.testuser = {};
+    users.groups.testuser = { };
 
     # ── Per-project backend template ────────────────────────────────
     # Lazy-spawned by the router (`systemctl start conexus@<name>`).
     systemd.services."conexus@" = {
       description = "CoNexus backend — project %i";
-      after = [ "fake-openai.service" ];
+      after = [ "fake-llm.service" ];
       serviceConfig = {
         Type = "simple";
         User = "testuser";
@@ -95,8 +100,7 @@ pkgs.testers.nixosTest {
         Environment = [
           "HOME=/home/testuser"
           "XDG_RUNTIME_DIR=/run/user/1500"
-          "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
-          "OPENAI_API_KEY=fake"
+          "CONEXUS_LLM_BASE_URL=http://127.0.0.1:11434/v1"
           "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
           "CONEXUS_EMBEDDING_DIMENSION=1024"
           # R8-F2 class-sweep: same fix as single-tenant.nix — see its
@@ -161,7 +165,11 @@ pkgs.testers.nixosTest {
     systemd.services.conexus-router = {
       description = "CoNexus router (multi-tenant test)";
       wantedBy = [ "multi-user.target" ];
-      after = [ "fake-openai.service" "network.target" "conexus-router-bootstrap-seed.service" ];
+      after = [
+        "fake-llm.service"
+        "network.target"
+        "conexus-router-bootstrap-seed.service"
+      ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): router runs its schema
         # migrations against this DB at startup. Default
@@ -244,13 +252,16 @@ pkgs.testers.nixosTest {
       });
     '';
 
-    environment.systemPackages = [ pkgs.curl pkgs.jq ];
+    environment.systemPackages = [
+      pkgs.curl
+      pkgs.jq
+    ];
     networking.firewall.enable = false;
   };
 
   testScript = ''
     start_all()
-    machine.wait_for_unit("fake-openai.service")
+    machine.wait_for_unit("fake-llm.service")
     machine.wait_for_unit("conexus-router.service")
     machine.wait_for_open_port(${toString ports.routerPort})
 

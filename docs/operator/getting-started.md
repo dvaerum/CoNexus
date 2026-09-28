@@ -184,22 +184,24 @@ used above, which operates on a project's own database, not `router.db`).
 ## Environment variables
 
 CoNexus defaults are designed to work out of the box — none of the
-following are required. The provider switch is presence/absence of a
-non-empty `OPENAI_API_KEY` (see
+following are required; a local Ollama at `http://localhost:11434/v1`
+is assumed unless overridden. ADR-0031: there is no cloud-provider
+switch anymore (the OpenAI cloud branch was removed) — every LLM seam
+(chat, embedding, and subject-gen) shares ONE base URL and resolves
+the same way. See
 [`rust/conexus-tools/src/embedding_client.rs`](../../rust/conexus-tools/src/embedding_client.rs)/
-[`completion_client.rs`](../../rust/conexus-tools/src/completion_client.rs)
-for the exact resolution rules) — it is NOT auto-seeded to any value;
-unset (or empty) means the local-Ollama branch.
+[`completion_client.rs`](../../rust/conexus-tools/src/completion_client.rs)/
+[`message_suggestions.rs`](../../rust/conexus-tools/src/message_suggestions.rs)
+for the exact resolution rules.
 
-| Variable                          | Default (unset `OPENAI_API_KEY`, i.e. Ollama) | Default (`OPENAI_API_KEY` set, i.e. OpenAI) | Notes |
-| --------------------------------- | ---------------------------------------------- | -------------------------------------------- | ----- |
-| `OPENAI_API_KEY`                  | unset                                          | (required — this is the switch)              | Set to a real OpenAI key to use the cloud; leave unset for local Ollama. |
-| `CONEXUS_LLM_BASE_URL`          | `http://localhost:11434/v1`                    | not consulted                                | Chat + embedding endpoint override, Ollama path only. |
-| `OLLAMA_MODEL`                    | `qwen3:1.7b`                                   | not consulted                                | Chat-completions model, Ollama path only. |
-| `OPENAI_BASE_URL`                 | not consulted                                  | `https://api.openai.com/v1`                  | Chat + embedding endpoint override, OpenAI path only. |
-| `OPENAI_MODEL`                    | not consulted                                  | **required, no default** — a missing value is a hard config error | Chat-completions model, OpenAI path only. |
-| `CONEXUS_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`                         | `text-embedding-3-large`                     | RAG embedding model; an explicit value overrides either branch's default. |
-| `CONEXUS_EMBEDDING_DIMENSION`   | `1024`                                         | `1536`                                       | Must match the embedding model; an explicit value overrides either branch's default. |
+| Variable                        | Default                     | Notes |
+| -------------------------------- | ---------------------------- | ----- |
+| `CONEXUS_LLM_BASE_URL`          | `http://localhost:11434/v1` | Shared endpoint for chat, embedding, AND subject-gen — point this at any Ollama-compatible (`/v1/chat/completions` + `/v1/embeddings`) server. |
+| `CONEXUS_CHAT_MODEL`            | `qwen3:1.7b`                 | Chat-completions model (`ask_project_rag`'s answer synthesis). |
+| `CONEXUS_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`       | RAG embedding model (vector-search similarity). |
+| `CONEXUS_EMBEDDING_DIMENSION`   | `1024`                       | Must match the embedding model. |
+| `CONEXUS_ENABLE_SUBJECT_GEN`    | `true`                       | Auto-generate a message subject via LLM when the sender didn't supply one. Set to `0`/`false`/`no` to disable (falls back to a truncated body preview instead). |
+| `CONEXUS_SUBJECT_MODEL`         | reuses `CONEXUS_CHAT_MODEL`  | Override to use a different (e.g. smaller/faster) model for subject lines only. |
 | `MCP_PROJECT_DIR`                 | (set by `--project-dir`)                       | (set by `--project-dir`)                     | **Advanced.** The CLI sets this from `--project-dir`. Schema authority is `sea-orm-migration`, not Alembic — see `rust/conexus-db/src/migration/mod.rs`'s module doc for the migration model. |
 
 Pre-v5.0.53 wirings used a `.env.example` checked into the repo

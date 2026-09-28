@@ -126,8 +126,8 @@
     * anyio
     * click
 *   **Environment Variables:** 
-    * `OPENAI_API_KEY` - (Optional) OpenAI API key; defaults to local Ollama when unset
-    * `OPENAI_BASE_URL` / `OPENAI_MODEL` - Override the Ollama defaults
+    * `CONEXUS_LLM_BASE_URL` - (Optional) local Ollama-compatible endpoint; defaults to `http://localhost:11434/v1`
+    * `CONEXUS_CHAT_MODEL` - Override the chat-completion model default
     * `CONEXUS_EMBEDDING_MODEL` / `CONEXUS_EMBEDDING_DIMENSION` - Embedding wiring
     * `MCP_PROJECT_DIR` - Advanced; normally set by `--project-dir`
 
@@ -139,7 +139,7 @@
     *   **File(s):** `pyproject.toml`
     *   **Purpose:** Configure project build configuration. No `.env`
         template is needed — CoNexus defaults to a local Ollama
-        endpoint when `OPENAI_API_KEY` is unset.
+        endpoint (`http://localhost:11434/v1`) out of the box.
     *   **Agent Task(s):**
         1.  `CREATE_FILE`: Create pyproject.toml with build configuration
 *   **Unit 2: Update Code to Use Environment Variables**

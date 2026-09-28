@@ -167,39 +167,42 @@ Defaults (all overridable at the import site):
 |---|---|---|
 | `llm` | `"internal"` | mode switch |
 | `llmHost` | `"10.0.2.2"` | qemu user-mode host alias |
-| `llmChatPort` | `11435` | host llama-cpp |
+| `llmPort` | `11434` | host ollama -- chat + embeddings share this one endpoint (ADR-0031) |
 | `llmChatModel` | `"qwen2.5:3b-instruct"` | |
-| `llmEmbeddingPort` | `11434` | host ollama |
 | `llmEmbeddingModel` | `"qwen3-embedding:0.6b"` | |
 | `llmEmbeddingDimension` | `1024` | must match the model |
 
-Chat and embeddings resolve from *different* env vars, so they can
-live on different ports (a fast iGPU llama-cpp for completion, a CPU
-ollama for embeddings). `external` mode sets, on the backend units
-only:
+ADR-0031: chat, embeddings, and subject-gen all resolve from the SAME
+`CONEXUS_LLM_BASE_URL` now (previously chat and embeddings could live
+on different ports -- e.g. a fast iGPU llama-cpp for completion, a CPU
+ollama for embeddings; that split is no longer supported, matching the
+Rust clients' single shared base-url resolution). `external` mode
+sets, on the backend units only:
 
 ```
-CONEXUS_LLM_BASE_URL=http://10.0.2.2:11435/v1   # chat/completion
-OPENAI_BASE_URL=http://10.0.2.2:11434/v1          # embeddings
-OPENAI_API_KEY=external                           # non-empty sentinel
-OPENAI_MODEL=qwen2.5:3b-instruct
+CONEXUS_LLM_BASE_URL=http://10.0.2.2:11434/v1
+CONEXUS_CHAT_MODEL=qwen2.5:3b-instruct
 CONEXUS_EMBEDDING_MODEL=qwen3-embedding:0.6b
 CONEXUS_EMBEDDING_DIMENSION=1024
 ```
 
-No Python change is involved — see `rust/conexus-tools/src/completion_client.rs`
-and `embedding_client.rs` for the resolution rules those vars feed.
+No sentinel/API-key needed anymore -- the OpenAI cloud-provider branch
+that `OPENAI_API_KEY=external` used to select and suppress is gone
+entirely, so `CONEXUS_LLM_BASE_URL` alone is sufficient to redirect
+away from the in-guest default. See
+`rust/conexus-tools/src/completion_client.rs` and
+`embedding_client.rs` for the resolution rules those vars feed.
 
 ### Fail-loud endpoint probe
 
 `10.0.2.2` answers whether or not anything is listening behind it, so
-a host that forgot to start llama-cpp/ollama would otherwise give you
+a host that forgot to start ollama would otherwise give you
 a VM that boots green and fails deep inside RAG indexing — a passing
 E2E run against a backend with no embeddings. `external` mode
 therefore adds `conexus-llm-endpoint-check.service`: a boot-time
-oneshot that curls both `/v1/models` endpoints (10 attempts, 2 s
-apart) and hard-fails, naming the exact URLs on the serial console, if
-either is unreachable. Every unit that embeds or completes
+oneshot that curls the shared `/v1/models` endpoint (10 attempts, 2 s
+apart) and hard-fails, naming the exact URL on the serial console, if
+it is unreachable. Every unit that embeds or completes
 (`conexus@`) `Requires` it, so a dead endpoint stops the backend
 instead of degrading it. `conexus-router.service` is deliberately
 *not* gated — it never talks to an LLM, and a dashboard that loads

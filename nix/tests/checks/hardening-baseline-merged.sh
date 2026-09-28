@@ -32,7 +32,7 @@
 # never imported nix/hardening.nix at all. Confirmed live via
 # `systemd-analyze security conexus-llm-endpoint-check.service` on a
 # booted vm-dev VM: 9.6 UNSAFE, root, full stock CapabilityBoundingSet,
-# NoNewPrivileges=no. nix/tests/fake-openai.nix's fake-openai.service
+# NoNewPrivileges=no. nix/tests/fake-llm.nix's fake-llm.service
 # (the VM-test embeddings stub, wired into every nixosTest under
 # nix/tests/) had the identical gap -- no hardening import, no `User=`
 # at all, defaulting to root. Both are covered here the same way.
@@ -100,11 +100,11 @@ let
       serviceConfig = vmDevCfg.systemd.services.conexus-llm-endpoint-check.serviceConfig;
       overrides = [ ];
     };
-    "fake-openai:fake-openai" = {
+    "fake-llm:fake-llm" = {
       # Reached via the same single-tenant nixosTest config used above --
-      # nix/tests/single-tenant.nix imports nix/tests/fake-openai.nix into
+      # nix/tests/single-tenant.nix imports nix/tests/fake-llm.nix into
       # nodes.machine.
-      serviceConfig = singleTenantConfig.systemd.services.fake-openai.serviceConfig;
+      serviceConfig = singleTenantConfig.systemd.services.fake-llm.serviceConfig;
       overrides = [ ];
     };
   };

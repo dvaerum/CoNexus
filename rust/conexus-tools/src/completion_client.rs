@@ -1,4 +1,6 @@
-//! Provider-agnostic chat-completion HTTP client. Port of
+//! Chat-completion HTTP client, Ollama-shaped (OpenAI-compatible
+//! `/v1/chat/completions` wire format -- the same shape Ollama,
+//! llama.cpp, and (if ever added) OpenRouter all speak). Port of
 //! `conexus/external/completion_service.py`.
 //!
 //! Same design departures as [`crate::embedding_client`] (see that
@@ -6,17 +8,19 @@
 //! port, [`resolve`] takes an explicit `get_env` lookup rather than
 //! reading the process environment (parallel-test-safety), and no
 //! per-config client cache (`HTTP_CLIENT` is one process-wide
-//! `reqwest::Client`, not bound to a single target the way the
-//! `openai` SDK's client is).
+//! `reqwest::Client`).
 //!
-//! Branches on `OPENAI_API_KEY`:
-//! - **Set + `OPENAI_MODEL` set** → OpenAI-shaped resolution.
-//! - **Set + `OPENAI_MODEL` unset** → [`CompletionConfigError`]. No
-//!   silent fallback to a default model (Python's own v5.0.43
-//!   incident: a hardcoded, nonexistent model name broke every
-//!   OpenAI-configured deploy at once).
-//! - **Unset/empty** → local Ollama, model from `OLLAMA_MODEL`
-//!   (default `qwen3:1.7b`, matching the VM's bundled chat model).
+//! ADR-0031: the OpenAI CLOUD-PROVIDER branch (`OPENAI_API_KEY`/
+//! `OPENAI_MODEL`/`OPENAI_BASE_URL`, `api.openai.com` as a fallback
+//! base URL) is REMOVED, not just renamed -- this module now resolves
+//! exactly one way, always: `CONEXUS_CHAT_MODEL` (default
+//! `qwen3:1.7b`) against `CONEXUS_LLM_BASE_URL` (default the local
+//! Ollama address, shared with [`crate::embedding_client`] and
+//! [`crate::message_suggestions`] -- one endpoint for every LLM seam,
+//! not one per seam). [`resolve`] is consequently infallible now: the
+//! only config-error case that existed (`OPENAI_API_KEY` set without
+//! `OPENAI_MODEL`) no longer exists because there is no separate
+//! model-required cloud branch to misconfigure.
 
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -24,7 +28,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-const OLLAMA_DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
+pub const OLLAMA_DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
 const OLLAMA_DEFAULT_MODEL: &str = "qwen3:1.7b";
 
 /// `CONEXUS_COMPLETION_CLIENT_TIMEOUT_SECONDS` default. Was 30s, which
@@ -58,27 +62,11 @@ static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
         .expect("reqwest client with a plain timeout always builds")
 });
 
-fn env_nonempty(get_env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<String> {
+pub(crate) fn env_nonempty(get_env: &impl Fn(&str) -> Option<String>, key: &str) -> Option<String> {
     get_env(key)
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
 }
-
-/// Raised by [`resolve`] when `OPENAI_API_KEY` is set without
-/// `OPENAI_MODEL` -- see module doc.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompletionConfigError;
-
-impl std::fmt::Display for CompletionConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "OPENAI_API_KEY is set but OPENAI_MODEL is not; the OpenAI provider requires an \
-             explicit model"
-        )
-    }
-}
-impl std::error::Error for CompletionConfigError {}
 
 /// A resolved chat-completion endpoint, ready to call.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,58 +76,38 @@ pub struct CompletionClient {
     pub model: String,
 }
 
-/// Resolve a [`CompletionClient`] from an env-lookup function. See
-/// module doc for the branch table.
-pub fn resolve(
-    get_env: impl Fn(&str) -> Option<String>,
-) -> Result<CompletionClient, CompletionConfigError> {
-    match env_nonempty(&get_env, "OPENAI_API_KEY") {
-        Some(api_key) => {
-            let model = env_nonempty(&get_env, "OPENAI_MODEL").ok_or(CompletionConfigError)?;
-            // CONEXUS_LLM_BASE_URL overrides the chat endpoint for
-            // EITHER provider (see this module's Python source doc);
-            // unset falls back to OPENAI_BASE_URL (the SDK's own env
-            // pickup this port replicates explicitly), then the cloud
-            // default.
-            let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
-                .or_else(|| env_nonempty(&get_env, "OPENAI_BASE_URL"))
-                .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
-            Ok(CompletionClient {
-                base_url,
-                api_key,
-                model,
-            })
-        }
-        None => {
-            let model = env_nonempty(&get_env, "OLLAMA_MODEL")
-                .unwrap_or_else(|| OLLAMA_DEFAULT_MODEL.to_string());
-            let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
-                .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string());
-            Ok(CompletionClient {
-                base_url,
-                api_key: "ollama".to_string(),
-                model,
-            })
-        }
+/// Resolve a [`CompletionClient`] from an env-lookup function.
+/// `CONEXUS_CHAT_MODEL` overrides the model (default `qwen3:1.7b`),
+/// `CONEXUS_LLM_BASE_URL` overrides the endpoint (default the local
+/// Ollama address) -- infallible; there is no longer a config shape
+/// that can fail to resolve.
+pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> CompletionClient {
+    let model =
+        env_nonempty(&get_env, "CONEXUS_CHAT_MODEL").unwrap_or_else(|| OLLAMA_DEFAULT_MODEL.to_string());
+    let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
+        .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string());
+    CompletionClient {
+        base_url,
+        api_key: "ollama".to_string(),
+        model,
     }
 }
 
 /// The one real call site: resolve from the actual process
 /// environment. Every test drives [`resolve`] directly instead.
-pub fn resolve_from_process_env() -> Result<CompletionClient, CompletionConfigError> {
+pub fn resolve_from_process_env() -> CompletionClient {
     resolve(|key| std::env::var(key).ok())
 }
 
 /// The chat/completion endpoint base URL, for introspection (used by
 /// `context_window` to discover the chat model's context window).
-/// Deliberately its OWN, simpler resolution than [`resolve`]'s
-/// per-provider base_url -- Python's `resolve_chat_base_url` doesn't
-/// fall back to the Ollama default when nothing is set, matching the
-/// original source exactly (a probe with no URL just can't run).
+/// `None` when `CONEXUS_LLM_BASE_URL` is unset -- a probe with no URL
+/// just can't run (matches the pre-ADR-0031 behavior; this function
+/// never applied the Ollama default the way [`resolve`] does).
 pub fn resolve_chat_base_url(get_env: impl Fn(&str) -> Option<String>) -> Option<String> {
     env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
-        .or_else(|| env_nonempty(&get_env, "OPENAI_BASE_URL"))
 }
+
 
 #[derive(Deserialize)]
 struct ChatChoice {
@@ -232,8 +200,8 @@ mod tests {
     }
 
     #[test]
-    fn no_openai_key_resolves_to_ollama_defaults() {
-        let client = resolve(env(&[])).unwrap();
+    fn no_env_resolves_to_ollama_defaults() {
+        let client = resolve(env(&[]));
         assert_eq!(
             client,
             CompletionClient {
@@ -245,55 +213,15 @@ mod tests {
     }
 
     #[test]
-    fn ollama_model_env_var_overrides_the_default() {
-        let client = resolve(env(&[("OLLAMA_MODEL", "llama3:8b")])).unwrap();
+    fn conexus_chat_model_env_var_overrides_the_default() {
+        let client = resolve(env(&[("CONEXUS_CHAT_MODEL", "llama3:8b")]));
         assert_eq!(client.model, "llama3:8b");
     }
 
     #[test]
-    fn openai_key_without_model_is_a_config_error() {
-        let err = resolve(env(&[("OPENAI_API_KEY", "sk-real")])).unwrap_err();
-        assert_eq!(err, CompletionConfigError);
-    }
-
-    #[test]
-    fn openai_key_and_model_resolve_to_the_cloud_default_base_url() {
-        let client = resolve(env(&[
-            ("OPENAI_API_KEY", "sk-real"),
-            ("OPENAI_MODEL", "gpt-4.1"),
-        ]))
-        .unwrap();
-        assert_eq!(
-            client,
-            CompletionClient {
-                base_url: "https://api.openai.com/v1".to_string(),
-                api_key: "sk-real".to_string(),
-                model: "gpt-4.1".to_string(),
-            }
-        );
-    }
-
-    #[test]
-    fn conexus_llm_base_url_overrides_the_chat_endpoint_for_openai_too() {
-        let client = resolve(env(&[
-            ("OPENAI_API_KEY", "sk-real"),
-            ("OPENAI_MODEL", "gpt-4.1"),
-            ("CONEXUS_LLM_BASE_URL", "http://fast-igpu:11435/v1"),
-            ("OPENAI_BASE_URL", "https://ignored.example/v1"),
-        ]))
-        .unwrap();
+    fn conexus_llm_base_url_overrides_the_default_endpoint() {
+        let client = resolve(env(&[("CONEXUS_LLM_BASE_URL", "http://fast-igpu:11435/v1")]));
         assert_eq!(client.base_url, "http://fast-igpu:11435/v1");
-    }
-
-    #[test]
-    fn openai_base_url_is_the_fallback_when_conexus_llm_base_url_is_unset() {
-        let client = resolve(env(&[
-            ("OPENAI_API_KEY", "sk-real"),
-            ("OPENAI_MODEL", "gpt-4.1"),
-            ("OPENAI_BASE_URL", "https://my-gateway.example/v1"),
-        ]))
-        .unwrap();
-        assert_eq!(client.base_url, "https://my-gateway.example/v1");
     }
 
     // ── resolve_client_timeout_secs ──────────────────────────────────
@@ -341,12 +269,9 @@ mod tests {
     }
 
     #[test]
-    fn chat_base_url_prefers_conexus_llm_base_url_over_openai_base_url() {
+    fn chat_base_url_is_conexus_llm_base_url_when_set() {
         assert_eq!(
-            resolve_chat_base_url(env(&[
-                ("CONEXUS_LLM_BASE_URL", "http://a"),
-                ("OPENAI_BASE_URL", "http://b"),
-            ])),
+            resolve_chat_base_url(env(&[("CONEXUS_LLM_BASE_URL", "http://a")])),
             Some("http://a".to_string())
         );
     }

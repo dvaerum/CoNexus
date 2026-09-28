@@ -1,4 +1,12 @@
-{ config, lib, pkgs, modulesPath, src ? null, craneLib ? null, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  modulesPath,
+  src ? null,
+  craneLib ? null,
+  ...
+}:
 # Path B interactive sandbox VM — boots the multi-tenant stack like
 # nix/vm.nix but with three differences tailored for dashboard E2E
 # work and live in-VM diagnostics:
@@ -43,10 +51,11 @@
 #
 #   4. **EXTERNAL LLM MODE.** `llm = "external"` is passed to vm.nix
 #      below, so this VM runs NO in-guest ollama and preloads no
-#      model weights; the backend is pointed at endpoints already
+#      model weights; the backend is pointed at ONE endpoint already
 #      running on the developer's HOST via qemu user-mode's
-#      10.0.2.2 host alias (chat on :11435, embeddings on :11434 by
-#      default). That drops guest RAM from 4096 MB to 2048 MB —
+#      10.0.2.2 host alias (chat + embeddings share one address,
+#      :11434 by default -- ADR-0031). That drops guest RAM from
+#      4096 MB to 2048 MB —
 #      which is the difference between "can boot the sandbox" and
 #      "cannot" on a busy workstation, and this VM exists precisely
 #      for interactive dashboard E2E where the RAG models are never
@@ -72,22 +81,23 @@ let
   # feature adds nothing to the image until a fixture is captured.
   fixturesDir = ./vm-dev/fixtures;
   fixtureEntries =
-    if builtins.pathExists fixturesDir
-    then lib.filterAttrs
-      (n: t: t == "regular" && lib.hasSuffix ".tar.zst" n)
-      (builtins.readDir fixturesDir)
-    else { };
-  etcFixtures = lib.mapAttrs'
-    (name: _: lib.nameValuePair
-      "conexus-vm-dev/fixtures/${name}"
-      { source = fixturesDir + "/${name}"; })
-    fixtureEntries;
+    if builtins.pathExists fixturesDir then
+      lib.filterAttrs (n: t: t == "regular" && lib.hasSuffix ".tar.zst" n) (builtins.readDir fixturesDir)
+    else
+      { };
+  etcFixtures = lib.mapAttrs' (
+    name: _: lib.nameValuePair "conexus-vm-dev/fixtures/${name}" { source = fixturesDir + "/${name}"; }
+  ) fixtureEntries;
 
   # writeShellApplication (shellcheck + PATH inputs) per repo idiom; the
   # script body lives in a real file next to this module.
   preloadScript = pkgs.writeShellApplication {
     name = "conexus-vm-dev-preload";
-    runtimeInputs = [ pkgs.gnutar pkgs.zstd pkgs.coreutils ];
+    runtimeInputs = [
+      pkgs.gnutar
+      pkgs.zstd
+      pkgs.coreutils
+    ];
     text = builtins.readFile ./vm-dev-preload.sh;
   };
 
@@ -120,8 +130,7 @@ let
   # that fully completes before conexus-router.service's own
   # activation begins — see the dedicated seed unit below.
   bootstrapPassword = "dev-sandbox-password";
-  bootstrapPasswordEnvFile = pkgs.writeText "conexus-vm-dev-bootstrap.env"
-    "CONEXUS_BOOTSTRAP_PASSWORD=${bootstrapPassword}\n";
+  bootstrapPasswordEnvFile = pkgs.writeText "conexus-vm-dev-bootstrap.env" "CONEXUS_BOOTSTRAP_PASSWORD=${bootstrapPassword}\n";
   bootstrapPasswordRuntimeDir = "conexus-vm-dev-bootstrap";
   bootstrapPasswordRuntimePath = "/run/${bootstrapPasswordRuntimeDir}/bootstrap.env";
 
@@ -155,18 +164,29 @@ let
   # processes' /proc/<pid> entries, not top-level files like cmdline)
   # and stays in effect.
   preloadHardening = hardening // {
-    CapabilityBoundingSet = [ "CAP_CHOWN" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
+    CapabilityBoundingSet = [
+      "CAP_CHOWN"
+      "CAP_DAC_OVERRIDE"
+      "CAP_FOWNER"
+    ];
     ProcSubset = "all";
   };
 in
 {
   imports = [
     (import ./vm.nix {
-      inherit config lib pkgs modulesPath src craneLib;
+      inherit
+        config
+        lib
+        pkgs
+        modulesPath
+        src
+        craneLib
+        ;
       mode = "multi";
-      # See header note 4. Retarget host/ports/models here (llmHost,
-      # llmChatPort, llmEmbeddingPort, llmChatModel,
-      # llmEmbeddingModel, llmEmbeddingDimension) if your host serves
+      # See header note 4. Retarget host/port/models here (llmHost,
+      # llmPort, llmChatModel, llmEmbeddingModel,
+      # llmEmbeddingDimension) if your host serves
       # them somewhere other than the defaults.
       llm = "external";
     })
@@ -216,7 +236,8 @@ in
       # it: EnvironmentFile= is loaded by PID 1 (root) before that unit's
       # own exec, not read by conexus-router's own runtime uid.
       DynamicUser = true;
-    } // hardening;
+    }
+    // hardening;
   };
 
   systemd.services.conexus-router = {
@@ -334,7 +355,8 @@ in
       # Pure echo to the console/journal fd systemd already opened and
       # inherited before exec — no privilege of any kind needed.
       DynamicUser = true;
-    } // hardening;
+    }
+    // hardening;
     script = ''
       echo ""
       echo "============================================================"
@@ -391,7 +413,10 @@ in
   systemd.services.conexus-vm-dev-preload = {
     description = "Restore a preload DB fixture into the conexus state dir (vm-dev, fresh disk only)";
     wantedBy = [ "multi-user.target" ];
-    after = [ "systemd-tmpfiles-setup.service" "local-fs.target" ];
+    after = [
+      "systemd-tmpfiles-setup.service"
+      "local-fs.target"
+    ];
     before = [ "conexus-router.service" ];
     # Only fire when a preload was actually requested. Matches both the
     # bare word and `word=value` forms of the cmdline option.
@@ -409,6 +434,7 @@ in
       ExecStart = "${preloadScript}/bin/conexus-vm-dev-preload";
       StandardOutput = "journal+console";
       StandardError = "journal+console";
-    } // preloadHardening;
+    }
+    // preloadHardening;
   };
 }

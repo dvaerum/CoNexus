@@ -1,39 +1,34 @@
-//! Provider-agnostic text-embedding HTTP client. Port of
+//! Text-embedding HTTP client, Ollama-shaped (OpenAI-compatible
+//! `/v1/embeddings` wire format). Port of
 //! `conexus/external/embedding_service.py`.
 //!
-//! Branches OpenAI-vs-Ollama on `OPENAI_API_KEY`, exactly like Python
-//! — the same switch [`crate::completion_client`] uses, so the two
-//! seams never disagree about which provider is live.
+//! ADR-0031: the OpenAI CLOUD-PROVIDER branch (`OPENAI_API_KEY`/
+//! `OPENAI_BASE_URL`, `text-embedding-3-large`/1536-dim cloud
+//! defaults) is REMOVED, not just renamed -- this module now resolves
+//! exactly one way, always: `CONEXUS_EMBEDDING_MODEL` (default
+//! `qwen3-embedding:0.6b`) / `CONEXUS_EMBEDDING_DIMENSION` (default
+//! 1024) against `CONEXUS_LLM_BASE_URL` -- the SAME shared base-url
+//! var [`crate::completion_client`] and [`crate::message_suggestions`]
+//! use, per ADR-0031's "one endpoint for every LLM seam" decision
+//! (previously this seam had its own separate `OPENAI_BASE_URL`).
 //!
-//! Two deliberate departures from a literal port:
-//!
-//! - **No env-var-mutation bootstrap.** Python's `core/config.py`
-//!   `setdefault()`s `OPENAI_API_KEY=ollama` / `OPENAI_BASE_URL=...`
-//!   etc at process-import time when the operator hasn't set
-//!   `OPENAI_API_KEY`, so that BY THE TIME `embedding_client()` runs,
-//!   its own `OPENAI_API_KEY` check always sees a value (either the
-//!   operator's, or the "ollama" sentinel) — a `conexus-backend`
-//!   process has no equivalent bootstrap step to port. [`resolve`]
-//!   folds that same "no key ⇒ local Ollama defaults" decision
-//!   directly into ONE function instead, computed fresh from whatever
-//!   the caller hands it — no process env mutation, no import-order
-//!   dependency to get right.
-//! - **Explicit env lookup, not a hidden `std::env::var` read inside
-//!   the resolver.** [`resolve`] takes a `get_env: impl Fn(&str) ->
-//!   Option<String>` instead of reading the process environment
-//!   itself — this crate's established "explicit input over hidden
-//!   state" convention (`conexus_auth::capabilities::
-//!   resolve_capabilities`'s `router_conn: Option<&Connection>`), and
-//!   it sidesteps a real hazard a literal `std::env::var` read would
-//!   create: `cargo test`'s default parallel test execution runs many
-//!   tests as threads in ONE process, and `std::env::set_var`/
-//!   `remove_var` mutate PROCESS-GLOBAL state — the exact "shared
-//!   global racing under parallel tests" bug class this workspace has
-//!   already hit twice (`conexus-vec`'s extension-registration lock,
-//!   `conexus-auth::tool`'s `CALLED` static). [`resolve_from_process_env`]
-//!   is the one real call site that reads the actual environment;
-//!   every test below drives [`resolve`] directly with an in-memory
-//!   map, so there is nothing to race.
+//! One deliberate departure from a literal port remains: **explicit
+//! env lookup, not a hidden `std::env::var` read inside the
+//! resolver.** [`resolve`] takes a `get_env: impl Fn(&str) ->
+//! Option<String>` instead of reading the process environment
+//! itself — this crate's established "explicit input over hidden
+//! state" convention (`conexus_auth::capabilities::
+//! resolve_capabilities`'s `router_conn: Option<&Connection>`), and
+//! it sidesteps a real hazard a literal `std::env::var` read would
+//! create: `cargo test`'s default parallel test execution runs many
+//! tests as threads in ONE process, and `std::env::set_var`/
+//! `remove_var` mutate PROCESS-GLOBAL state — the exact "shared
+//! global racing under parallel tests" bug class this workspace has
+//! already hit twice (`conexus-vec`'s extension-registration lock,
+//! `conexus-auth::tool`'s `CALLED` static). [`resolve_from_process_env`]
+//! is the one real call site that reads the actual environment;
+//! every test below drives [`resolve`] directly with an in-memory
+//! map, so there is nothing to race.
 //!
 //! No client-instance cache (unlike Python's `_client_cache`, added
 //! there to fix a real connection-leak bug, R12-F3): a `reqwest::Client`
@@ -50,7 +45,6 @@ use serde::Deserialize;
 use serde_json::json;
 
 const OLLAMA_DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
-const OPENAI_DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 
 /// `CONEXUS_LLM_CLIENT_TIMEOUT_SECONDS` default -- R12-F2 defense in
 /// depth (see Python's identically-named constant): an unreachable
@@ -86,50 +80,28 @@ pub struct EmbeddingClient {
 /// module doc for why this takes a function rather than reading
 /// `std::env` directly.
 ///
-/// `OPENAI_API_KEY` set ⇒ OpenAI-shaped resolution: `base_url` from
-/// `OPENAI_BASE_URL` (cloud default otherwise), model/dimension
-/// default to `text-embedding-3-large`/1536 (Python's
-/// `SIMPLE_EMBEDDING_MODEL`/`SIMPLE_EMBEDDING_DIMENSION` OpenAI
-/// fallback -- `conexus-backend` has no `--advanced` flag yet, so the
-/// advanced-mode dimension/model never applies here; see
-/// `conexus-backend`'s own "deliberately not ported" list).
-///
-/// `OPENAI_API_KEY` unset/empty ⇒ local Ollama: `base_url` from
-/// `CONEXUS_LLM_BASE_URL` (verified against Python's actual
-/// `OllamaEmbeddingClient.__init__` -- NOT `OPENAI_BASE_URL`, despite
-/// this module's own Python docstring claiming the embedding seam
-/// "deliberately does NOT consult `CONEXUS_LLM_BASE_URL`"; that
-/// claim only holds for the OpenAI branch), else the bundled-Ollama
-/// default; `api_key` is the `"ollama"` sentinel; model/dimension
-/// default to `qwen3-embedding:0.6b`/1024 (Python's own
-/// zero-config-VM defaults).
-///
-/// `CONEXUS_EMBEDDING_MODEL`/`CONEXUS_EMBEDDING_DIMENSION`, when
-/// present, override the model/dimension in EITHER branch (matches
-/// Python: an explicit setting always wins over either provider's
-/// default).
+/// `base_url` from `CONEXUS_LLM_BASE_URL` (shared with every other LLM
+/// seam), else the bundled-Ollama default; `api_key` is always the
+/// `"ollama"` sentinel (the wire format needs SOME bearer token value,
+/// even though a local Ollama doesn't check it); `model`/`dimension`
+/// default to `qwen3-embedding:0.6b`/1024, overridable via
+/// `CONEXUS_EMBEDDING_MODEL`/`CONEXUS_EMBEDDING_DIMENSION`.
 pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> EmbeddingClient {
-    let model_override = env_nonempty(&get_env, "CONEXUS_EMBEDDING_MODEL");
-    let dimension_override =
-        env_nonempty(&get_env, "CONEXUS_EMBEDDING_DIMENSION").and_then(|v| v.parse::<u32>().ok());
-
-    match env_nonempty(&get_env, "OPENAI_API_KEY") {
-        Some(api_key) => EmbeddingClient {
-            base_url: env_nonempty(&get_env, "OPENAI_BASE_URL")
-                .unwrap_or_else(|| OPENAI_DEFAULT_BASE_URL.to_string()),
-            api_key,
-            model: model_override.unwrap_or_else(|| "text-embedding-3-large".to_string()),
-            dimension: dimension_override.unwrap_or(1536),
-        },
-        None => EmbeddingClient {
-            base_url: env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
-                .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string()),
-            api_key: "ollama".to_string(),
-            model: model_override.unwrap_or_else(|| "qwen3-embedding:0.6b".to_string()),
-            dimension: dimension_override.unwrap_or(1024),
-        },
+    let model = env_nonempty(&get_env, "CONEXUS_EMBEDDING_MODEL")
+        .unwrap_or_else(|| "qwen3-embedding:0.6b".to_string());
+    let dimension = env_nonempty(&get_env, "CONEXUS_EMBEDDING_DIMENSION")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(1024);
+    let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
+        .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string());
+    EmbeddingClient {
+        base_url,
+        api_key: "ollama".to_string(),
+        model,
+        dimension,
     }
 }
+
 
 /// The one real call site: resolve from the actual process
 /// environment. Every test drives [`resolve`] directly instead (see
@@ -204,7 +176,7 @@ mod tests {
     }
 
     #[test]
-    fn no_openai_key_resolves_to_local_ollama_defaults() {
+    fn no_env_resolves_to_local_ollama_defaults() {
         let client = resolve(env(&[]));
         assert_eq!(
             client,
@@ -218,63 +190,23 @@ mod tests {
     }
 
     #[test]
-    fn ollama_branch_honours_conexus_llm_base_url_override() {
+    fn conexus_llm_base_url_overrides_the_default_endpoint() {
         let client = resolve(env(&[("CONEXUS_LLM_BASE_URL", "http://gpu-box:11434/v1")]));
         assert_eq!(client.base_url, "http://gpu-box:11434/v1");
     }
 
     #[test]
-    fn openai_key_set_resolves_to_openai_cloud_defaults() {
-        let client = resolve(env(&[("OPENAI_API_KEY", "sk-real")]));
-        assert_eq!(
-            client,
-            EmbeddingClient {
-                base_url: OPENAI_DEFAULT_BASE_URL.to_string(),
-                api_key: "sk-real".to_string(),
-                model: "text-embedding-3-large".to_string(),
-                dimension: 1536,
-            }
-        );
-    }
-
-    #[test]
-    fn openai_branch_honours_openai_base_url_override() {
+    fn explicit_model_and_dimension_overrides_win() {
         let client = resolve(env(&[
-            ("OPENAI_API_KEY", "sk-real"),
-            ("OPENAI_BASE_URL", "https://my-gateway.example/v1"),
-        ]));
-        assert_eq!(client.base_url, "https://my-gateway.example/v1");
-    }
-
-    #[test]
-    fn explicit_model_and_dimension_override_win_in_either_branch() {
-        let ollama = resolve(env(&[
             ("CONEXUS_EMBEDDING_MODEL", "custom-model"),
             ("CONEXUS_EMBEDDING_DIMENSION", "768"),
         ]));
-        assert_eq!(ollama.model, "custom-model");
-        assert_eq!(ollama.dimension, 768);
-
-        let openai = resolve(env(&[
-            ("OPENAI_API_KEY", "sk-real"),
-            ("CONEXUS_EMBEDDING_MODEL", "custom-model"),
-            ("CONEXUS_EMBEDDING_DIMENSION", "768"),
-        ]));
-        assert_eq!(openai.model, "custom-model");
-        assert_eq!(openai.dimension, 768);
+        assert_eq!(client.model, "custom-model");
+        assert_eq!(client.dimension, 768);
     }
 
     #[test]
-    fn whitespace_only_openai_api_key_is_treated_as_unset() {
-        let client = resolve(env(&[("OPENAI_API_KEY", "   ")]));
-        assert_eq!(
-            client.api_key, "ollama",
-            "must fall through to the Ollama branch"
-        );
-    }
-
-    #[test]
-    fn an_unparseable_dimension_override_falls_back_to_the_provider_default() {
+    fn an_unparseable_dimension_override_falls_back_to_the_default() {
         let client = resolve(env(&[("CONEXUS_EMBEDDING_DIMENSION", "not-a-number")]));
         assert_eq!(client.dimension, 1024);
     }

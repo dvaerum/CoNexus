@@ -49,7 +49,13 @@
 #   4. [multi_tenant] the identical request with NO header still
 #      requires real auth (401) — proving trust isn't accidentally
 #      wide open.
-{ pkgs, lib, self, craneLib, ... }:
+{
+  pkgs,
+  lib,
+  self,
+  craneLib,
+  ...
+}:
 
 let
   ports = import ./_ports.nix;
@@ -70,8 +76,7 @@ let
   # directly — it's never actually read by any Nix-generated config);
   # what matters for this test is placing the real token file where
   # the binary will actually look.
-  daemonAgentTokenPath =
-    "/var/lib/conexus/.config/conexus/tokens/${singleName}--${daemonAgentId}.token";
+  daemonAgentTokenPath = "/var/lib/conexus/.config/conexus/tokens/${singleName}--${daemonAgentId}.token";
 
   commonModuleConfig = {
     enable = true;
@@ -85,7 +90,10 @@ pkgs.testers.nixosTest {
   name = "conexus-module-parity";
 
   nodes.single_tenant = { config, pkgs, ... }: {
-    imports = [ ./fake-openai.nix ../module.nix ];
+    imports = [
+      ./fake-llm.nix
+      ../module.nix
+    ];
 
     virtualisation = {
       memorySize = 1536;
@@ -127,7 +135,10 @@ pkgs.testers.nixosTest {
       "d ${singleWorkspace} 0750 conexus conexus - -"
     ];
 
-    environment.systemPackages = [ pkgs.curl pkgs.sqlite ];
+    environment.systemPackages = [
+      pkgs.curl
+      pkgs.sqlite
+    ];
   };
 
   nodes.multi_tenant = { config, pkgs, ... }: {
@@ -150,7 +161,10 @@ pkgs.testers.nixosTest {
       # trust to mean anything.
       sso.proxyHeader = {
         trustHeader = "X-Test-User";
-        trustedIps = [ "127.0.0.1" "::1" ];
+        trustedIps = [
+          "127.0.0.1"
+          "::1"
+        ];
         defaultIsSysadmin = true;
       };
     };

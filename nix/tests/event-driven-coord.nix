@@ -27,7 +27,13 @@
 # pattern as multi-tenant.nix and no-auto-cleanup.nix (see
 # docs/learnings/nspawn-test-migration.md): no systemd-hardening-
 # directive assertions and no multi-node topology here either.
-{ pkgs, lib, self, craneLib, ... }:
+{
+  pkgs,
+  lib,
+  self,
+  craneLib,
+  ...
+}:
 
 let
   ports = import ./_ports.nix;
@@ -52,14 +58,13 @@ let
   # nix/module.nix's `forwarding_hmac` key-file pattern (search that
   # file for "F015 v4"), except this value is a fixed, publicly-known
   # CI sentinel rather than `/dev/urandom` output.
-  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env"
-    "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
+  bootstrapPasswordEnvFile = pkgs.writeText "conexus-router-bootstrap.env" "CONEXUS_BOOTSTRAP_PASSWORD=ci-sentinel-pw\n";
 in
 pkgs.testers.nixosTest {
   name = "conexus-event-driven-coord";
 
   containers.machine = { config, pkgs, ... }: {
-    imports = [ ./fake-openai.nix ];
+    imports = [ ./fake-llm.nix ];
 
     users.users.testuser = {
       isNormalUser = true;
@@ -67,11 +72,11 @@ pkgs.testers.nixosTest {
       uid = 1500;
       createHome = true;
     };
-    users.groups.testuser = {};
+    users.groups.testuser = { };
 
     systemd.services."conexus@" = {
       description = "CoNexus backend — project %i";
-      after = [ "fake-openai.service" ];
+      after = [ "fake-llm.service" ];
       serviceConfig = {
         Type = "simple";
         User = "testuser";
@@ -79,8 +84,7 @@ pkgs.testers.nixosTest {
         Environment = [
           "HOME=/home/testuser"
           "XDG_RUNTIME_DIR=/run/user/1500"
-          "OPENAI_BASE_URL=http://127.0.0.1:11434/v1"
-          "OPENAI_API_KEY=fake"
+          "CONEXUS_LLM_BASE_URL=http://127.0.0.1:11434/v1"
           "CONEXUS_EMBEDDING_MODEL=fake-zero-vector"
           "CONEXUS_EMBEDDING_DIMENSION=1024"
           # Keep the wake-loop default snappy so the
@@ -150,7 +154,11 @@ pkgs.testers.nixosTest {
     systemd.services.conexus-router = {
       description = "CoNexus router (event-coord test)";
       wantedBy = [ "multi-user.target" ];
-      after = [ "fake-openai.service" "network.target" "conexus-router-bootstrap-seed.service" ];
+      after = [
+        "fake-llm.service"
+        "network.target"
+        "conexus-router-bootstrap-seed.service"
+      ];
       environment = {
         # Phase 1 PR B (prancy-napping-pie): see multi-tenant.nix.
         CONEXUS_ROUTER_DB = "/home/testuser/.config/conexus/router.db";
@@ -217,7 +225,11 @@ pkgs.testers.nixosTest {
       });
     '';
 
-    environment.systemPackages = [ pkgs.curl pkgs.jq pkgs.sqlite ];
+    environment.systemPackages = [
+      pkgs.curl
+      pkgs.jq
+      pkgs.sqlite
+    ];
     networking.firewall.enable = false;
   };
 
@@ -225,7 +237,7 @@ pkgs.testers.nixosTest {
     import json
 
     start_all()
-    machine.wait_for_unit("fake-openai.service")
+    machine.wait_for_unit("fake-llm.service")
     machine.wait_for_unit("conexus-router.service")
     machine.wait_for_open_port(${toString ports.routerPort})
 

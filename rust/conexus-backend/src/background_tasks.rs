@@ -134,7 +134,7 @@ mod subject_backfill {
         get_env: impl Fn(&str) -> Option<String> + Clone,
         batch_limit: i64,
     ) -> anyhow::Result<i64> {
-        if !message_suggestions::subject_model_configured(&get_env) {
+        if !message_suggestions::subject_gen_enabled(&get_env) {
             return Ok(0);
         }
 

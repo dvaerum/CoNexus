@@ -2094,7 +2094,7 @@ pub async fn suggest_subject(body: Bytes) -> Response {
     }
 
     let get_env = |k: &str| std::env::var(k).ok();
-    if !conexus_tools::message_suggestions::subject_model_configured(&get_env) {
+    if !conexus_tools::message_suggestions::subject_gen_enabled(&get_env) {
         return Json(json!({"subject": Value::Null})).into_response();
     }
 
