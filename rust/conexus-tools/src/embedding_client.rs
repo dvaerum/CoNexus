@@ -102,7 +102,6 @@ pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> EmbeddingClient {
     }
 }
 
-
 /// The one real call site: resolve from the actual process
 /// environment. Every test drives [`resolve`] directly instead (see
 /// module doc).

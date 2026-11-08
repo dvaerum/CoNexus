@@ -548,7 +548,10 @@ mod tests {
             &ctx,
         )
         .await;
-        assert!(matches!(result, ToolResult::PermissionDenied { .. }), "{result:?}");
+        assert!(
+            matches!(result, ToolResult::PermissionDenied { .. }),
+            "{result:?}"
+        );
     }
 
     #[tokio::test]
@@ -597,7 +600,10 @@ mod tests {
             &ctx,
         )
         .await;
-        assert!(matches!(result, ToolResult::PermissionDenied { .. }), "{result:?}");
+        assert!(
+            matches!(result, ToolResult::PermissionDenied { .. }),
+            "{result:?}"
+        );
     }
 
     #[tokio::test]
@@ -620,7 +626,9 @@ mod tests {
             &ctx,
         )
         .await;
-        assert!(matches!(result, ToolResult::PermissionDenied { .. }), "{result:?}");
+        assert!(
+            matches!(result, ToolResult::PermissionDenied { .. }),
+            "{result:?}"
+        );
     }
 }
-

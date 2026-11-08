@@ -1328,13 +1328,10 @@ mod subject_backfill_tests {
             let conn = shared.conn.lock().await;
             seed_root(&conn, "m1", "admin", "hello there");
         }
-        let titled = backfill_null_subjects(
-            &shared,
-            env(&[("CONEXUS_ENABLE_SUBJECT_GEN", "false")]),
-            25,
-        )
-        .await
-        .unwrap();
+        let titled =
+            backfill_null_subjects(&shared, env(&[("CONEXUS_ENABLE_SUBJECT_GEN", "false")]), 25)
+                .await
+                .unwrap();
         assert_eq!(titled, 0);
     }
 

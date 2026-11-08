@@ -178,7 +178,6 @@ async fn config_allow_worker_view_foreign_tasks(db: &sea_orm::DatabaseConnection
 #[derive(Debug)]
 struct RagQueryError;
 
-
 const SYSTEM_PROMPT_GENERAL: &str = "You are an AI assistant answering questions about a software project. \
 Use the provided context, which may include recently updated live data (like project context keys or tasks) and information retrieved from an indexed knowledge base (like documentation or code summaries), to answer the user's query. \
 Prioritize information from the 'Live' sections if available and relevant for time-sensitive data. \
@@ -1154,7 +1153,11 @@ mod tests {
         }
     }
 
-    fn message_chunk_result(source_ref: &str, sender_id: &str, recipient_id: &str) -> RagSearchResult {
+    fn message_chunk_result(
+        source_ref: &str,
+        sender_id: &str,
+        recipient_id: &str,
+    ) -> RagSearchResult {
         RagSearchResult {
             chunk: conexus_db::RagChunkRow {
                 chunk_id: 1,

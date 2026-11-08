@@ -5262,7 +5262,6 @@ mod tests {
         assert_eq!(notification["params"]["uri"], json!("conexus://messages"));
     }
 
-
     // -----------------------------------------------------------
     // PF-R14-1 (ported from `tests/router/test_sec_r14_messages_query_
     // int_coercion.py`): `coerce_int_field` already handles a

@@ -360,8 +360,7 @@ mod tests {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut buf = [0u8; 8192];
             let _ = socket.read(&mut buf).await;
-            let body =
-                r#"{"message":{"content":"  \"Deploy failed on staging\"  "}}"#;
+            let body = r#"{"message":{"content":"  \"Deploy failed on staging\"  "}}"#;
             let resp = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
                 body.len(),

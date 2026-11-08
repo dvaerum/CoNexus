@@ -93,8 +93,8 @@ pub struct CompletionClient {
 /// Ollama address) -- infallible; there is no longer a config shape
 /// that can fail to resolve.
 pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> CompletionClient {
-    let model =
-        env_nonempty(&get_env, "CONEXUS_CHAT_MODEL").unwrap_or_else(|| OLLAMA_DEFAULT_MODEL.to_string());
+    let model = env_nonempty(&get_env, "CONEXUS_CHAT_MODEL")
+        .unwrap_or_else(|| OLLAMA_DEFAULT_MODEL.to_string());
     let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
         .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string());
     CompletionClient {
@@ -118,7 +118,6 @@ pub fn resolve_from_process_env() -> CompletionClient {
 pub fn resolve_chat_base_url(get_env: impl Fn(&str) -> Option<String>) -> Option<String> {
     env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
 }
-
 
 #[derive(Deserialize)]
 struct ChatChoice {
@@ -249,7 +248,10 @@ mod tests {
 
     #[test]
     fn conexus_llm_base_url_overrides_the_default_endpoint() {
-        let client = resolve(env(&[("CONEXUS_LLM_BASE_URL", "http://fast-igpu:11435/v1")]));
+        let client = resolve(env(&[(
+            "CONEXUS_LLM_BASE_URL",
+            "http://fast-igpu:11435/v1",
+        )]));
         assert_eq!(client.base_url, "http://fast-igpu:11435/v1");
     }
 
@@ -374,7 +376,10 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap();
+        client
+            .chat(&[("user", "hi")], 0.4, None, None)
+            .await
+            .unwrap();
         let request = handle.await.unwrap();
         assert!(!request.contains("\"think\""), "request was: {request}");
     }
@@ -412,7 +417,10 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        let answer = client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap();
+        let answer = client
+            .chat(&[("user", "hi")], 0.4, None, None)
+            .await
+            .unwrap();
         assert_eq!(answer, "the answer");
         handle.await.unwrap();
     }
@@ -426,7 +434,10 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        let answer = client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap();
+        let answer = client
+            .chat(&[("user", "hi")], 0.4, None, None)
+            .await
+            .unwrap();
         assert_eq!(answer, "");
         handle.await.unwrap();
     }
@@ -439,7 +450,10 @@ mod tests {
             api_key: "test".to_string(),
             model: "test-model".to_string(),
         };
-        let err = client.chat(&[("user", "hi")], 0.4, None, None).await.unwrap_err();
+        let err = client
+            .chat(&[("user", "hi")], 0.4, None, None)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("500"));
         handle.await.unwrap();
     }
