@@ -80,16 +80,21 @@ jobs:
           key: aoe-bridge-${{ runner.os }}-${{ hashFiles('aoe-bridge/Cargo.lock') }}
           restore-keys: aoe-bridge-${{ runner.os }}-
 
+      # Later steps use `if: !cancelled()` so one red step (fmt) cannot hide
+      # the rest — a fmt failure once masked a failing cargo-audit for 6+ weeks.
       - name: Format
         run: cargo fmt --check
 
       - name: Clippy
+        if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: Test
+        if: ${{ !cancelled() }}
         run: cargo test --locked
 
       - name: Install cargo-audit
+        if: ${{ !cancelled() }}
         # taiki-e/install-action fetches a prebuilt binary instead of
         # compiling cargo-audit from source, keeping this step seconds
         # rather than minutes.
@@ -98,6 +103,7 @@ jobs:
           tool: cargo-audit
 
       - name: Audit (cargo-audit)
+        if: ${{ !cancelled() }}
         # R3-F2: aoe-bridge (140 transitive crates) had no dependency-audit
         # coverage — Python (pip-audit) and the dashboard (npm audit) both
         # already gate on advisories, Rust did not. Fails on ANY advisory in
@@ -144,17 +150,21 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy
+        if: ${{ !cancelled() }}
         run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: Test
+        if: ${{ !cancelled() }}
         run: cargo test --locked
 
       - name: Install cargo-audit
+        if: ${{ !cancelled() }}
         uses: taiki-e/install-action@5b4d68e2e660441203ab128a23676f1e4faf1532 # v2.86.3
         with:
           tool: cargo-audit
 
       - name: Audit (cargo-audit)
+        if: ${{ !cancelled() }}
         run: cargo audit
 
   dashboard:

@@ -79,3 +79,6 @@ async fn main() {
     publisher_handle.abort();
     observe::info("stdin closed; worker exiting");
 }
+
+
+fn   _ci_proof (  ) {  }
