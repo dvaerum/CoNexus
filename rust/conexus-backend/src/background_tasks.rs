@@ -62,20 +62,24 @@ mod message_retention {
     /// never touching the table) when retention is disabled -- same
     /// contract as Python's `prune_old_messages()`.
     ///
-    /// Phase G: fully sea-orm now -- `message_repository::
-    /// prune_read_before` was converted in this repository's own PR
-    /// 1/5, so this no longer needs the legacy `&tokio::sync::
-    /// Mutex<Connection>` handle (or its lock) at all.
+    /// The pruned messages' RAG chunks (ADR-0030) are purged in the
+    /// same transaction -- the indexer never sweeps orphans, so they
+    /// would otherwise outlive the retention window.
     pub async fn prune_old_messages(
         sea_orm_db: &sea_orm::DatabaseConnection,
         now: chrono::DateTime<chrono::Utc>,
     ) -> anyhow::Result<i64> {
+        use sea_orm::TransactionTrait;
         let days = read_retention_days(sea_orm_db).await;
         if days <= 0 {
             return Ok(0);
         }
         let cutoff = (now - chrono::Duration::days(days)).to_rfc3339();
-        Ok(conexus_db::message_repository::prune_read_before(sea_orm_db, &cutoff).await?)
+        let txn = sea_orm_db.begin().await?;
+        let pruned = conexus_db::message_repository::prune_read_before(&txn, &cutoff).await?;
+        conexus_db::rag_repository::purge_sources(&txn, "agent_message", &pruned).await?;
+        txn.commit().await?;
+        Ok(pruned.len() as i64)
     }
 
     pub async fn run_periodically(shared: Arc<SharedState>, interval: Duration) {
@@ -1218,6 +1222,63 @@ mod tests {
         assert!(message_repository::get_by_id(&conn, "recent-read")
             .unwrap()
             .is_some());
+    }
+
+    fn index_message_chunk(conn: &Connection, id: &str) {
+        conexus_db::rag_repository::bulk_index_chunks(
+            conn,
+            "agent_message",
+            id,
+            &[conexus_db::rag_repository::NewChunk {
+                chunk_text: "From: alice\nTo: admin\nhi",
+                metadata: None,
+                embedding: None,
+            }],
+            "2026-01-01T00:00:00Z",
+        )
+        .unwrap();
+        conexus_db::rag_repository::set_meta(conn, "agent_message", None, Some(&[(id, "h")]))
+            .unwrap();
+    }
+
+    fn rag_rows_for(conn: &Connection, id: &str) -> (i64, i64) {
+        let chunks = conn
+            .query_row(
+                "SELECT COUNT(*) FROM rag_chunks \
+                 WHERE source_type = 'agent_message' AND source_ref = ?1",
+                [id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let hashes = conn
+            .query_row(
+                "SELECT COUNT(*) FROM rag_meta WHERE meta_key = ?1",
+                [format!("hash_agent_message_{id}")],
+                |r| r.get(0),
+            )
+            .unwrap();
+        (chunks, hashes)
+    }
+
+    #[tokio::test]
+    async fn pruning_purges_the_rag_chunks_of_pruned_messages_only() {
+        let (_dir, conn, sea_orm_db) = test_db().await;
+        let now: chrono::DateTime<chrono::Utc> = "2026-06-01T00:00:00Z".parse().unwrap();
+        seed_message(&conn, "old-read", "2026-01-01T00:00:00Z", true);
+        seed_message(&conn, "old-unread", "2026-01-01T00:00:00Z", false);
+        index_message_chunk(&conn, "old-read");
+        index_message_chunk(&conn, "old-unread");
+        set_retention_days(&sea_orm_db, 30).await;
+
+        let deleted = prune_old_messages(&sea_orm_db, now).await.unwrap();
+
+        assert_eq!(deleted, 1);
+        assert_eq!(
+            rag_rows_for(&conn, "old-read"),
+            (0, 0),
+            "a pruned message must not stay RAG-retrievable"
+        );
+        assert_eq!(rag_rows_for(&conn, "old-unread"), (1, 1));
     }
 
     #[tokio::test]

@@ -842,23 +842,30 @@ pub async fn rename_participant(
 }
 
 /// `DELETE`s read messages older than `cutoff_timestamp` — the
-/// background cleanup sweep. Returns the count removed.
-///
-/// Phase G (sea-orm migration): sea-orm-backed (`async`, `db: &
-/// sea_orm::DatabaseConnection`) — PR 1/5 of this repository's own
-/// conversion sequence. Built via `Entity::delete_many`, same idiom
-/// `agent_repository::AgentRepository::delete` already establishes for
-/// a bulk DELETE.
-pub async fn prune_read_before(
-    db: &DatabaseConnection,
+/// background cleanup sweep. Returns the removed `message_id`s so the
+/// caller can purge their RAG chunks; run it in a transaction together
+/// with that purge (generic over `ConnectionTrait` for this reason) so
+/// the id list and the delete see the same rows.
+pub async fn prune_read_before<C: ConnectionTrait>(
+    db: &C,
     cutoff_timestamp: &str,
-) -> std::result::Result<i64, DbErr> {
-    let result = message::Entity::delete_many()
+) -> std::result::Result<Vec<String>, DbErr> {
+    const BATCH: usize = 500;
+    let ids: Vec<String> = message::Entity::find()
+        .select_only()
+        .column(message::Column::MessageId)
         .filter(message::Column::Read.eq(true))
         .filter(message::Column::Timestamp.lt(cutoff_timestamp))
-        .exec(db)
+        .into_tuple()
+        .all(db)
         .await?;
-    Ok(result.rows_affected as i64)
+    for batch in ids.chunks(BATCH) {
+        message::Entity::delete_many()
+            .filter(message::Column::MessageId.is_in(batch.iter().cloned()))
+            .exec(db)
+            .await?;
+    }
+    Ok(ids)
 }
 
 /// Bulk INSERT — a straight loop of parameterized inserts (rusqlite
@@ -1913,7 +1920,7 @@ mod tests {
         let pruned = prune_read_before(&db, "2026-01-15T00:00:00Z")
             .await
             .unwrap();
-        assert_eq!(pruned, 1);
+        assert_eq!(pruned, vec!["old-read".to_string()]);
         assert_eq!(get_by_id(&conn, "old-read").unwrap(), None);
         assert!(
             get_by_id(&conn, "old-unread").unwrap().is_some(),

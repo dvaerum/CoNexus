@@ -2696,6 +2696,11 @@ pub async fn delete_message(
         if conexus_db::message_repository::delete(&tx, &message_id).is_err() {
             return None;
         }
+        // ADR-0030: the indexer never sweeps orphans, so drop the
+        // message's RAG chunk in the same transaction as the row.
+        if conexus_db::rag_repository::purge_source(&tx, "agent_message", &message_id).is_err() {
+            return None;
+        }
         let details = json!({"message_id": message_id});
         if tx.commit().is_err() {
             return None;
@@ -5260,6 +5265,60 @@ mod tests {
             json!("notifications/resources/updated")
         );
         assert_eq!(notification["params"]["uri"], json!("conexus://messages"));
+    }
+
+    #[tokio::test]
+    async fn delete_message_purges_the_messages_rag_chunk_and_hash() {
+        let conn = test_conn();
+        conn.execute(
+            "INSERT INTO agent_messages (message_id, sender_id, recipient_id, \
+             message_content, message_type, priority, timestamp, delivered, read) \
+             VALUES ('m1', 'alice', 'admin', 'hi', 'text', 'normal', \
+             '2026-01-01T00:00:00Z', 0, 0)",
+            [],
+        )
+        .unwrap();
+        conexus_db::rag_repository::bulk_index_chunks(
+            &conn,
+            "agent_message",
+            "m1",
+            &[conexus_db::rag_repository::NewChunk {
+                chunk_text: "From: alice\nTo: admin\nhi",
+                metadata: None,
+                embedding: None,
+            }],
+            "2026-01-01T00:00:00Z",
+        )
+        .unwrap();
+        conexus_db::rag_repository::set_meta(&conn, "agent_message", None, Some(&[("m1", "h")]))
+            .unwrap();
+        let shared = test_shared_state(conn).await;
+        let resolved = resolved_operator_bearer("dummy-token");
+        let resp = delete_message(
+            Path("m1".to_string()),
+            State(shared.clone()),
+            Extension(resolved),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let guard = shared.conn.lock().await;
+        let chunks: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM rag_chunks WHERE source_type = 'agent_message'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(chunks, 0, "a deleted message must not stay RAG-retrievable");
+        let hashes: i64 = guard
+            .query_row(
+                "SELECT COUNT(*) FROM rag_meta WHERE meta_key = 'hash_agent_message_m1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hashes, 0);
     }
 
     // -----------------------------------------------------------

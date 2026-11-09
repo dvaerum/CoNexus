@@ -95,6 +95,9 @@
 //! changed shape to take a `DatabaseConnection`, they call the private
 //! rusqlite-flavored [`embeddings_table_exists_sync`] instead — same
 //! query, same semantics, just not the public (now-async) name.
+//! Exception: [`purge_sources`] is the sea-orm batch form of
+//! `purge_source`, for the message-retention sweep's sea-orm
+//! transaction.
 
 use rusqlite::{Connection, OptionalExtension, Result};
 use sea_orm::{
@@ -156,7 +159,7 @@ pub struct NewChunk<'a> {
 /// function in this module already uses this same check internally,
 /// so `ask_project_rag` calling it too doesn't introduce a second
 /// notion of "is RAG available", just reuses the one that exists.
-pub async fn embeddings_table_exists(db: &DatabaseConnection) -> Result<bool, DbErr> {
+pub async fn embeddings_table_exists<C: ConnectionTrait>(db: &C) -> Result<bool, DbErr> {
     // sea-query's builder has no `sqlite_master` introspection
     // vocabulary — same raw-SQL escape hatch as `search_similar`'s own
     // `vec0` query below.
@@ -302,6 +305,52 @@ pub fn purge_source(conn: &Connection, source_type: &str, source_ref: &str) -> R
     let meta_key = format!("hash_{source_type}_{source_ref}");
     conn.execute("DELETE FROM rag_meta WHERE meta_key = ?1", [&meta_key])?;
 
+    Ok(deleted as i64)
+}
+
+/// [`purge_source`] for many refs of one `source_type`, on sea-orm so it
+/// can join a caller's sea-orm transaction (the message-retention sweep
+/// deletes its `agent_messages` rows the same way). Batched to stay
+/// under SQLite's bound-parameter limit. Returns the chunk rows deleted.
+pub async fn purge_sources<C: ConnectionTrait>(
+    db: &C,
+    source_type: &str,
+    source_refs: &[String],
+) -> Result<i64, DbErr> {
+    const BATCH: usize = 500;
+    let has_embeddings = embeddings_table_exists(db).await?;
+    let mut deleted = 0u64;
+    for batch in source_refs.chunks(BATCH) {
+        let placeholders = vec!["?"; batch.len()].join(",");
+        let with_type = |sql: String| {
+            let mut values: Vec<sea_orm::Value> = vec![source_type.into()];
+            values.extend(batch.iter().map(|r| r.as_str().into()));
+            Statement::from_sql_and_values(sea_orm::DatabaseBackend::Sqlite, sql, values)
+        };
+        if has_embeddings {
+            db.execute_raw(with_type(format!(
+                "DELETE FROM rag_embeddings WHERE rowid IN (SELECT chunk_id FROM rag_chunks \
+                 WHERE source_type = ? AND source_ref IN ({placeholders}))"
+            )))
+            .await?;
+        }
+        deleted += db
+            .execute_raw(with_type(format!(
+                "DELETE FROM rag_chunks WHERE source_type = ? AND source_ref IN ({placeholders})"
+            )))
+            .await?
+            .rows_affected();
+        let meta_keys: Vec<sea_orm::Value> = batch
+            .iter()
+            .map(|r| format!("hash_{source_type}_{r}").into())
+            .collect();
+        db.execute_raw(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            format!("DELETE FROM rag_meta WHERE meta_key IN ({placeholders})"),
+            meta_keys,
+        ))
+        .await?;
+    }
     Ok(deleted as i64)
 }
 
@@ -728,6 +777,45 @@ mod tests {
             hash, None,
             "purge_source MUST clear the watermark so a re-add re-indexes"
         );
+    }
+
+    #[tokio::test]
+    async fn purge_sources_clears_chunks_embeddings_and_hashes_for_each_ref_only() {
+        let (_dir, conn, db) = test_conn_with_vec_and_sea_orm(3).await;
+        for r in ["a", "b", "keep"] {
+            set_meta(&conn, "agent_message", None, Some(&[(r, "h")])).unwrap();
+            bulk_index_chunks(
+                &conn,
+                "agent_message",
+                r,
+                &[one_chunk("content", Some(&[1.0, 0.0, 0.0]))],
+                "2026-01-01T00:00:00Z",
+            )
+            .unwrap();
+        }
+
+        let deleted = purge_sources(&db, "agent_message", &["a".to_string(), "b".to_string()])
+            .await
+            .unwrap();
+        assert_eq!(deleted, 2);
+
+        let count = |sql: &str| -> i64 { conn.query_row(sql, [], |r| r.get(0)).unwrap() };
+        assert_eq!(count("SELECT COUNT(*) FROM rag_chunks"), 1);
+        assert_eq!(count("SELECT COUNT(*) FROM rag_embeddings"), 1);
+        assert_eq!(
+            count("SELECT COUNT(*) FROM rag_meta WHERE meta_key LIKE 'hash_agent_message_%'"),
+            1
+        );
+        assert_eq!(
+            count("SELECT COUNT(*) FROM rag_chunks WHERE source_ref = 'keep'"),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn purge_sources_with_no_refs_is_a_no_op() {
+        let (_dir, _conn, db) = test_conn_without_vec_and_sea_orm().await;
+        assert_eq!(purge_sources(&db, "agent_message", &[]).await.unwrap(), 0);
     }
 
     #[tokio::test]
