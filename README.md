@@ -154,10 +154,10 @@ claude process).
 #### Environment variables (most common)
 
 ```bash
-# OpenAI / Ollama wiring (defaults to local Ollama when unset):
-# export OPENAI_API_KEY="sk-..."                    # Switch to OpenAI cloud
-# export OPENAI_BASE_URL="http://127.0.0.1:11434/v1"
-# export OPENAI_MODEL="qwen3:1.7b"
+# One shared Ollama-compatible endpoint for chat + embeddings
+# (defaults to local Ollama when unset; no API key, see ADR-0031):
+# export CONEXUS_LLM_BASE_URL="http://127.0.0.1:11434/v1"
+# export CONEXUS_CHAT_MODEL="qwen3:1.7b"
 # export CONEXUS_EMBEDDING_MODEL="qwen3-embedding:0.6b"
 # export CONEXUS_EMBEDDING_DIMENSION="1024"
 ```
@@ -165,7 +165,9 @@ claude process).
 See [`docs/operator/getting-started.md`](./docs/operator/getting-started.md)
 for the full reference (including `MCP_PROJECT_DIR` and the
 bootstrap env vars `CONEXUS_BOOTSTRAP_USERNAME` /
-`CONEXUS_BOOTSTRAP_PASSWORD`).
+`CONEXUS_BOOTSTRAP_PASSWORD`), and
+[ADR-0031](./docs/adr/0031-drop-openai-provider-shared-llm-config.md)
+for why there is no cloud-provider switch.
 
 ## How It Works: Breaking Complexity into Simple Steps
 

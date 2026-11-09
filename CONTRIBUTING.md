@@ -37,9 +37,8 @@ Prerequisites:
 - **Nix** with flakes enabled (for packaging/deployment checks —
   optional unless you're touching `nix/`)
 - **Ollama** with a small embedding model (`qwen3-embedding:0.6b`
-  recommended; or any OpenAI-compatible embedding endpoint via
-  `OPENAI_BASE_URL` / `OPENAI_API_KEY`) — only needed for the RAG
-  indexer/query path
+  recommended; or any Ollama-compatible endpoint via
+  `CONEXUS_LLM_BASE_URL`) — only needed for the RAG indexer/query path
 
 ```sh
 git clone https://github.com/dvaerum/CoNexus.git
@@ -66,9 +65,12 @@ cd ../..
 bash nix/tests/checks/run-all.sh
 ```
 
-OpenAI API key not required — local Ollama works fine. Set
-`OPENAI_BASE_URL=http://127.0.0.1:11434/v1` and any non-empty
-`OPENAI_API_KEY`.
+No API key is needed: a local Ollama at the default URL works with no
+LLM env vars set. The variables (`CONEXUS_LLM_BASE_URL` and the model
+overrides) are listed in
+[`docs/operator/getting-started.md`](docs/operator/getting-started.md);
+[ADR-0031](docs/adr/0031-drop-openai-provider-shared-llm-config.md)
+explains why the old `OPENAI_*` variables no longer do anything.
 
 ## Branch layout
 
