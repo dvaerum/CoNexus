@@ -27,7 +27,7 @@ use rmcp::model::{
     ListToolsResult, PaginatedRequestParams, ProgressNotificationParam, ProgressToken, Prompt,
     PromptArgument, PromptMessage, ProtocolVersion, ReadResourceRequestParams,
     ReadResourceResponse, ReadResourceResult, Resource, ResourceContents, Role, ServerCapabilities,
-    ServerInfo, Tool,
+    ServerConfig, Tool,
 };
 use rmcp::service::{Peer, RequestContext};
 use rmcp::{ErrorData as McpError, RoleServer, ServerHandler};
@@ -485,8 +485,8 @@ pub(crate) async fn dispatch_rest_tool(
 }
 
 impl ServerHandler for ConexusServer {
-    fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(
             ServerCapabilities::builder()
                 .enable_tools()
                 .enable_prompts()

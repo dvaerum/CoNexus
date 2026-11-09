@@ -51,17 +51,16 @@ clap = { version = "4", features = ["derive"] }
 # the library crates below it keep their own targeted Result types).
 anyhow = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
-# rmcp EXACTLY 3.1.4, not "3.1" (which would float up to 3.2.0):
-# 3.2.0 changed several APIs this crate uses (CallToolResponse return
-# shape, deprecated the Logging notification family, several structs
-# went #[non_exhaustive]) -- confirmed by this migration's own Phase 0
-# transport spike (docs/learnings/rust-migration-mcp-transport-spike.md).
-# Matches what pikvm_mcp_server/m365-bridge already ship in production.
+# rmcp pinned EXACTLY (not "3.x"): the Phase 0 transport spike found 3.2.0
+# changing APIs this crate uses (CallToolResponse return shape, deprecated
+# Logging notifications, structs went #[non_exhaustive]) -- see
+# docs/learnings/rust-migration-mcp-transport-spike.md. 3.9.0 is the first
+# release past RUSTSEC-2026-0457/0461/0462 and built with no source changes.
 # "server" + "transport-streamable-http-server" only -- no "macros"
 # feature, since Tool registration is hand-written
 # (conexus-tools::all_tools()) per the migration plan's explicit
 # rejection of proc-macro/inventory::submit! auto-collection.
-rmcp = { version = "=3.1.4", features = ["server", "transport-streamable-http-server"] }
+rmcp = { version = "=3.9.0", features = ["server", "transport-streamable-http-server"] }
 axum = "0.8"
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["tokio", "server", "service"] }
