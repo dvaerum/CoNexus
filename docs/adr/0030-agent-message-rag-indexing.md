@@ -188,11 +188,14 @@ Implemented 2026-09-25:
   source types).
 - `rag_tools.rs::drop_unowned_message_chunks` -- the post-search
   filter, applied right after `drop_unowned_task_chunks` in
-  `query_rag_system`'s vector-search stage. A `None` `requesting_agent_
-  id` (no agent-bearer identity) or a chunk with no metadata both drop
-  closed (deny by default), not open.
-- TDD coverage: 6 unit tests for the retrieval filter (own-sent,
-  own-received, neither, no-caller, no-metadata, non-message-chunk
-  passthrough) plus one indexer end-to-end test asserting the metadata
+  `query_rag_system`'s vector-search stage. It checks the LIVE
+  `agent_messages` row, not the chunk's `metadata` snapshot: agent
+  purge rewrites participants to `[deleted-<id>]` without re-indexing,
+  so trusting the snapshot let a re-created agent of the same name
+  read the purged agent's DMs. A `None` `requesting_agent_id`, a
+  missing row, or a DB error all drop closed.
+- TDD coverage: unit tests for the retrieval filter (own-sent,
+  own-received, neither, no-caller, stale metadata, purged-then-
+  re-created name, missing row, non-message-chunk passthrough) plus one indexer end-to-end test asserting the metadata
   actually lands in `rag_chunks` and the watermark/hash meta keys are
   written. Full workspace suite green (2,000+ tests) after the change.

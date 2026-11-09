@@ -567,36 +567,47 @@ fn drop_unowned_task_chunks(
 
 /// ADR-0030: scopes `source_type = "agent_message"` chunks to their
 /// real sender/recipient -- a message chunk is visible to `caller`
-/// iff `caller` is its `sender_id` OR its `recipient_id`, read
-/// straight off the chunk's own `metadata` (written once, at index
-/// time, by `conexus_backend::background_tasks::rag_indexing` --
-/// see that module's own doc). No DB round-trip needed (unlike
-/// `drop_unowned_task_chunks`'s task-ownership lookup): the two
-/// columns that decide visibility are baked into the chunk itself and
-/// never change after the message is sent. A caller with no
-/// `agent_id` at all (e.g. an operator-session principal) sees no
-/// `agent_message` chunks -- there's no "operator" sender/recipient
-/// value to match against, matching `get_agent_messages`'s own
-/// agent-only scope for this data.
+/// iff `caller` is the `sender_id` OR `recipient_id` of the LIVE
+/// `agent_messages` row the chunk came from. The chunk's own
+/// `metadata` copy is deliberately not trusted: agent purge rewrites
+/// participants to a `[deleted-<id>]` tombstone without re-indexing,
+/// so a stale copy would let a re-created agent of the same name read
+/// the purged agent's DMs. A chunk whose row is gone drops too. A
+/// caller with no `agent_id` (e.g. an operator session) sees no
+/// `agent_message` chunks, matching `get_agent_messages`'s agent-only
+/// scope. Any DB error drops closed.
 fn drop_unowned_message_chunks(
+    conn: &Connection,
     results: Vec<RagSearchResult>,
     requesting_agent_id: Option<&str>,
 ) -> Vec<RagSearchResult> {
+    let message_refs: HashSet<&str> = results
+        .iter()
+        .filter(|r| r.chunk.source_type == "agent_message")
+        .map(|r| r.chunk.source_ref.as_str())
+        .collect();
+
+    let mut visible: HashSet<String> = HashSet::new();
+    if let (Some(caller), false) = (requesting_agent_id, message_refs.is_empty()) {
+        let refs: Vec<&str> = message_refs.iter().copied().collect();
+        let placeholders = refs.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT message_id FROM agent_messages WHERE message_id IN ({placeholders}) \
+             AND (sender_id = ? OR recipient_id = ?)"
+        );
+        if let Ok(mut stmt) = conn.prepare(&sql) {
+            let mut params: Vec<&dyn ToSql> = refs.iter().map(|r| r as &dyn ToSql).collect();
+            params.push(&caller);
+            params.push(&caller);
+            if let Ok(rows) = stmt.query_map(params.as_slice(), |row| row.get::<_, String>(0)) {
+                visible.extend(rows.flatten());
+            }
+        }
+    }
+
     results
         .into_iter()
-        .filter(|r| {
-            if r.chunk.source_type != "agent_message" {
-                return true;
-            }
-            let Some(caller) = requesting_agent_id else {
-                return false;
-            };
-            let Some(meta) = &r.chunk.metadata else {
-                return false;
-            };
-            meta.get("sender_id").and_then(Value::as_str) == Some(caller)
-                || meta.get("recipient_id").and_then(Value::as_str) == Some(caller)
-        })
+        .filter(|r| r.chunk.source_type != "agent_message" || visible.contains(&r.chunk.source_ref))
         .collect()
 }
 
@@ -679,7 +690,7 @@ async fn query_rag_system(
                         include_foreign,
                     );
                     vector_results =
-                        drop_unowned_message_chunks(vector_results, requesting_agent_id);
+                        drop_unowned_message_chunks(&conn, vector_results, requesting_agent_id);
                 }
             }
         }
@@ -1174,46 +1185,106 @@ mod tests {
         }
     }
 
-    #[test]
-    fn drop_unowned_message_chunks_keeps_non_message_chunks_unconditionally() {
+    fn insert_message(conn: &Connection, message_id: &str, sender_id: &str, recipient_id: &str) {
+        conn.execute(
+            "INSERT INTO agent_messages (message_id, sender_id, recipient_id, \
+             message_content, timestamp) VALUES (?1, ?2, ?3, 'body', ?4)",
+            rusqlite::params![message_id, sender_id, recipient_id, NOW],
+        )
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_keeps_non_message_chunks_unconditionally() {
+        let conn = test_conn();
+        let guard = conn.lock().await;
         let results = vec![chunk_result("markdown", "README.md")];
-        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
         assert_eq!(filtered.len(), 1);
     }
 
-    #[test]
-    fn drop_unowned_message_chunks_keeps_a_message_the_caller_sent() {
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_keeps_a_message_the_caller_sent() {
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        insert_message(&guard, "msg-1", "a1", "a2");
         let results = vec![message_chunk_result("msg-1", "a1", "a2")];
-        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
         assert_eq!(filtered.len(), 1);
     }
 
-    #[test]
-    fn drop_unowned_message_chunks_keeps_a_message_the_caller_received() {
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_keeps_a_message_the_caller_received() {
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        insert_message(&guard, "msg-1", "a2", "a1");
         let results = vec![message_chunk_result("msg-1", "a2", "a1")];
-        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
         assert_eq!(filtered.len(), 1);
     }
 
-    #[test]
-    fn drop_unowned_message_chunks_drops_a_message_between_two_other_agents() {
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_drops_a_message_between_two_other_agents() {
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        insert_message(&guard, "msg-1", "a2", "a3");
         let results = vec![message_chunk_result("msg-1", "a2", "a3")];
-        let filtered = drop_unowned_message_chunks(results, Some("a1"));
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
         assert!(filtered.is_empty());
     }
 
-    #[test]
-    fn drop_unowned_message_chunks_drops_everything_for_a_callerless_principal() {
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_drops_everything_for_a_callerless_principal() {
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        insert_message(&guard, "msg-1", "a1", "a2");
         let results = vec![message_chunk_result("msg-1", "a1", "a2")];
-        let filtered = drop_unowned_message_chunks(results, None);
+        let filtered = drop_unowned_message_chunks(&guard, results, None);
         assert!(filtered.is_empty());
     }
 
-    #[test]
-    fn drop_unowned_message_chunks_drops_a_message_chunk_with_no_metadata() {
-        let mut result = message_chunk_result("msg-1", "a1", "a2");
-        result.chunk.metadata = None;
-        let filtered = drop_unowned_message_chunks(vec![result], Some("a1"));
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_ignores_chunk_metadata_and_reads_the_live_row() {
+        // A chunk whose (index-time) metadata names the caller, but
+        // whose live row does not, must drop -- the metadata copy is
+        // not authoritative.
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        insert_message(&guard, "msg-1", "a2", "a3");
+        let results = vec![message_chunk_result("msg-1", "a1", "a2")];
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
+        assert!(filtered.is_empty());
+    }
+
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_hides_purged_agent_dms_from_a_reused_name() {
+        // Purge rewrites the participant to the `[deleted-<id>]`
+        // tombstone and drops the agent row; the chunk (indexed before
+        // the purge, never re-indexed) still says "a1". A NEW agent
+        // re-created as "a1" must not see the old agent's DMs.
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        insert_message(&guard, "msg-1", "a1", "a2");
+        let results = vec![message_chunk_result("msg-1", "a1", "a2")];
+        guard
+            .execute(
+                "UPDATE agent_messages SET sender_id = '[deleted-a1]' WHERE sender_id = 'a1'",
+                [],
+            )
+            .unwrap();
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
+        assert!(
+            filtered.is_empty(),
+            "a same-named successor must not inherit a purged agent's message chunks"
+        );
+    }
+
+    #[tokio::test]
+    async fn drop_unowned_message_chunks_drops_a_chunk_whose_message_row_is_gone() {
+        let conn = test_conn();
+        let guard = conn.lock().await;
+        let results = vec![message_chunk_result("msg-gone", "a1", "a2")];
+        let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
         assert!(filtered.is_empty());
     }
 

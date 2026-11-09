@@ -452,10 +452,10 @@ mod rag_indexing {
         mod_time: f64,
         hash: String,
         /// ADR-0030: `agent_message` chunks carry `{"sender_id":
-        /// ..., "recipient_id": ...}` here so `rag_tools::
-        /// drop_unowned_message_chunks` can scope retrieval without a
-        /// second DB round-trip. `None` for every other source_type
-        /// (markdown/context carry no per-chunk ownership).
+        /// ..., "recipient_id": ...}` here as an index-time snapshot
+        /// only -- it goes stale on agent purge, so `rag_tools::
+        /// drop_unowned_message_chunks` scopes against the live row
+        /// instead. `None` for every other source_type.
         metadata: Option<serde_json::Value>,
     }
 
@@ -636,11 +636,9 @@ mod rag_indexing {
         // 2b. Agent messages (ADR-0030) -- always scanned, both modes
         // (same "always on" treatment as project context; there's no
         // per-message equivalent of CONEXUS_DISABLE_AUTO_INDEXING).
-        // Each message becomes its own chunk carrying sender_id/
-        // recipient_id in `metadata` -- `rag_tools::
-        // drop_unowned_message_chunks` is the ONLY place that
-        // ownership is ever consulted; content is embedded/chunked
-        // exactly like every other source.
+        // Each message becomes its own chunk; ownership is enforced
+        // only at retrieval, against the live row, by `rag_tools::
+        // drop_unowned_message_chunks`.
         use conexus_db::entity::message::{Column as MessageColumn, Entity as MessageEntity};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
         let message_rows = MessageEntity::find()
