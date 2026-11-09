@@ -80,8 +80,10 @@ pub struct EmbeddingClient {
 /// module doc for why this takes a function rather than reading
 /// `std::env` directly.
 ///
-/// `base_url` from `CONEXUS_LLM_BASE_URL` (shared with every other LLM
-/// seam), else the bundled-Ollama default; `api_key` is always the
+/// `base_url` from `CONEXUS_EMBEDDING_BASE_URL` (optional, for a host
+/// that serves embeddings from a different server than chat), else
+/// `CONEXUS_LLM_BASE_URL` (shared with every other LLM seam), else the
+/// bundled-Ollama default; `api_key` is always the
 /// `"ollama"` sentinel (the wire format needs SOME bearer token value,
 /// even though a local Ollama doesn't check it); `model`/`dimension`
 /// default to `qwen3-embedding:0.6b`/1024, overridable via
@@ -92,7 +94,8 @@ pub fn resolve(get_env: impl Fn(&str) -> Option<String>) -> EmbeddingClient {
     let dimension = env_nonempty(&get_env, "CONEXUS_EMBEDDING_DIMENSION")
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(1024);
-    let base_url = env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL")
+    let base_url = env_nonempty(&get_env, "CONEXUS_EMBEDDING_BASE_URL")
+        .or_else(|| env_nonempty(&get_env, "CONEXUS_LLM_BASE_URL"))
         .unwrap_or_else(|| OLLAMA_DEFAULT_BASE_URL.to_string());
     EmbeddingClient {
         base_url,
@@ -192,6 +195,24 @@ mod tests {
     fn conexus_llm_base_url_overrides_the_default_endpoint() {
         let client = resolve(env(&[("CONEXUS_LLM_BASE_URL", "http://gpu-box:11434/v1")]));
         assert_eq!(client.base_url, "http://gpu-box:11434/v1");
+    }
+
+    #[test]
+    fn conexus_embedding_base_url_wins_over_the_shared_llm_url() {
+        let client = resolve(env(&[
+            ("CONEXUS_LLM_BASE_URL", "http://chat-box:11435/v1"),
+            ("CONEXUS_EMBEDDING_BASE_URL", "http://embed-box:11437/v1"),
+        ]));
+        assert_eq!(client.base_url, "http://embed-box:11437/v1");
+    }
+
+    #[test]
+    fn a_blank_embedding_base_url_falls_back_to_the_shared_llm_url() {
+        let client = resolve(env(&[
+            ("CONEXUS_LLM_BASE_URL", "http://chat-box:11435/v1"),
+            ("CONEXUS_EMBEDDING_BASE_URL", "  "),
+        ]));
+        assert_eq!(client.base_url, "http://chat-box:11435/v1");
     }
 
     #[test]

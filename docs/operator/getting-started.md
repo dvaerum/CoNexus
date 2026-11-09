@@ -197,6 +197,7 @@ for the exact resolution rules.
 | Variable                        | Default                     | Notes |
 | -------------------------------- | ---------------------------- | ----- |
 | `CONEXUS_LLM_BASE_URL`          | `http://localhost:11434/v1` | Shared endpoint for chat, embedding, AND subject-gen — point this at any Ollama-compatible (`/v1/chat/completions` + `/v1/embeddings`) server. |
+| `CONEXUS_EMBEDDING_BASE_URL`    | reuses `CONEXUS_LLM_BASE_URL` | Optional: serve embeddings from a different server than chat (e.g. a chat-only llama.cpp plus a separate embedding server). See ADR-0031's amendment. |
 | `CONEXUS_CHAT_MODEL`            | `qwen3:1.7b`                 | Chat-completions model (`ask_project_rag`'s answer synthesis). |
 | `CONEXUS_EMBEDDING_MODEL`       | `qwen3-embedding:0.6b`       | RAG embedding model (vector-search similarity). |
 | `CONEXUS_EMBEDDING_DIMENSION`   | `1024`                       | Must match the embedding model. |

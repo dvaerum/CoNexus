@@ -1,6 +1,6 @@
 # ADR 0031: Drop the OpenAI cloud provider; one shared LLM endpoint; subject-gen on by default
 
-**Status**: Accepted, implemented 2026-09-28.
+**Status**: Accepted, implemented 2026-09-28. Amended 2026-11-09 (see Amendment).
 **Date**: 2026-09-28.
 **Builds on**: `completion_client.rs`/`embedding_client.rs`'s existing
 "explicit `get_env` lookup" convention; ADR-0030's precedent of
@@ -292,3 +292,19 @@ Verified against the real deployed server: the exact request shape
 `ollama_native_chat_no_think` builds now returns real subject text
 (`"Deploy to staging failed with timeout"`) instead of an empty
 string, confirmed via direct `curl` before deploying the fix.
+
+## Amendment (2026-11-09): optional `CONEXUS_EMBEDDING_BASE_URL`
+
+Decision 2 and the "Keep independent base-url vars per seam" rejection
+rested on the claim that one shared URL "matches every real deployment's
+actual topology". It does not: the operator's own host runs chat and
+embeddings on two separate llama.cpp servers (the chat server cannot
+embed), the exact split `nix/vm.nix`'s external mode used. After the
+shared-URL change shipped, every embedding call on that host hit the
+chat server and failed with HTTP 501, so RAG indexing and query
+embedding stopped working.
+
+`CONEXUS_EMBEDDING_BASE_URL` is now an optional override for the
+embedding seam only. Unset or blank, embeddings still use
+`CONEXUS_LLM_BASE_URL`, so a single-endpoint deployment is configured
+exactly as decided above. Chat and subject-gen are unchanged.
