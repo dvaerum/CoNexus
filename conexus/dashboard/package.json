@@ -28,7 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.523.0",
-    "next": "15.5.25",
+    "next": "15.5.29",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
@@ -75,11 +75,18 @@
     "\"nanoid\": \"^3.3.17\", so this override is a patch bump within",
     "postcss's own accepted range — pure lockfile staleness, not a",
     "postcss-vs-nanoid version conflict. Drop once postcss ships a",
-    "release that resolves nanoid>=3.3.18 on its own."
+    "release that resolves nanoid>=3.3.18 on its own.",
+    "minimatch 7-11.0.0 (globparts DoS) is pinned ^10.2.2 by the latest",
+    "@typescript-eslint/typescript-estree (8.72.1), which has no release",
+    "with a patched range yet; lint-time only, never in the shipped",
+    "bundle. Drop once typescript-estree depends on minimatch>=11.0.1."
   ],
   "overrides": {
     "postcss": "^8.5.26",
     "sharp": "^0.35.3",
-    "nanoid": "^3.3.18"
+    "nanoid": "^3.3.18",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
