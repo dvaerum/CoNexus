@@ -766,6 +766,7 @@ dependencies = [
  "conexus-auth",
  "conexus-core",
  "conexus-db",
+ "conexus-vec",
  "conexus-wakeloop",
  "getrandom 0.4.3",
  "hex",

@@ -82,3 +82,5 @@ tokio = { version = "1", features = [
 # writes a real file to disk -- an isolated real tempdir per test,
 # same crate `conexus-backend` already uses for its own boot tests.
 tempfile = "3"
+# rag_tools' vector-search tests need a real sqlite-vec `vec0` table.
+conexus-vec = { path = "../conexus-vec" }

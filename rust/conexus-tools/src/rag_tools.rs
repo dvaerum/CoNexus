@@ -611,6 +611,52 @@ fn drop_unowned_message_chunks(
         .collect()
 }
 
+/// How many vector-search chunks reach the prompt.
+const VECTOR_RESULT_LIMIT: usize = 13;
+
+/// Over-fetch factor for the post-search ownership filters (ADR-0030
+/// decision 2), the same `x4` `search_similar` uses for its own
+/// `source_type_filter`: without it, other agents' nearer message/task
+/// chunks fill the limit and are then dropped, starving the results.
+const VECTOR_OVERFETCH_FACTOR: usize = 4;
+
+/// Nearest-neighbour candidates for [`scope_vector_candidates`].
+async fn fetch_vector_candidates(
+    sea_orm_db: &sea_orm::DatabaseConnection,
+    query_embedding: &[f32],
+) -> Result<Vec<RagSearchResult>, sea_orm::DbErr> {
+    rag_repository::search_similar(
+        sea_orm_db,
+        query_embedding,
+        (VECTOR_RESULT_LIMIT * VECTOR_OVERFETCH_FACTOR) as i64,
+        None,
+    )
+    .await
+}
+
+/// Drops candidates the caller may not see, then caps at
+/// [`VECTOR_RESULT_LIMIT`]. Sync (not folded into the fetch) because a
+/// `&Connection` held across an `.await` would make
+/// `query_rag_system`'s future `!Send`.
+fn scope_vector_candidates(
+    conn: &Connection,
+    candidates: Vec<RagSearchResult>,
+    requesting_agent_id: Option<&str>,
+    can_view_all_tasks: bool,
+    include_foreign: bool,
+) -> Vec<RagSearchResult> {
+    let visible = drop_unowned_task_chunks(
+        conn,
+        candidates,
+        requesting_agent_id,
+        can_view_all_tasks,
+        include_foreign,
+    );
+    let mut visible = drop_unowned_message_chunks(conn, visible, requesting_agent_id);
+    visible.truncate(VECTOR_RESULT_LIMIT);
+    visible
+}
+
 /// The 5-stage pipeline: live context -> live tasks -> vector search
 /// -> token-budgeted assembly -> chat completion. Port of
 /// `query_rag_system` (the `ask_project_rag`-only call shape; the
@@ -679,18 +725,15 @@ async fn query_rag_system(
         let client = embedding_client::resolve_from_process_env();
         if let Ok(mut vectors) = client.embed(&[query_text.to_string()]).await {
             if let Some(query_embedding) = vectors.pop() {
-                if let Ok(results) =
-                    rag_repository::search_similar(sea_orm_db, &query_embedding, 13, None).await
+                if let Ok(candidates) = fetch_vector_candidates(sea_orm_db, &query_embedding).await
                 {
-                    vector_results = drop_unowned_task_chunks(
+                    vector_results = scope_vector_candidates(
                         &conn,
-                        results,
+                        candidates,
                         requesting_agent_id,
                         can_view_all_tasks,
                         include_foreign,
                     );
-                    vector_results =
-                        drop_unowned_message_chunks(&conn, vector_results, requesting_agent_id);
                 }
             }
         }
@@ -1286,6 +1329,71 @@ mod tests {
         let results = vec![message_chunk_result("msg-gone", "a1", "a2")];
         let filtered = drop_unowned_message_chunks(&guard, results, Some("a1"));
         assert!(filtered.is_empty());
+    }
+
+    // ── fetch/scope_vector_candidates ─────────────────────────────────────────
+
+    /// File-backed DB with a real `vec0` table, opened as both rusqlite
+    /// (seeding + the ownership filters) and sea-orm (`search_similar`).
+    async fn vec_db() -> (tempfile::TempDir, Connection, sea_orm::DatabaseConnection) {
+        static VEC_REGISTERED: std::sync::Once = std::sync::Once::new();
+        VEC_REGISTERED.call_once(|| assert!(conexus_vec::register_sqlite_vec()));
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conn = Connection::open(&path).unwrap();
+        init_schema(&conn).unwrap();
+        conexus_db::schema::init_rag_embeddings_table(&conn, 2).unwrap();
+        let db = sea_orm::Database::connect(format!("sqlite://{}", path.display()))
+            .await
+            .unwrap();
+        (dir, conn, db)
+    }
+
+    fn index(conn: &Connection, source_type: &str, source_ref: &str, embedding: [f32; 2]) {
+        conexus_db::rag_repository::bulk_index_chunks(
+            conn,
+            source_type,
+            source_ref,
+            &[conexus_db::rag_repository::NewChunk {
+                chunk_text: "text",
+                metadata: None,
+                embedding: Some(&embedding),
+            }],
+            NOW,
+        )
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn vector_search_is_not_starved_by_other_agents_closer_message_chunks() {
+        let (_dir, conn, db) = vec_db().await;
+        // More foreign DMs than the result limit, all nearer the query
+        // than the one chunk the caller is allowed to see.
+        for i in 0..VECTOR_RESULT_LIMIT + 2 {
+            let id = format!("msg-{i}");
+            insert_message(&conn, &id, "a2", "a3");
+            index(&conn, "agent_message", &id, [1.0, 0.0]);
+        }
+        index(&conn, "markdown", "README.md", [0.0, 1.0]);
+
+        let candidates = fetch_vector_candidates(&db, &[1.0, 0.0]).await.unwrap();
+        let results = scope_vector_candidates(&conn, candidates, Some("a1"), false, false);
+        let refs: Vec<&str> = results
+            .iter()
+            .map(|r| r.chunk.source_ref.as_str())
+            .collect();
+        assert_eq!(refs, vec!["README.md"]);
+    }
+
+    #[tokio::test]
+    async fn vector_search_caps_visible_results_at_the_limit() {
+        let (_dir, conn, db) = vec_db().await;
+        for i in 0..VECTOR_RESULT_LIMIT + 5 {
+            index(&conn, "markdown", &format!("doc-{i}.md"), [1.0, 0.0]);
+        }
+        let candidates = fetch_vector_candidates(&db, &[1.0, 0.0]).await.unwrap();
+        let results = scope_vector_candidates(&conn, candidates, Some("a1"), false, false);
+        assert_eq!(results.len(), VECTOR_RESULT_LIMIT);
     }
 
     #[tokio::test]
