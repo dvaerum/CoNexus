@@ -44,6 +44,7 @@ mod oidc_group_mapping;
 mod oidc_handlers;
 mod oidc_http_client;
 mod oidc_reconcile;
+mod operator_identity;
 mod orchestrator;
 mod path_policy;
 mod perm_gates;

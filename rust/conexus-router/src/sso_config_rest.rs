@@ -15,13 +15,12 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use axum::response::{IntoResponse, Response};
-use axum::Extension;
 use conexus_core::capability::Capability;
 use serde_json::json;
 
 use crate::mcp_handler::{HandlerBody, HandlerResponse};
+use crate::operator_identity::OperatorIdentity;
 use crate::project_gate;
-use crate::session_gate::GateIdentity;
 use crate::sso::{self, SsoSettings};
 use crate::state::RouterState;
 
@@ -92,7 +91,7 @@ pub fn sso_config_response(result: &Result<SsoSettings, sso::SsoConfigError>) ->
 /// shape over a blanket `require_sysadmin`).
 pub async fn get_sso_config_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
 ) -> Response {
     let single_tenant_name = state.mcp_handler_config.single_tenant_name.as_deref();
     if let Err(resp) = project_gate::require_capability(

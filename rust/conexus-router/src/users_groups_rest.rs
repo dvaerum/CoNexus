@@ -26,7 +26,7 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Extension, Path, State};
+use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
@@ -49,6 +49,7 @@ use crate::admin_users_gate;
 use crate::admin_users_users::{self, CreateUserOutcome, DeleteUserOutcome, EditUserOutcome};
 use crate::identity::IdentityError;
 use crate::mcp_handler::{HandlerBody, HandlerResponse};
+use crate::operator_identity::OperatorIdentity;
 use crate::perm_gates::{self, RevalidationSpec};
 use crate::project_gate::{self, GateError};
 use crate::session_gate::GateIdentity;
@@ -126,7 +127,7 @@ fn require_users_capability(
 /// capability check applies -- no in-handler re-check yield point.
 pub async fn list_users_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
 ) -> Response {
     if let Err(resp) = require_users_capability(&state, &identity) {
         return resp.into_response();
@@ -140,7 +141,7 @@ pub async fn list_users_handler(
 /// Port of `create_user_handler`.
 pub async fn create_user_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
@@ -189,7 +190,7 @@ pub async fn create_user_handler(
 /// Port of `edit_user_handler`.
 pub async fn edit_user_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(user_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
@@ -235,7 +236,7 @@ pub async fn edit_user_handler(
 /// capability check applies.
 pub async fn delete_user_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(user_id): Path<String>,
 ) -> Response {
     if let Err(resp) = require_users_capability(&state, &identity) {
@@ -274,7 +275,7 @@ fn require_groups_capability(
 /// Port of `list_groups_handler`. No body, entry-time check only.
 pub async fn list_groups_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
 ) -> Response {
     if let Err(resp) = require_groups_capability(&state, &identity) {
         return resp.into_response();
@@ -288,7 +289,7 @@ pub async fn list_groups_handler(
 /// Port of `create_group_handler`.
 pub async fn create_group_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
@@ -336,7 +337,7 @@ pub async fn create_group_handler(
 /// Port of `edit_group_handler`.
 pub async fn edit_group_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(group_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
@@ -381,7 +382,7 @@ pub async fn edit_group_handler(
 /// Port of `delete_group_handler`. No body, entry-time check only.
 pub async fn delete_group_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(group_id): Path<String>,
 ) -> Response {
     if let Err(resp) = require_groups_capability(&state, &identity) {
@@ -412,7 +413,7 @@ pub async fn delete_group_handler(
 /// identical `groups_gate` variable for every group-member route too.
 pub async fn list_group_members_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(group_id): Path<String>,
 ) -> Response {
     if let Err(resp) = require_groups_capability(&state, &identity) {
@@ -427,7 +428,7 @@ pub async fn list_group_members_handler(
 /// Port of `add_group_member_handler`.
 pub async fn add_group_member_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(group_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
@@ -478,7 +479,7 @@ pub async fn add_group_member_handler(
 /// the auth middleware set for this request).
 pub async fn remove_group_member_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path((group_id, member_id)): Path<(String, String)>,
 ) -> Response {
     if let Err(resp) = require_groups_capability(&state, &identity) {
@@ -524,7 +525,7 @@ fn require_group_caps_capability(
 /// registration.
 pub async fn list_group_capabilities_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(group_id): Path<String>,
 ) -> Response {
     if let Err(resp) = require_group_caps_capability(&state, &identity) {
@@ -561,7 +562,7 @@ pub async fn list_group_capabilities_handler(
 /// decision functions use.
 pub async fn replace_group_capabilities_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(group_id): Path<String>,
     headers: HeaderMap,
     body: Bytes,
@@ -653,7 +654,7 @@ fn resolve_caller_role_on_project(
 /// there is no later yield point for it to become stale relative to.
 pub async fn list_project_memberships_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(name): Path<String>,
 ) -> Response {
     if let Err(resp) = require_project_memberships_capability(&state, &identity) {
@@ -706,7 +707,7 @@ pub async fn list_project_memberships_handler(
 /// AZ-R12-1 role-rank guard against a genuine non-sysadmin delegate).
 pub async fn add_project_membership_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(name): Path<String>,
     headers: HeaderMap,
     body: Bytes,
@@ -792,7 +793,7 @@ pub async fn add_project_membership_handler(
 /// per-project `caller_role` via `resolve_caller_role_on_project`.
 pub async fn change_project_membership_role_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path((name, membership_id)): Path<(String, String)>,
     headers: HeaderMap,
     body: Bytes,
@@ -891,7 +892,7 @@ pub async fn change_project_membership_role_handler(
 /// regardless of staleness.
 pub async fn delete_project_membership_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path((name, membership_id)): Path<(String, String)>,
 ) -> Response {
     if let Err(resp) = require_project_memberships_capability(&state, &identity) {
@@ -995,6 +996,12 @@ mod tests {
     const NOW: &str = "2026-01-01T00:00:00.000+00:00";
 
     async fn real_state() -> (tempfile::TempDir, Arc<RouterState>) {
+        real_state_with(None).await
+    }
+
+    async fn real_state_with(
+        single_tenant_name: Option<&str>,
+    ) -> (tempfile::TempDir, Arc<RouterState>) {
         let dir = tempfile::TempDir::new().unwrap();
         // `conn`/`sea_orm_db` are two HANDLES onto the SAME real,
         // tempfile-backed SQLite file, not two independent
@@ -1025,7 +1032,7 @@ mod tests {
                 external_url: None,
                 idle_sec: 14400,
                 asset_prefix: None,
-                single_tenant_name: None,
+                single_tenant_name: single_tenant_name.map(str::to_string),
                 single_tenant_workspace: None,
                 max_streams_per_agent: 4,
                 max_streams_global: 64,
@@ -1192,7 +1199,7 @@ mod tests {
     async fn list_users_handler_denies_a_viewer_with_no_capability() {
         let (_dir, state) = real_state().await;
         let (_vera_id, _group_id, identity) = seed_delegate(&state, "vera", &[]).await;
-        let resp = list_users_handler(State(state.clone()), Extension(identity)).await;
+        let resp = list_users_handler(State(state.clone()), OperatorIdentity(identity)).await;
         assert_eq!(resp_status(&resp), 403);
         let body = resp_json(resp).await;
         assert_eq!(body["error"], "forbidden");
@@ -1206,7 +1213,7 @@ mod tests {
     async fn list_groups_handler_denies_a_viewer_with_no_capability() {
         let (_dir, state) = real_state().await;
         let (_vera_id, _group_id, identity) = seed_delegate(&state, "vera", &[]).await;
-        let resp = list_groups_handler(State(state.clone()), Extension(identity)).await;
+        let resp = list_groups_handler(State(state.clone()), OperatorIdentity(identity)).await;
         assert_eq!(resp_status(&resp), 403);
         let body = resp_json(resp).await;
         assert_eq!(body["error"], "forbidden");
@@ -1226,7 +1233,7 @@ mod tests {
             .unwrap();
         let resp = list_project_memberships_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("alpha".to_string()),
         )
         .await;
@@ -1248,7 +1255,7 @@ mod tests {
         let (_dir, state) = real_state().await;
         let (_alice_id, _group_id, identity) =
             seed_delegate(&state, "alice", &[Capability::SystemUsersManage.as_str()]).await;
-        let resp = list_users_handler(State(state.clone()), Extension(identity)).await;
+        let resp = list_users_handler(State(state.clone()), OperatorIdentity(identity)).await;
         assert_eq!(resp_status(&resp), 200);
     }
 
@@ -1257,7 +1264,7 @@ mod tests {
         let (_dir, state) = real_state().await;
         let (_alice_id, _group_id, identity) =
             seed_delegate(&state, "alice", &[Capability::SystemGroupsManage.as_str()]).await;
-        let resp = list_groups_handler(State(state.clone()), Extension(identity)).await;
+        let resp = list_groups_handler(State(state.clone()), OperatorIdentity(identity)).await;
         assert_eq!(resp_status(&resp), 200);
     }
 
@@ -1286,7 +1293,7 @@ mod tests {
         };
         let resp = list_project_memberships_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("alpha".to_string()),
         )
         .await;
@@ -1314,7 +1321,7 @@ mod tests {
 
         let resp = create_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             HeaderMap::new(),
             Bytes::from(deep_body),
         )
@@ -1354,7 +1361,7 @@ mod tests {
         }));
         let resp = create_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             HeaderMap::new(),
             body,
         )
@@ -1384,7 +1391,7 @@ mod tests {
         }));
         let resp = create_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             HeaderMap::new(),
             body,
         )
@@ -1409,7 +1416,7 @@ mod tests {
         }));
         let resp = create_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             HeaderMap::new(),
             body,
         )
@@ -1444,7 +1451,7 @@ mod tests {
         let body = json_body(serde_json::json!({"is_sysadmin": true}));
         let resp = edit_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(victim_id.clone()),
             HeaderMap::new(),
             body,
@@ -1496,7 +1503,7 @@ mod tests {
         let body = json_body(serde_json::json!({"email": "raced-in@example.test"}));
         let resp = edit_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(victim_id.clone()),
             headers,
             body,
@@ -1529,7 +1536,7 @@ mod tests {
         }));
         let resp = create_group_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             HeaderMap::new(),
             body,
         )
@@ -1570,7 +1577,7 @@ mod tests {
         let body = json_body(serde_json::json!({"name": "renamed-target-group"}));
         let resp = edit_group_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(target_group_id.clone()),
             HeaderMap::new(),
             body,
@@ -1611,7 +1618,7 @@ mod tests {
         let body = json_body(serde_json::json!({"user_id": newbie_id}));
         let resp = add_group_member_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(target_group_id.clone()),
             HeaderMap::new(),
             body,
@@ -1652,7 +1659,7 @@ mod tests {
         }));
         let resp = replace_group_capabilities_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(target_group_id.clone()),
             HeaderMap::new(),
             body,
@@ -1693,7 +1700,7 @@ mod tests {
         let body = json_body(serde_json::json!({"user_id": newbie_id, "role": "viewer"}));
         let resp = add_project_membership_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("proj-a".to_string()),
             HeaderMap::new(),
             body,
@@ -1746,7 +1753,7 @@ mod tests {
         let body = json_body(serde_json::json!({"user_id": alice_id, "role": "operator"}));
         let resp = add_project_membership_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("proj-x".to_string()),
             HeaderMap::new(),
             body,
@@ -1811,7 +1818,7 @@ mod tests {
         let body = json_body(serde_json::json!({"user_id": mallory_id, "role": "operator"}));
         let resp = add_project_membership_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("proj-y".to_string()),
             HeaderMap::new(),
             body,
@@ -1912,7 +1919,7 @@ mod tests {
         let task = tokio::spawn(async move {
             add_project_membership_handler(
                 State(state2),
-                Extension(identity),
+                OperatorIdentity(identity),
                 Path("racer-add-vs-delete-http".to_string()),
                 HeaderMap::new(),
                 body,
@@ -2002,7 +2009,7 @@ mod tests {
         let body = json_body(serde_json::json!({"role": "operator"}));
         let resp = change_project_membership_role_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(("proj-b".to_string(), format!("u:{target_id}"))),
             HeaderMap::new(),
             body,
@@ -2057,7 +2064,7 @@ mod tests {
         let body = json_body(serde_json::json!({"role": "operator"}));
         let resp = change_project_membership_role_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(("proj-z".to_string(), format!("u:{target_id}"))),
             HeaderMap::new(),
             body,
@@ -2116,7 +2123,7 @@ mod tests {
 
         let resp = delete_project_membership_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(("proj-w".to_string(), format!("u:{target_id}"))),
         )
         .await;
@@ -2149,7 +2156,7 @@ mod tests {
         let body = json_body(serde_json::json!({"email": "still-valid@example.test"}));
         let resp = edit_user_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path(victim_id.clone()),
             HeaderMap::new(),
             body,
@@ -2162,5 +2169,47 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(victim.email.as_deref(), Some("still-valid@example.test"));
+    }
+    // Single-tenant PassThrough never inserts a `GateIdentity`; these
+    // go through a real axum router because the failure (a 500 from the
+    // extractor) happens before any handler body runs.
+    async fn status_of(app: &axum::Router, method: &str, uri: &str) -> u16 {
+        use tower::ServiceExt;
+        app.clone()
+            .oneshot(
+                axum::http::Request::builder()
+                    .method(method)
+                    .uri(uri)
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
+    fn operator_directory_app(state: Arc<RouterState>) -> axum::Router {
+        use axum::routing::get;
+        axum::Router::new()
+            .route("/users", get(list_users_handler).post(create_user_handler))
+            .route("/groups", get(list_groups_handler))
+            .with_state(state)
+    }
+
+    #[tokio::test]
+    async fn operator_directory_handlers_410_without_identity_in_single_tenant_mode() {
+        let (_dir, state) = real_state_with(Some("onlyproj")).await;
+        let app = operator_directory_app(state);
+        for (method, uri) in [("GET", "/users"), ("POST", "/users"), ("GET", "/groups")] {
+            assert_eq!(status_of(&app, method, uri).await, 410, "{method} {uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn operator_directory_handlers_401_without_identity_in_multi_tenant_mode() {
+        let (_dir, state) = real_state().await;
+        let app = operator_directory_app(state);
+        assert_eq!(status_of(&app, "GET", "/users").await, 401);
     }
 }

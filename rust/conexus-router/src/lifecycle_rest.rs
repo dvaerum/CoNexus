@@ -34,6 +34,7 @@ use conexus_core::capability::Capability;
 
 use crate::lifecycle;
 use crate::mcp_handler::{HandlerBody, HandlerResponse};
+use crate::operator_identity::OperatorIdentity;
 use crate::orchestrator::primitives::{backend_impl_for, run_systemctl, unit_name};
 use crate::perm_gates::{self, RevalidationProject, RevalidationSpec};
 use crate::project_gate::{self, CreateProjectOutcome, GateError};
@@ -431,7 +432,7 @@ async fn systemctl_stop_ignoring_result(state: &RouterState, name: &str) {
 /// stderr), and `finish_stop_project` is never called in that case.
 pub async fn stop_project_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(name): Path<String>,
     headers: HeaderMap,
 ) -> Response {
@@ -731,7 +732,7 @@ pub async fn rename_project_handler(
 /// a HIDDEN project) still runs too, inside `decide_alias_usage`.
 pub async fn alias_usage_handler(
     State(state): State<Arc<RouterState>>,
-    Extension(identity): Extension<GateIdentity>,
+    OperatorIdentity(identity): OperatorIdentity,
     Path(name): Path<String>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Response {
@@ -1221,7 +1222,7 @@ mod handler_tests {
         let identity = identity_for("vera", false, HashSet::new());
         let resp = stop_project_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("no-such-project".to_string()),
             HeaderMap::new(),
         )
@@ -1241,7 +1242,7 @@ mod handler_tests {
         let identity = identity_for("vera", false, HashSet::new());
         let resp = alias_usage_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("victim".to_string()),
             Query(HashMap::from([(
                 "alias".to_string(),
@@ -1316,7 +1317,7 @@ mod handler_tests {
         );
         let resp = alias_usage_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("victim".to_string()),
             Query(HashMap::from([(
                 "alias".to_string(),
@@ -1690,7 +1691,7 @@ mod handler_tests {
         let task = tokio::spawn(async move {
             stop_project_handler(
                 State(state2),
-                Extension(identity),
+                OperatorIdentity(identity),
                 Path("racer-stop".to_string()),
                 HeaderMap::new(),
             )
@@ -1797,7 +1798,7 @@ mod handler_tests {
         let task = tokio::spawn(async move {
             stop_project_handler(
                 State(state2),
-                Extension(identity),
+                OperatorIdentity(identity),
                 Path("racer-stop-vs-rename".to_string()),
                 HeaderMap::new(),
             )
@@ -1889,7 +1890,7 @@ mod handler_tests {
         let task = tokio::spawn(async move {
             stop_project_handler(
                 State(state2),
-                Extension(identity),
+                OperatorIdentity(identity),
                 Path("race-stop-project".to_string()),
                 HeaderMap::new(),
             )
@@ -2043,7 +2044,7 @@ mod handler_tests {
         let identity = identity_for(&uid, true, HashSet::new());
         let resp = stop_project_handler(
             State(state.clone()),
-            Extension(identity),
+            OperatorIdentity(identity),
             Path("winddown".to_string()),
             HeaderMap::new(),
         )
