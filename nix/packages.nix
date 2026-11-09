@@ -61,9 +61,9 @@ let
     src = "${src}/conexus/dashboard";
     # Re-set whenever the dashboard's package-lock.json changes
     # upstream (rare). On hash mismatch, nix prints the correct
-    # value; paste it here. Updated 2026-09-08: next 15.5.23 -> 15.5.25
-    # + npm audit fix (dashboard-npm-audit-critical-rce security fix).
-    npmDepsHash = "sha256-EPA1am+uB/3zVzcBV0lmOj62uFLyH9hwoahK/l3o210=";
+    # value; paste it here (or run `nix run nixpkgs#prefetch-npm-deps --
+    # conexus/dashboard/package-lock.json`).
+    npmDepsHash = "sha256-bJJXdt8/Q16htN4FfYHUr4zMsbcI/Opizzn4Xss/VEc=";
     NEXT_PUBLIC_AUTO_CONNECT = "false";
     NEXT_PUBLIC_DEFAULT_SERVER_HOST = "";
     NEXT_PUBLIC_DEFAULT_SERVER_PORT = "";
