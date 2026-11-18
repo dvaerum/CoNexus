@@ -1,19 +1,21 @@
 # CoNexus delivery bridge — Agent of Empires plugin manifest.
 #
 # Schema reference: aoe-plugin-api (PluginManifest), docs/plugin-api.md.
-# api_version 15 is required for the `sessions` dynamic_select option source (the
-# session_id dropdown) and the `password` (masked) field type (the token field) --
-# upstream's independent 12->13 bump (an unrelated home-pane/sparkline feature)
-# pushed our two feature bumps to 14 (`session.mcp`) and 15 (these field types),
-# one higher than an earlier draft of this manifest assumed. 13 already covers
-# the `home-pane` UI slot and the `object_list` widget (≥9); 15 adds both
-# field-type niceties. A pre-15 host emits an "upgrade aoe" message rather than
-# an "unknown variant" error.
+# api_version 22 is required for the `sessions` dynamic_select option source (the
+# session_id dropdown) and the `password` (masked) / object-list field types (the
+# token field): the aoe fork gates them at 22 (`PluginManifest::validate`), after
+# upstream's own bumps (12->13 for the home-pane/sparkline feature, 21/22 for agent
+# declarations and session-id capture) moved the fork's numbering. The earlier
+# value 15 made a current host refuse this manifest at load time ("password
+# settings / object-list fields require api_version >= 22"), so the bridge worker
+# never started. 13 already covers the `home-pane` UI slot and the `object_list`
+# widget (>= 9). A host below the required version emits an "upgrade aoe" message
+# rather than an "unknown variant" error.
 
 id = "dev.dvaerum.conexus-delivery"
 name = "CoNexus Delivery Bridge"
 version = "0.1.0"
-api_version = 15
+api_version = 22
 description = "Injects CoNexus delivery notifications into AoE-run sessions that don't poll wait_for_events (ADR-0021): subscribes to each covered session's delivery SSE stream, reports transport-status up, injects skinny (id/subject/status only) nudges via AoE's /send and /acp/prompt routes, and (optionally) wires conexus's tools into each covered session as a per-session MCP server."
 
 # runtime.worker: run the worker at all, plus the config.get and ui.state.*
